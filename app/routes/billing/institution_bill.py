@@ -84,6 +84,13 @@ def get_institution_bills(
 @router.get("/enriched", response_model=list[InstitutionBillEnrichedResponseSchema])
 def get_enriched_institution_bills_endpoint(
     response: Response,
+    institution_entity_id: list[UUID] | None = Query(
+        None,
+        description=(
+            "Filter by institution entity ID(s). Repeated param: "
+            "?institution_entity_id=<uuid>&institution_entity_id=<uuid>"
+        ),
+    ),
     pagination: PaginationParams | None = Depends(get_pagination_params),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -102,6 +109,7 @@ def get_enriched_institution_bills_endpoint(
             db,
             scope=scope,
             include_archived=False,
+            institution_entity_id=institution_entity_id,
             page=pagination.page if pagination else None,
             page_size=pagination.page_size if pagination else None,
         )

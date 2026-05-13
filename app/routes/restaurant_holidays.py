@@ -5,6 +5,7 @@ Routes for managing restaurant-specific holidays.
 Supports single and bulk operations with national holiday validation.
 """
 
+from typing import Literal
 from uuid import UUID
 
 import psycopg2.extensions
@@ -163,6 +164,9 @@ def list_restaurant_holidays(
 @router.get("/enriched", response_model=list[RestaurantHolidayEnrichedResponseSchema])
 def list_enriched_restaurant_holidays(
     restaurant_id: UUID | None = Query(None, description="Filter by restaurant ID"),
+    holiday_type: list[Literal["national", "restaurant"]] | None = Query(
+        None, description="Filter by holiday type. Repeated param: ?holiday_type=national&holiday_type=restaurant"
+    ),
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):
@@ -179,11 +183,18 @@ def list_enriched_restaurant_holidays(
     """
     scope = _get_scope_for_entity(current_user)
 
+    # Coerce Literal values to plain str for the service layer (mypy list invariance).
+    holiday_type_strs: list[str] | None = list(holiday_type) if holiday_type is not None else None
+
     def get_operation(connection: psycopg2.extensions.connection):
         from app.services.entity_service import get_enriched_restaurant_holidays
 
         return get_enriched_restaurant_holidays(
-            restaurant_id=restaurant_id, db=connection, scope=scope, include_archived=False
+            restaurant_id=restaurant_id,
+            db=connection,
+            scope=scope,
+            include_archived=False,
+            holiday_type=holiday_type_strs,
         )
 
     return handle_business_operation(get_operation, "enriched restaurant holidays retrieval", None, db)

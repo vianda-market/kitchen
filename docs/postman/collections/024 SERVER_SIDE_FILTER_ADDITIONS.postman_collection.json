@@ -1,0 +1,579 @@
+{
+  "info": {
+    "_postman_id": "server-side-filter-additions-2026-v1",
+    "name": "024 SERVER_SIDE_FILTER_ADDITIONS",
+    "description": "024 – Server-side filter additions (kitchen#316, #317, #318). Covers: (1) GET /restaurant-holidays/enriched?holiday_type= — single-value, repeated-value, omission (closes #316); (2) GET /addresses/enriched?address_type= — single-value, repeated-value, omission (closes #317); (3) GET /institution-bills/enriched?institution_entity_id= — single-value, repeated-value, omission (closes #318). Run after DB has seeded demo data. Uses {{baseUrl}} and {{adminAuthToken}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login as Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const response = pm.response.json();",
+                  "pm.test('Response has access_token', function () {",
+                  "    pm.expect(response).to.have.property('access_token');",
+                  "});",
+                  "pm.collectionVariables.set('adminAuthToken', response.access_token);",
+                  "pm.environment.set('adminAuthToken', response.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "{{adminUsername}}" },
+                { "key": "password", "value": "{{adminPassword}}" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "token"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "#316 — holiday_type filter on /restaurant-holidays/enriched",
+      "item": [
+        {
+          "name": "GET /restaurant-holidays/enriched — omit holiday_type (returns all)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// Each row must have holiday_type field",
+                  "const rows = pm.response.json();",
+                  "rows.forEach(function (row) {",
+                  "    pm.test('Row has holiday_type', function () {",
+                  "        pm.expect(row).to.have.property('holiday_type');",
+                  "        pm.expect(['national', 'restaurant']).to.include(row.holiday_type);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurant-holidays/enriched",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurant-holidays", "enriched"]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurant-holidays/enriched?holiday_type=national — single-value",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const rows = pm.response.json();",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(rows).to.be.an('array');",
+                  "});",
+                  "rows.forEach(function (row) {",
+                  "    pm.test('All rows have holiday_type=national', function () {",
+                  "        pm.expect(row.holiday_type).to.equal('national');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurant-holidays/enriched?holiday_type=national",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurant-holidays", "enriched"],
+              "query": [
+                { "key": "holiday_type", "value": "national" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurant-holidays/enriched?holiday_type=restaurant — single-value",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const rows = pm.response.json();",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(rows).to.be.an('array');",
+                  "});",
+                  "rows.forEach(function (row) {",
+                  "    pm.test('All rows have holiday_type=restaurant', function () {",
+                  "        pm.expect(row.holiday_type).to.equal('restaurant');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurant-holidays/enriched?holiday_type=restaurant",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurant-holidays", "enriched"],
+              "query": [
+                { "key": "holiday_type", "value": "restaurant" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurant-holidays/enriched?holiday_type=national&holiday_type=restaurant — repeated (returns all)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const rows = pm.response.json();",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(rows).to.be.an('array');",
+                  "});",
+                  "// Repeated values = union — both types allowed",
+                  "rows.forEach(function (row) {",
+                  "    pm.test('Each row has a valid holiday_type', function () {",
+                  "        pm.expect(['national', 'restaurant']).to.include(row.holiday_type);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurant-holidays/enriched?holiday_type=national&holiday_type=restaurant",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurant-holidays", "enriched"],
+              "query": [
+                { "key": "holiday_type", "value": "national" },
+                { "key": "holiday_type", "value": "restaurant" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /restaurant-holidays/enriched?holiday_type=invalid — 422 validation error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 422 for invalid holiday_type value', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/restaurant-holidays/enriched?holiday_type=invalid",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "restaurant-holidays", "enriched"],
+              "query": [
+                { "key": "holiday_type", "value": "invalid" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "#317 — address_type filter on /addresses/enriched",
+      "item": [
+        {
+          "name": "GET /addresses/enriched — omit address_type (returns all)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "const rows = pm.response.json();",
+                  "if (rows.length > 0) {",
+                  "    // Capture a restaurant-type address_id for later tests",
+                  "    const restaurantAddr = rows.find(function (r) {",
+                  "        return Array.isArray(r.address_type) && r.address_type.includes('restaurant');",
+                  "    });",
+                  "    if (restaurantAddr) {",
+                  "        pm.collectionVariables.set('restaurantAddressId', restaurantAddr.address_id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/enriched",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "addresses", "enriched"]
+            }
+          }
+        },
+        {
+          "name": "GET /addresses/enriched?address_type=restaurant — single-value scalar match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const rows = pm.response.json();",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(rows).to.be.an('array');",
+                  "});",
+                  "rows.forEach(function (row) {",
+                  "    pm.test('Row address_type includes restaurant', function () {",
+                  "        const types = Array.isArray(row.address_type) ? row.address_type : [row.address_type];",
+                  "        pm.expect(types).to.include('restaurant');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/enriched?address_type=restaurant",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "addresses", "enriched"],
+              "query": [
+                { "key": "address_type", "value": "restaurant" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /addresses/enriched?address_type=entity_billing&address_type=entity_address — repeated-value (union)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const rows = pm.response.json();",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(rows).to.be.an('array');",
+                  "});",
+                  "// Every returned row must contain at least one of the queried types (array-overlap)",
+                  "rows.forEach(function (row) {",
+                  "    pm.test('Row address_type overlaps queried values', function () {",
+                  "        const types = Array.isArray(row.address_type) ? row.address_type : [row.address_type];",
+                  "        const queried = ['entity_billing', 'entity_address'];",
+                  "        const hasOverlap = types.some(function (t) { return queried.includes(t); });",
+                  "        pm.expect(hasOverlap).to.be.true;",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/enriched?address_type=entity_billing&address_type=entity_address",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "addresses", "enriched"],
+              "query": [
+                { "key": "address_type", "value": "entity_billing" },
+                { "key": "address_type", "value": "entity_address" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /addresses/enriched?address_type=invalid_type — 422 validation error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 422 for invalid address_type value', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/addresses/enriched?address_type=invalid_type",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "addresses", "enriched"],
+              "query": [
+                { "key": "address_type", "value": "invalid_type" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "#318 — institution_entity_id filter on /institution-bills/enriched",
+      "item": [
+        {
+          "name": "GET /institution-bills/enriched — omit institution_entity_id (returns all)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const rows = pm.response.json();",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(rows).to.be.an('array');",
+                  "});",
+                  "// Capture an institution_entity_id for later tests",
+                  "if (rows.length > 0 && rows[0].institution_entity_id) {",
+                  "    pm.collectionVariables.set('sampleEntityId', rows[0].institution_entity_id);",
+                  "    pm.environment.set('sampleEntityId', rows[0].institution_entity_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills/enriched",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "institution-bills", "enriched"]
+            }
+          }
+        },
+        {
+          "name": "GET /institution-bills/enriched?institution_entity_id={{sampleEntityId}} — single-value",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const rows = pm.response.json();",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(rows).to.be.an('array');",
+                  "});",
+                  "const entityId = pm.collectionVariables.get('sampleEntityId') || pm.environment.get('sampleEntityId');",
+                  "if (entityId) {",
+                  "    rows.forEach(function (row) {",
+                  "        pm.test('All rows match institution_entity_id', function () {",
+                  "            pm.expect(row.institution_entity_id).to.equal(entityId);",
+                  "        });",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills/enriched?institution_entity_id={{sampleEntityId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "institution-bills", "enriched"],
+              "query": [
+                { "key": "institution_entity_id", "value": "{{sampleEntityId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /institution-bills/enriched?institution_entity_id=A&institution_entity_id=B — repeated-value (multi-select)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Use a zero UUID as the second value — no rows match it, so we test the union logic",
+                  "pm.collectionVariables.set('nilUuid', '00000000-0000-0000-0000-000000000000');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "// All rows must belong to one of the queried entity IDs",
+                  "const rows = pm.response.json();",
+                  "const entityId = pm.collectionVariables.get('sampleEntityId') || pm.environment.get('sampleEntityId');",
+                  "const nilUuid = '00000000-0000-0000-0000-000000000000';",
+                  "const allowed = [entityId, nilUuid].filter(Boolean);",
+                  "rows.forEach(function (row) {",
+                  "    pm.test('Row institution_entity_id is in queried set', function () {",
+                  "        pm.expect(allowed).to.include(row.institution_entity_id);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills/enriched?institution_entity_id={{sampleEntityId}}&institution_entity_id=00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "institution-bills", "enriched"],
+              "query": [
+                { "key": "institution_entity_id", "value": "{{sampleEntityId}}" },
+                { "key": "institution_entity_id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /institution-bills/enriched?institution_entity_id=not-a-uuid — 422 validation error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 422 for non-UUID institution_entity_id', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAuthToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/institution-bills/enriched?institution_entity_id=not-a-uuid",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "institution-bills", "enriched"],
+              "query": [
+                { "key": "institution_entity_id", "value": "not-a-uuid" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "adminAuthToken", "value": "" },
+    { "key": "sampleEntityId", "value": "" },
+    { "key": "restaurantAddressId", "value": "" },
+    { "key": "nilUuid", "value": "00000000-0000-0000-0000-000000000000" }
+  ]
+}

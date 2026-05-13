@@ -901,6 +901,7 @@ def get_enriched_addresses(
     scope: InstitutionScope | None = None,
     include_archived: bool = False,
     institution_id: UUID | None = None,
+    address_type: list[str] | None = None,
     page: int | None = None,
     page_size: int | None = None,
 ) -> list[AddressEnrichedResponseSchema]:
@@ -913,6 +914,8 @@ def get_enriched_addresses(
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records
         institution_id: Optional institution ID to filter results (B2B Internal dropdown scoping)
+        address_type: Optional list of address types to filter by. Uses array-overlap semantics
+            (a.address_type && ARRAY[...]) because the DB column is address_type_enum[].
 
     Returns:
         List of enriched address schemas with institution name and user details
@@ -920,6 +923,10 @@ def get_enriched_addresses(
     additional_conditions: list[tuple[str, list]] = []
     if institution_id is not None:
         additional_conditions.append(("a.institution_id = %s", [institution_id]))
+    if address_type is not None and len(address_type) > 0:
+        # a.address_type is address_type_enum[] — use array-overlap operator (&&).
+        # Any row whose address_type array shares at least one element with the filter values is returned.
+        additional_conditions.append(("a.address_type && %s::address_type_enum[]", [address_type]))
     addresses = _address_enriched_service.get_enriched(
         db,
         select_fields=[
@@ -3078,6 +3085,7 @@ def get_enriched_institution_bills(
     *,
     scope: InstitutionScope | None = None,
     include_archived: bool = False,
+    institution_entity_id: list[UUID] | None = None,
     page: int | None = None,
     page_size: int | None = None,
 ) -> list[InstitutionBillEnrichedResponseSchema]:
@@ -3093,6 +3101,7 @@ def get_enriched_institution_bills(
         db: Database connection
         scope: Optional institution scope for filtering (for Internal/Suppliers)
         include_archived: Whether to include archived records (default: False)
+        institution_entity_id: Optional list of institution entity IDs to filter by (IN semantics).
 
     Returns:
         List of InstitutionBillEnrichedResponseSchema with institution, entity, restaurant, currency, and market information
@@ -3100,6 +3109,11 @@ def get_enriched_institution_bills(
     Raises:
         HTTPException: For system errors or database failures
     """
+    additional_conditions: list[tuple[str, list]] = []
+    if institution_entity_id is not None and len(institution_entity_id) > 0:
+        additional_conditions.append(
+            ("ibi.institution_entity_id = ANY(%s::uuid[])", [[str(eid) for eid in institution_entity_id]])
+        )
     return _bill_enriched_service.get_enriched(
         db,
         select_fields=[
@@ -3132,6 +3146,7 @@ def get_enriched_institution_bills(
         ],
         scope=scope,
         include_archived=include_archived,
+        additional_conditions=additional_conditions if additional_conditions else None,
         page=page,
         page_size=page_size,
     )
@@ -3911,6 +3926,7 @@ def get_enriched_restaurant_holidays(
     *,
     scope: InstitutionScope | None = None,
     include_archived: bool = False,
+    holiday_type: list[str] | None = None,
 ) -> list[RestaurantHolidayEnrichedResponseSchema]:
     """
     Get enriched restaurant holidays that includes both restaurant-specific holidays
@@ -3925,6 +3941,7 @@ def get_enriched_restaurant_holidays(
         db: Database connection
         scope: Optional institution scope for filtering (Suppliers see their restaurants, Internal see all)
         include_archived: Whether to include archived records (default: False)
+        holiday_type: Optional list of holiday types to include ('restaurant', 'national'). If None, both types are returned.
 
     Returns:
         List of RestaurantHolidayEnrichedResponseSchema with both restaurant and national holidays
@@ -3936,171 +3953,182 @@ def get_enriched_restaurant_holidays(
     try:
         enriched_holidays = []
 
-        # Step 1: Get restaurant holidays
-        # Build query for restaurant holidays with scoping
-        restaurant_conditions = []
-        restaurant_params = []
+        # holiday_type filter: determine which sub-queries to run.
+        # holiday_type is a synthetic field (not a DB column) so we skip
+        # the irrelevant sub-queries entirely rather than filtering post-hoc.
+        include_restaurant_type = holiday_type is None or "restaurant" in holiday_type
+        include_national_type = holiday_type is None or "national" in holiday_type
 
-        if not include_archived:
-            restaurant_conditions.append("rh.is_archived = FALSE")
+        # Step 1: Get restaurant holidays (skipped when holiday_type filter excludes "restaurant")
+        if include_restaurant_type:
+            # Build query for restaurant holidays with scoping
+            restaurant_conditions = []
+            restaurant_params = []
 
-        if restaurant_id:
-            restaurant_conditions.append("rh.restaurant_id = %s")
-            restaurant_params.append(str(restaurant_id))
+            if not include_archived:
+                restaurant_conditions.append("rh.is_archived = FALSE")
 
-        # Add institution scoping if needed
-        if scope and not scope.is_global:
-            restaurant_conditions.append("r.institution_id = %s")
-            restaurant_params.append(str(scope.institution_id))
+            if restaurant_id:
+                restaurant_conditions.append("rh.restaurant_id = %s")
+                restaurant_params.append(str(restaurant_id))
 
-        restaurant_where = " WHERE " + " AND ".join(restaurant_conditions) if restaurant_conditions else ""
+            # Add institution scoping if needed
+            if scope and not scope.is_global:
+                restaurant_conditions.append("r.institution_id = %s")
+                restaurant_params.append(str(scope.institution_id))
 
-        restaurant_query = f"""
-            SELECT
-                rh.holiday_id,
-                rh.restaurant_id,
-                r.name as restaurant_name,
-                i.name as institution_name,
-                rh.country_code,
-                rh.holiday_date,
-                rh.holiday_name,
-                rh.is_recurring,
-                rh.recurring_month,
-                rh.recurring_day,
-                rh.source,
-                rh.status,
-                rh.is_archived,
-                rh.created_date,
-                rh.modified_by,
-                rh.modified_date
-            FROM restaurant_holidays rh
-            INNER JOIN restaurant_info r ON rh.restaurant_id = r.restaurant_id
-            INNER JOIN institution_info i ON r.institution_id = i.institution_id
-            {restaurant_where}
-            ORDER BY rh.holiday_date DESC
-        """
+            restaurant_where = " WHERE " + " AND ".join(restaurant_conditions) if restaurant_conditions else ""
 
-        restaurant_holidays = db_read(
-            restaurant_query, tuple(restaurant_params) if restaurant_params else None, connection=db
-        )
-
-        # Convert restaurant holidays to enriched schema
-        for row in restaurant_holidays or []:
-            enriched_holidays.append(
-                RestaurantHolidayEnrichedResponseSchema(
-                    holiday_type="restaurant",
-                    holiday_id=UUID(row.get("holiday_id")),
-                    restaurant_id=UUID(row.get("restaurant_id")),
-                    restaurant_name=row.get("restaurant_name"),
-                    institution_name=row.get("institution_name"),
-                    country_code=row.get("country_code"),
-                    holiday_date=row.get("holiday_date"),
-                    holiday_name=row.get("holiday_name"),
-                    is_recurring=row.get("is_recurring", False),
-                    recurring_month=row.get("recurring_month"),
-                    recurring_day=row.get("recurring_day"),
-                    source=row.get("source"),
-                    status=row.get("status", Status.ACTIVE.value),
-                    is_archived=row.get("is_archived", False),
-                    created_date=row.get("created_date"),
-                    modified_by=UUID(row.get("modified_by")) if row.get("modified_by") else None,
-                    modified_date=row.get("modified_date"),
-                    is_editable=True,
-                )
-            )
-
-        # Step 2: Get national holidays for restaurants the user has access to
-        # First, get list of restaurants and their country codes
-        restaurant_conditions_national = []
-        restaurant_params_national = []
-
-        if restaurant_id:
-            restaurant_conditions_national.append("r.restaurant_id = %s")
-            restaurant_params_national.append(str(restaurant_id))
-
-        # Add institution scoping if needed
-        if scope and not scope.is_global:
-            restaurant_conditions_national.append("r.institution_id = %s")
-            restaurant_params_national.append(str(scope.institution_id))
-
-        restaurant_where_national = (
-            " WHERE " + " AND ".join(restaurant_conditions_national) if restaurant_conditions_national else ""
-        )
-
-        # Get restaurants with their addresses to determine country codes
-        restaurants_query = f"""
-            SELECT DISTINCT
-                r.restaurant_id,
-                a.country_code
-            FROM restaurant_info r
-            INNER JOIN address_info a ON r.address_id = a.address_id
-            {restaurant_where_national}
-        """
-
-        restaurants = db_read(
-            restaurants_query, tuple(restaurant_params_national) if restaurant_params_national else None, connection=db
-        )
-
-        # Collect unique country codes
-        country_codes = set()
-        for restaurant_row in restaurants or []:
-            country_code = restaurant_row.get("country_code")
-            if country_code:
-                country_codes.add(country_code)
-
-        # Get national holidays for these country codes
-        if country_codes:
-            national_conditions = ["nh.is_archived = FALSE"]
-            national_params = []
-
-            # Build IN clause for country codes
-            placeholders = ",".join(["%s"] * len(country_codes))
-            national_conditions.append(f"nh.country_code IN ({placeholders})")
-            national_params.extend(list(country_codes))
-
-            national_where = " WHERE " + " AND ".join(national_conditions)
-
-            national_query = f"""
+            restaurant_query = f"""
                 SELECT
-                    nh.country_code,
-                    nh.holiday_name,
-                    nh.holiday_date,
-                    nh.is_recurring,
-                    nh.recurring_month,
-                    nh.recurring_day,
-                    nh.source,
-                    nh.status
-                FROM national_holidays nh
-                {national_where}
-                ORDER BY nh.holiday_date DESC
+                    rh.holiday_id,
+                    rh.restaurant_id,
+                    r.name as restaurant_name,
+                    i.name as institution_name,
+                    rh.country_code,
+                    rh.holiday_date,
+                    rh.holiday_name,
+                    rh.is_recurring,
+                    rh.recurring_month,
+                    rh.recurring_day,
+                    rh.source,
+                    rh.status,
+                    rh.is_archived,
+                    rh.created_date,
+                    rh.modified_by,
+                    rh.modified_date
+                FROM restaurant_holidays rh
+                INNER JOIN restaurant_info r ON rh.restaurant_id = r.restaurant_id
+                INNER JOIN institution_info i ON r.institution_id = i.institution_id
+                {restaurant_where}
+                ORDER BY rh.holiday_date DESC
             """
 
-            national_holidays = db_read(national_query, tuple(national_params), connection=db)
+            restaurant_holidays = db_read(
+                restaurant_query, tuple(restaurant_params) if restaurant_params else None, connection=db
+            )
 
-            # Convert national holidays to enriched schema
-            for row in national_holidays or []:
+            # Convert restaurant holidays to enriched schema
+            for row in restaurant_holidays or []:
                 enriched_holidays.append(
                     RestaurantHolidayEnrichedResponseSchema(
-                        holiday_type="national",
+                        holiday_type="restaurant",
+                        holiday_id=UUID(row.get("holiday_id")),
+                        restaurant_id=UUID(row.get("restaurant_id")),
+                        restaurant_name=row.get("restaurant_name"),
+                        institution_name=row.get("institution_name"),
                         country_code=row.get("country_code"),
-                        holiday_name=row.get("holiday_name"),
                         holiday_date=row.get("holiday_date"),
+                        holiday_name=row.get("holiday_name"),
                         is_recurring=row.get("is_recurring", False),
                         recurring_month=row.get("recurring_month"),
                         recurring_day=row.get("recurring_day"),
                         source=row.get("source"),
-                        holiday_id=None,
-                        restaurant_id=None,
-                        restaurant_name=None,
-                        institution_name=None,
                         status=row.get("status", Status.ACTIVE.value),
-                        is_archived=False,
-                        created_date=None,
-                        modified_by=None,
-                        modified_date=None,
-                        is_editable=False,
+                        is_archived=row.get("is_archived", False),
+                        created_date=row.get("created_date"),
+                        modified_by=UUID(row.get("modified_by")) if row.get("modified_by") else None,
+                        modified_date=row.get("modified_date"),
+                        is_editable=True,
                     )
                 )
+
+        # Step 2: Get national holidays for restaurants the user has access to
+        # (skipped when holiday_type filter excludes "national")
+        if include_national_type:
+            # First, get list of restaurants and their country codes
+            restaurant_conditions_national = []
+            restaurant_params_national = []
+
+            if restaurant_id:
+                restaurant_conditions_national.append("r.restaurant_id = %s")
+                restaurant_params_national.append(str(restaurant_id))
+
+            # Add institution scoping if needed
+            if scope and not scope.is_global:
+                restaurant_conditions_national.append("r.institution_id = %s")
+                restaurant_params_national.append(str(scope.institution_id))
+
+            restaurant_where_national = (
+                " WHERE " + " AND ".join(restaurant_conditions_national) if restaurant_conditions_national else ""
+            )
+
+            # Get restaurants with their addresses to determine country codes
+            restaurants_query = f"""
+                SELECT DISTINCT
+                    r.restaurant_id,
+                    a.country_code
+                FROM restaurant_info r
+                INNER JOIN address_info a ON r.address_id = a.address_id
+                {restaurant_where_national}
+            """
+
+            restaurants = db_read(
+                restaurants_query,
+                tuple(restaurant_params_national) if restaurant_params_national else None,
+                connection=db,
+            )
+
+            # Collect unique country codes
+            country_codes = set()
+            for restaurant_row in restaurants or []:
+                country_code = restaurant_row.get("country_code")
+                if country_code:
+                    country_codes.add(country_code)
+
+            # Get national holidays for these country codes
+            if country_codes:
+                national_conditions = ["nh.is_archived = FALSE"]
+                national_params = []
+
+                # Build IN clause for country codes
+                placeholders = ",".join(["%s"] * len(country_codes))
+                national_conditions.append(f"nh.country_code IN ({placeholders})")
+                national_params.extend(list(country_codes))
+
+                national_where = " WHERE " + " AND ".join(national_conditions)
+
+                national_query = f"""
+                    SELECT
+                        nh.country_code,
+                        nh.holiday_name,
+                        nh.holiday_date,
+                        nh.is_recurring,
+                        nh.recurring_month,
+                        nh.recurring_day,
+                        nh.source,
+                        nh.status
+                    FROM national_holidays nh
+                    {national_where}
+                    ORDER BY nh.holiday_date DESC
+                """
+
+                national_holidays = db_read(national_query, tuple(national_params), connection=db)
+
+                # Convert national holidays to enriched schema
+                for row in national_holidays or []:
+                    enriched_holidays.append(
+                        RestaurantHolidayEnrichedResponseSchema(
+                            holiday_type="national",
+                            country_code=row.get("country_code"),
+                            holiday_name=row.get("holiday_name"),
+                            holiday_date=row.get("holiday_date"),
+                            is_recurring=row.get("is_recurring", False),
+                            recurring_month=row.get("recurring_month"),
+                            recurring_day=row.get("recurring_day"),
+                            source=row.get("source"),
+                            holiday_id=None,
+                            restaurant_id=None,
+                            restaurant_name=None,
+                            institution_name=None,
+                            status=row.get("status", Status.ACTIVE.value),
+                            is_archived=False,
+                            created_date=None,
+                            modified_by=None,
+                            modified_date=None,
+                            is_editable=False,
+                        )
+                    )
 
         # Sort all holidays by date (most recent first)
         enriched_holidays.sort(key=lambda x: x.holiday_date, reverse=True)
