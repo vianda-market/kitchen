@@ -8,7 +8,7 @@
 
 ## Problem
 
-Registered B2C users today have unlimited access to browse restaurants, plates, and other discovery endpoints. A user who creates an account but never subscribes to a plan can still generate significant load — especially on endpoints that hit external APIs (address autocomplete, geocoding) or run expensive queries (restaurant explorer, plate selections with JOINs). We need tiered rate limits that protect the system while keeping the experience smooth for paying subscribers.
+Registered B2C users today have unlimited access to browse restaurants, viandas, and other discovery endpoints. A user who creates an account but never subscribes to a plan can still generate significant load — especially on endpoints that hit external APIs (address autocomplete, geocoding) or run expensive queries (restaurant explorer, vianda selections with JOINs). We need tiered rate limits that protect the system while keeping the experience smooth for paying subscribers.
 
 ---
 
@@ -53,7 +53,7 @@ These endpoints are either expensive or hit external paid APIs:
 |---|---|---|
 | `GET /addresses/suggest` | 30 req/min (down from 60) | Each call hits Mapbox API ($) |
 | `GET /restaurants/explorer` | 20 req/min | Heavy JOIN query |
-| `GET /plate-selections/*` | 30 req/min | Multi-table query |
+| `GET /vianda-selections/*` | 30 req/min | Multi-table query |
 | `GET /cuisines/*` | 60 req/min | Lightweight, keep generous |
 | Other authenticated routes | Fall back to global 120 req/min | Default |
 

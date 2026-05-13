@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "restaurant-explorer-b2c-2026",
 		"name": "004 RESTAURANT_EXPLORER_B2C",
-		"description": "Tests for the B2C restaurant explorer: GET /restaurants/cities (dropdown) and GET /restaurants/by-city (list/map). Both require Bearer auth. No institution scope; filter by country_code and city. Only Active restaurants with at least one active plate_kitchen_day are returned. See docs/api/b2c_client/feedback_from_client/RESTAURANT_EXPLORE_B2C.md and docs/api/shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md.",
+		"description": "Tests for the B2C restaurant explorer: GET /restaurants/cities (dropdown) and GET /restaurants/by-city (list/map). Both require Bearer auth. No institution scope; filter by country_code and city. Only Active restaurants with at least one active vianda_kitchen_day are returned. See docs/api/b2c_client/feedback_from_client/RESTAURANT_EXPLORE_B2C.md and docs/api/shared_client/RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
 	},
 	"event": [

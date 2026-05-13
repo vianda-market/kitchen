@@ -1,8 +1,8 @@
 """
 Pickup Type Enumeration
 
-Defines the valid pickup types for plate selection.
-Pickup types are fixed at compile time and determine how plates are collected.
+Defines the valid pickup types for vianda selection.
+Pickup types are fixed at compile time and determine how viandas are collected.
 """
 
 from enum import Enum

@@ -11,9 +11,9 @@
 
 Cuisine classification touches three critical surfaces:
 
-1. **Supplier product registration** — suppliers assign a cuisine when creating restaurants/plates; input must be structured and guided (autocomplete or dropdown)
+1. **Supplier product registration** — suppliers assign a cuisine when creating restaurants/viandas; input must be structured and guided (autocomplete or dropdown)
 2. **Customer discovery** — customers filter and browse by cuisine; data must be clean and consistent
-3. **Recommendation engine** — cuisine is a parameter for plate recommendations; data quality directly impacts recommendation accuracy
+3. **Recommendation engine** — cuisine is a parameter for vianda recommendations; data quality directly impacts recommendation accuracy
 
 The current implementation uses a hardcoded Python tuple (`SUPPORTED_CUISINES`) validated at the API layer. This has three problems:
 
@@ -236,9 +236,9 @@ Replace the current dropdown with an **autocomplete input**:
 - Only active cuisines with at least one restaurant shown
 - Group by parent cuisine optionally (Italian > Tuscan, Neapolitan)
 
-### Customer Plate Display (B2C — vianda-app)
+### Customer Vianda Display (B2C — vianda-app)
 
-- Show cuisine name on plate cards (resolved from restaurant's cuisine)
+- Show cuisine name on vianda cards (resolved from restaurant's cuisine)
 - Cuisine used as a parameter in recommendation engine queries
 
 ---
@@ -288,7 +288,7 @@ When a supplier suggestion is approved and a new `cuisine` row is created, `cuis
 
 - `/api/v1/cuisines/` — autocomplete and dropdown
 - `/leads/restaurants`, `/leads/featured-restaurant` — enriched restaurant endpoints
-- Enriched plate endpoints — cuisine resolved from restaurant's FK
+- Enriched vianda endpoints — cuisine resolved from restaurant's FK
 - B2C explore filters — filter chips show localized cuisine names
 
 ---
@@ -359,7 +359,7 @@ Replace or augment the human reviewer with an AI agent that processes `cuisine_s
 | Repo | Impact | Doc to produce |
 |------|--------|---------------|
 | **vianda-platform** (B2B) | Replace cuisine dropdown with autocomplete + "Other" flow; add admin cuisine management page | Updated `CUISINES_API_CLIENT.md` |
-| **vianda-app** (B2C) | Update cuisine filter to use new response shape; display cuisine on plate cards | Updated `CUISINES_API_CLIENT.md` |
+| **vianda-app** (B2C) | Update cuisine filter to use new response shape; display cuisine on vianda cards | Updated `CUISINES_API_CLIENT.md` |
 | **vianda-home** (marketing) | Restaurant cards show cuisine from new field | No change if already consuming `cuisine` string |
 
 ---
@@ -370,4 +370,4 @@ Replace or augment the human reviewer with an AI agent that processes `cuisine_s
 - [CUISINES_API_CLIENT.md](../api/shared_client/CUISINES_API_CLIENT.md) — Current client guide (to be updated)
 - [SCHEMA_CHANGE_GUIDE.md](../guidelines/SCHEMA_CHANGE_GUIDE.md) — Required process for DB changes
 - [EXPLORE_FILTERS_ROADMAP.md](./b2c_client/EXPLORE_FILTERS_ROADMAP.md) — B2C cuisine filter context
-- [PLATE_RECOMMENDATION_AND_FAVORITES_B2C.md](../api/b2c_client/PLATE_RECOMMENDATION_AND_FAVORITES_B2C.md) — Recommendation engine context
+- [VIANDA_RECOMMENDATION_AND_FAVORITES_B2C.md](../api/b2c_client/VIANDA_RECOMMENDATION_AND_FAVORITES_B2C.md) — Recommendation engine context

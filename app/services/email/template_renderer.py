@@ -13,10 +13,10 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+_TEMVIANDA_DIR = Path(__file__).resolve().parent / "templates"
 
 _env = Environment(
-    loader=FileSystemLoader(str(_TEMPLATE_DIR)),
+    loader=FileSystemLoader(str(_TEMVIANDA_DIR)),
     autoescape=select_autoescape(["html"]),
 )
 
@@ -41,7 +41,7 @@ def _get_template(base_name: str, ext: str, locale: str):
     return _env.get_template(f"{base_name}.{ext}")
 
 
-def render_email(template_name: str, locale: str = "en", **context) -> tuple[str, str]:
+def render_email(temvianda_name: str, locale: str = "en", **context) -> tuple[str, str]:
     """
     Render an email template with locale support.
 
@@ -49,19 +49,19 @@ def render_email(template_name: str, locale: str = "en", **context) -> tuple[str
     then falls back to the default English file (``onboarding/need_help.html``).
 
     Args:
-        template_name: Path relative to templates dir, without extension (e.g. "onboarding/need_help")
+        temvianda_name: Path relative to templates dir, without extension (e.g. "onboarding/need_help")
         locale: Locale code ("en", "es", "pt")
         **context: Template variables
 
     Returns:
         (text_body, html_body) tuple
     """
-    html_template = _get_template(template_name, "html", locale)
+    html_template = _get_template(temvianda_name, "html", locale)
     html_body = html_template.render(locale=locale, **context)
 
     # Try loading a dedicated .txt template; fall back to stripping HTML
     try:
-        txt_template = _get_template(template_name, "txt", locale)
+        txt_template = _get_template(temvianda_name, "txt", locale)
         text_body = txt_template.render(locale=locale, **context)
     except Exception:
         text_body = _strip_html(html_body)

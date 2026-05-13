@@ -30,7 +30,7 @@ Any create endpoint for an entity that has a `status` field:
 
 - **Users** – backend sets default (e.g. Active) when creating users (admin or signup).
 - **Markets** – omit or null `status`; backend assigns Active.
-- **Plans**, **Plates**, **Restaurants**, **Products**, **Institutions**, **Addresses**, **Employers**, **Institution entities**, **Plate kitchen days**, **National holidays**, **Restaurant holidays**, **Credit currencies**, **QR codes**, **Discretionary requests**, **Subscriptions**, **Payment methods**, **Fintech links**, etc. – same rule: omit or null on create; backend assigns the appropriate default (usually Active; some flows such as bills may use Pending).
+- **Plans**, **Viandas**, **Restaurants**, **Products**, **Institutions**, **Addresses**, **Employers**, **Institution entities**, **Vianda kitchen days**, **National holidays**, **Restaurant holidays**, **Credit currencies**, **QR codes**, **Discretionary requests**, **Subscriptions**, **Payment methods**, **Fintech links**, etc. – same rule: omit or null on create; backend assigns the appropriate default (usually Active; some flows such as bills may use Pending).
 
 ---
 

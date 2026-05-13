@@ -57,7 +57,7 @@ Postman collections are the **contract test** layer for HTTP surfaces. They are 
 - **Auth is idempotent**: a login step near the top sets a bearer token variable; later requests reuse it. Super-admin login is shared via Newman `--globals` in CI.
 - **Per-frontend-consumer organization** for leads-style public APIs (see `docs/postman/guidelines/LEADS_COLLECTION_CONVENTIONS.md`). One collection per consumer repo keeps contract drift localized.
 - **Country codes** are always ISO 3166-1 alpha-2 (`AR`, `US`). Collections that send `ARG`/`USA` are wrong — see `docs/api/shared_client/COUNTRY_CODE_API_CONTRACT.md`.
-- **Minimal seed + E2E flow**: DB rebuild seeds only one super admin, two institutions, and the Global market. The E2E Plate Selection collection creates everything else via the API. Postman populates test data; it does not depend on fixtures planted outside of it.
+- **Minimal seed + E2E flow**: DB rebuild seeds only one super admin, two institutions, and the Global market. The E2E Vianda Selection collection creates everything else via the API. Postman populates test data; it does not depend on fixtures planted outside of it.
 
 **Running locally:** `bash app/tests/run_postman_collections.sh`. **In CI:** `bash scripts/run_newman.sh <numbers…>` (see `.github/workflows/ci.yml`).
 

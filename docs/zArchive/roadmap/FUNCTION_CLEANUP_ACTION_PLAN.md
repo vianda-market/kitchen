@@ -14,7 +14,7 @@
 |----------|-------|--------|
 | `get_all_by_user_address_city()` | 1031, 1632 | ✅ Keep 1031, remove 1632 |
 | `get_all_active_for_today_by_user_address_city()` | 1043, 1652 | ✅ Keep 1043, remove 1652 |
-| `get_by_plate_selection_id()` | 1271, 1696 | ✅ Keep 1271, remove 1696 |
+| `get_by_vianda_selection_id()` | 1271, 1696 | ✅ Keep 1271, remove 1696 |
 | `mark_collected()` / `mark_transaction_as_collected()` | 1702, 1736 | ✅ Keep 1702, remove 1736 |
 
 **Steps:**
@@ -102,7 +102,7 @@ class CRUDService:
 ```python
 class CRUDService:
     # Add methods:
-    def get_by_plate_selection_id(self, plate_selection_id, db)
+    def get_by_vianda_selection_id(self, vianda_selection_id, db)
     def mark_collected(self, transaction_id, collected_timestamp, modified_by, db)
     def update_final_amount(self, transaction_id, final_amount, modified_by, db)
     def update_arrival_time(self, transaction_id, arrival_time, modified_by, db)

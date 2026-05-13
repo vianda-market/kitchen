@@ -103,8 +103,8 @@ def delete_record(record_id: UUID):
 - `institution_payment_attempt` - Soft delete implemented
 - `institution_bill` - Soft delete implemented
 - `client_payment_attempt` - Soft delete implemented
-- `plate_pickup` - Soft delete implemented
-- `plate_selection` - Soft delete implemented
+- `vianda_pickup` - Soft delete implemented
+- `vianda_selection` - Soft delete implemented
 - `product` - Soft delete already implemented
 - `credit_currency` - Soft delete already implemented
 - `role` - Soft delete already implemented
@@ -114,7 +114,7 @@ def delete_record(record_id: UUID):
 - `restaurant` - Soft delete already implemented
 - `subscription` - Soft delete already implemented
 - `institution` - Soft delete already implemented
-- `plate` - Soft delete already implemented
+- `vianda` - Soft delete already implemented
 - `plan` - Soft delete already implemented
 - `geolocation` - Soft delete already implemented
 - `address` - Soft delete already implemented

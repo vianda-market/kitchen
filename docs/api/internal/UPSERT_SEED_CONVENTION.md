@@ -1,12 +1,12 @@
 # Upsert Endpoint & Canonical Fixture Convention
 
-Applies to: **plans** (issue #130), **plates** (issue #166), **users** (issue #168), **restaurants** (issue #167), **institutions** (issue #190), **markets** (issue #190), **institution entities** (issue #190), and **products** (issue #190).
+Applies to: **plans** (issue #130), **viandas** (issue #166), **users** (issue #168), **restaurants** (issue #167), **institutions** (issue #190), **markets** (issue #190), **institution entities** (issue #190), and **products** (issue #190).
 
 ## Overview
 
-Postman collections and dev seed scripts that create plans, plates, users, restaurants,
+Postman collections and dev seed scripts that create plans, viandas, users, restaurants,
 or products should use the idempotent upsert endpoints (`PUT /api/v1/plans/by-key`,
-`PUT /api/v1/plates/by-key`, `PUT /api/v1/users/by-key`,
+`PUT /api/v1/viandas/by-key`, `PUT /api/v1/users/by-key`,
 `PUT /api/v1/restaurants/by-key`, `PUT /api/v1/products/by-key`) rather than
 the corresponding `POST` endpoints. Using POST creates a new row on every run,
 causing duplicate rows to accumulate in the dev DB.
@@ -74,10 +74,10 @@ Never create a plan priced at 10 ARS or $0.10.
 
 ---
 
-## Plates — `PUT /api/v1/plates/by-key`
+## Viandas — `PUT /api/v1/viandas/by-key`
 
 ```http
-PUT /api/v1/plates/by-key
+PUT /api/v1/viandas/by-key
 Authorization: Bearer {internal-token}
 Content-Type: application/json
 ```
@@ -86,60 +86,60 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `RESTAURANT_LA_COCINA_PORTENA_PLATE_BONDIOLA` |
-| `product_id` | UUID | yes | FK to `ops.product_info` — the recipe this plate is based on |
-| `restaurant_id` | UUID | yes | FK to `ops.restaurant_info` — the restaurant offering this plate |
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `RESTAURANT_LA_COCINA_PORTENA_VIANDA_BONDIOLA` |
+| `product_id` | UUID | yes | FK to `ops.product_info` — the recipe this vianda is based on |
+| `restaurant_id` | UUID | yes | FK to `ops.restaurant_info` — the restaurant offering this vianda |
 | `price` | decimal (>= 0) | yes | Local-currency price charged to subscribers |
 | `credit` | int (> 0) | yes | Credit cost deducted from the subscriber's balance |
 | `delivery_time_minutes` | int (> 0) | no | Estimated minutes to readiness (default 15) |
 | `status` | string | no | `active` (default) or `inactive` |
 
-Response body is `PlateResponseSchema` (same shape as `GET /api/v1/plates/{plate_id}`).
+Response body is `ViandaResponseSchema` (same shape as `GET /api/v1/viandas/{vianda_id}`).
 
-### canonical_key convention for plates
+### canonical_key convention for viandas
 
 ```
-RESTAURANT_{RESTAURANT_SLUG}_PLATE_{PLATE_SLUG}
+RESTAURANT_{RESTAURANT_SLUG}_VIANDA_{VIANDA_SLUG}
 ```
 
 Examples:
-- `RESTAURANT_LA_COCINA_PORTENA_PLATE_BONDIOLA` — La Cocina Portena's bondiola plate
-- `RESTAURANT_LA_COCINA_PORTENA_PLATE_ENSALADA_GRIEGA` — same restaurant, different plate
-- `RESTAURANT_E2E_PLATE_STANDARD` — generic E2E test fixture plate
+- `RESTAURANT_LA_COCINA_PORTENA_VIANDA_BONDIOLA` — La Cocina Portena's bondiola vianda
+- `RESTAURANT_LA_COCINA_PORTENA_VIANDA_ENSALADA_GRIEGA` — same restaurant, different vianda
+- `RESTAURANT_E2E_VIANDA_STANDARD` — generic E2E test fixture vianda
 
-### Pricing guidance for plates
+### Pricing guidance for viandas
 
 Use realistic prices that reflect actual ARS subscription values:
 
-| Market | Recommended plate price |
+| Market | Recommended vianda price |
 |---|---|
 | AR | 15 000 - 25 000 ARS |
 | US | $8 - $15 USD |
 
 The E2E collection fixture uses 20 000 ARS / 8 credits.
 
-### Why SQL fixtures are not used for plates
+### Why SQL fixtures are not used for viandas
 
-Unlike plans (which reference only `market_id` from reference data), plates
+Unlike plans (which reference only `market_id` from reference data), viandas
 require both `product_id` and `restaurant_id`, which are created at test run
-time via Postman. Therefore canonical plate fixtures live in the Postman
-collection as `PUT /plates/by-key` calls rather than as SQL `INSERT` statements.
+time via Postman. Therefore canonical vianda fixtures live in the Postman
+collection as `PUT /viandas/by-key` calls rather than as SQL `INSERT` statements.
 
-If you need a fully SQL-driven plate fixture (e.g. for geo tests), create the
+If you need a fully SQL-driven vianda fixture (e.g. for geo tests), create the
 product and restaurant rows with fixed UUIDs first, then use:
 
 ```sql
-INSERT INTO ops.plate_info (...)
+INSERT INTO ops.vianda_info (...)
 ON CONFLICT (canonical_key) WHERE canonical_key IS NOT NULL
 DO UPDATE SET ...
 ```
 
-### Schema Notes (plates)
+### Schema Notes (viandas)
 
-- `ops.plate_info.canonical_key VARCHAR(200) NULL` — added in
-  migration `0003_plate_canonical_key.sql`.
-- Partial index `uq_plate_info_canonical_key` (sparse: only indexed when non-null).
-- `PlateResponseSchema` includes `canonical_key` (nullable string).
+- `ops.vianda_info.canonical_key VARCHAR(200) NULL` — added in
+  migration `0003_vianda_canonical_key.sql`.
+- Partial index `uq_vianda_info_canonical_key` (sparse: only indexed when non-null).
+- `ViandaResponseSchema` includes `canonical_key` (nullable string).
 
 ---
 
@@ -221,7 +221,7 @@ new system/sentinel accounts are added.
 
 `PUT /users/by-key` is Internal-only but Postman collection-level bearer auth
 may resolve to the current step's supplier/customer token. Use the same
-synchronous admin-token elevation pattern as `PUT /plates/by-key`:
+synchronous admin-token elevation pattern as `PUT /viandas/by-key`:
 
 1. Read the admin token from collection scope (not overwritten by supplier login).
 2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
@@ -229,7 +229,7 @@ synchronous admin-token elevation pattern as `PUT /plates/by-key`:
    to overwrite as normal.
 
 See "Upsert Canonical Supplier User (idempotent)" in
-`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+`docs/postman/collections/000 E2E Vianda Selection.postman_collection.json`.
 
 ### Re-align institutionId after upsert
 
@@ -311,7 +311,7 @@ Examples:
 
 ### Why SQL fixtures are not used for restaurants
 
-Like plates, restaurants require `institution_id`, `institution_entity_id`, and
+Like viandas, restaurants require `institution_id`, `institution_entity_id`, and
 `address_id`, which are created at test run time via Postman. Therefore canonical
 restaurant fixtures live in the Postman collection as `PUT /restaurants/by-key`
 calls rather than as SQL `INSERT` statements.
@@ -320,14 +320,14 @@ calls rather than as SQL `INSERT` statements.
 
 `PUT /restaurants/by-key` is Internal-only but Postman collection-level bearer
 auth may resolve to the current step's supplier token. Use the same synchronous
-admin-token elevation pattern as `PUT /plates/by-key`:
+admin-token elevation pattern as `PUT /viandas/by-key`:
 
 1. Read the admin token from collection scope (not overwritten by supplier login).
 2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
 3. Restore the supplier token in the test script post-upsert.
 
 See "Upsert Canonical Restaurant (idempotent)" in
-`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+`docs/postman/collections/000 E2E Vianda Selection.postman_collection.json`.
 
 ### Schema Notes (restaurants)
 
@@ -413,7 +413,7 @@ synchronous admin-token elevation pattern as `PUT /restaurants/by-key`:
 3. After the upsert, restore `{{authToken}}` to the supplier token.
 
 See "Upsert Canonical Supplier Institution (idempotent)" in
-`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+`docs/postman/collections/000 E2E Vianda Selection.postman_collection.json`.
 
 ### Schema Notes (institutions)
 
@@ -516,7 +516,7 @@ pm.request.body.update(JSON.stringify(payload));
 ```
 
 See "Upsert Canonical Market Argentina (idempotent)" in
-`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+`docs/postman/collections/000 E2E Vianda Selection.postman_collection.json`.
 
 ### Schema Notes (markets)
 
@@ -605,7 +605,7 @@ synchronous admin-token elevation pattern as `PUT /restaurants/by-key`:
 3. Restore the supplier token in the test script post-upsert.
 
 See "Upsert Canonical Supplier Entity (idempotent)" in
-`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+`docs/postman/collections/000 E2E Vianda Selection.postman_collection.json`.
 
 ### Schema Notes (institution entities)
 
@@ -659,11 +659,11 @@ E2E_PRODUCT_{SLUG}
 ```
 
 Examples:
-- `E2E_PRODUCT_BIG_BURGUER` — shared E2E product used across collections (the plate upsert references it via `productId`)
+- `E2E_PRODUCT_BIG_BURGUER` — shared E2E product used across collections (the vianda upsert references it via `productId`)
 
 ### Why SQL fixtures are not used for products
 
-Like restaurants and plates, products require `institution_id` which is created
+Like restaurants and viandas, products require `institution_id` which is created
 at test run time via Postman. Therefore canonical product fixtures live in the
 Postman collection as `PUT /products/by-key` calls rather than as SQL
 `INSERT` statements.
@@ -673,19 +673,19 @@ Postman collection as `PUT /products/by-key` calls rather than as SQL
 `PUT /products/by-key` is Internal-only but at the point where it runs in the
 E2E collection the environment-scope `authToken` holds the supplier token from
 "Login Supplier Admin". Use the same synchronous admin-token elevation pattern
-as `PUT /plates/by-key`:
+as `PUT /viandas/by-key`:
 
 1. Read the admin token from collection scope (not overwritten by supplier login).
 2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
 3. After the upsert, restore `{{authToken}}` to the supplier token.
 
 See "Upsert Canonical Supplier Product (idempotent)" in
-`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+`docs/postman/collections/000 E2E Vianda Selection.postman_collection.json`.
 
 ### productId downstream propagation
 
 The test script sets `pm.collectionVariables.set('productId', body.product_id)` so
-the downstream "Upsert Canonical Plate" step can inject it as `payload.product_id`.
+the downstream "Upsert Canonical Vianda" step can inject it as `payload.product_id`.
 Do not remove or rename this variable.
 
 ### Schema Notes (products)
@@ -696,41 +696,41 @@ Do not remove or rename this variable.
 - `ProductResponseSchema` includes `canonical_key` (nullable string).
 
 ---
-## Plate Kitchen Days — `PUT /api/v1/plate-kitchen-days/by-key`
+## Vianda Kitchen Days — `PUT /api/v1/vianda-kitchen-days/by-key`
 
 ```http
-PUT /api/v1/plate-kitchen-days/by-key
+PUT /api/v1/vianda-kitchen-days/by-key
 Authorization: Bearer {internal-token}
 Content-Type: application/json
 ```
 
 **INTERNAL SEED/FIXTURE ENDPOINT ONLY.** Never use for ad-hoc kitchen day creation
-(use `POST /plate-kitchen-days` instead). Auth: Internal only. Returns 403 for
+(use `POST /vianda-kitchen-days` instead). Auth: Internal only. Returns 403 for
 Customer/Supplier roles.
 
-Plate kitchen days are unique by `(plate_id, kitchen_day)`.  The canonical_key
-identifies the logical fixture row — one key per plate + weekday combination.
+Vianda kitchen days are unique by `(vianda_id, kitchen_day)`.  The canonical_key
+identifies the logical fixture row — one key per vianda + weekday combination.
 
 ### Request body
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_PKD_E2E_PLATE_STANDARD_MONDAY` |
-| `plate_id` | UUID | yes | FK to `ops.plate_info`. **Immutable after INSERT.** |
+| `canonical_key` | string (<=200 chars) | yes | Stable identifier, e.g. `E2E_PKD_E2E_VIANDA_STANDARD_MONDAY` |
+| `vianda_id` | UUID | yes | FK to `ops.vianda_info`. **Immutable after INSERT.** |
 | `kitchen_day` | string | yes | Weekday: `monday`–`friday`. **Immutable after INSERT.** |
 | `status` | string | no | `active` (default) or `inactive` |
 
-Response body is `PlateKitchenDayResponseSchema` (same shape as
-`GET /api/v1/plate-kitchen-days/{plate_kitchen_day_id}`).
+Response body is `ViandaKitchenDayResponseSchema` (same shape as
+`GET /api/v1/vianda-kitchen-days/{vianda_kitchen_day_id}`).
 
 ### INSERT vs UPDATE behaviour
 
-- **INSERT path**: a new plate kitchen day row is created with the given
-  `canonical_key`, `plate_id`, `kitchen_day`, and `status`. If a non-canonical
-  row already occupies the `(plate_id, kitchen_day)` slot (e.g. from a prior
+- **INSERT path**: a new vianda kitchen day row is created with the given
+  `canonical_key`, `vianda_id`, `kitchen_day`, and `status`. If a non-canonical
+  row already occupies the `(vianda_id, kitchen_day)` slot (e.g. from a prior
   `POST`), that existing row is adopted (stamped with the canonical_key) instead
   of creating a duplicate.
-- **UPDATE path**: only `status` and `canonical_key` are updated.  `plate_id`
+- **UPDATE path**: only `status` and `canonical_key` are updated.  `vianda_id`
   and `kitchen_day` are immutable after creation — any values sent in the payload
   are silently ignored on the update path.
 
@@ -739,49 +739,49 @@ Response body is `PlateKitchenDayResponseSchema` (same shape as
 The following fields are locked after INSERT and cannot be changed via this
 endpoint:
 
-- `plate_id` — FK to the plate; cannot change after creation. To reassign a
-  kitchen day to a different plate, archive the old row and create a new
+- `vianda_id` — FK to the vianda; cannot change after creation. To reassign a
+  kitchen day to a different vianda, archive the old row and create a new
   canonical row.
 - `kitchen_day` — the weekday this row represents; cannot change after creation.
-  To move the same plate to a different day, archive the old row and create a
+  To move the same vianda to a different day, archive the old row and create a
   new canonical row for the new day.
 
-### canonical_key convention for plate kitchen days
+### canonical_key convention for vianda kitchen days
 
 ```
-E2E_PKD_{PLATE_SLUG}_{DAY}
+E2E_PKD_{VIANDA_SLUG}_{DAY}
 ```
 
-Where `PLATE_SLUG` is derived from the plate's canonical key (the segment after
-`RESTAURANT_..._PLATE_`) uppercased, and `DAY` is the weekday in UPPER_SNAKE_CASE.
+Where `VIANDA_SLUG` is derived from the vianda's canonical key (the segment after
+`RESTAURANT_..._VIANDA_`) uppercased, and `DAY` is the weekday in UPPER_SNAKE_CASE.
 
 Examples:
-- `E2E_PKD_E2E_PLATE_STANDARD_MONDAY` — Monday slot for the standard E2E plate
-- `E2E_PKD_E2E_PLATE_STANDARD_TUESDAY` — Tuesday slot
-- `E2E_PKD_CAMBALACHE_BONDIOLA_MONDAY` — Monday slot for a named plate
+- `E2E_PKD_E2E_VIANDA_STANDARD_MONDAY` — Monday slot for the standard E2E vianda
+- `E2E_PKD_E2E_VIANDA_STANDARD_TUESDAY` — Tuesday slot
+- `E2E_PKD_CAMBALACHE_BONDIOLA_MONDAY` — Monday slot for a named vianda
 
 ### Postman pre-request token elevation
 
-`PUT /plate-kitchen-days/by-key` is Internal-only.  The canonical kitchen-day
+`PUT /vianda-kitchen-days/by-key` is Internal-only.  The canonical kitchen-day
 upserts run inside the "Supplier Menu Setup" folder where the collection-level
 auth resolves to the supplier token.  Use the same admin-token elevation pattern
-as `PUT /plates/by-key`:
+as `PUT /viandas/by-key`:
 
 1. Read the admin token from collection scope (not overwritten by supplier login).
 2. Promote it to environment scope so `{{authToken}}` resolves to the admin token.
 3. Restore the supplier token in the test script post-upsert (so downstream
    supplier steps continue to work).
 
-See "Upsert Canonical Plate Kitchen Day Monday (idempotent)" through
-"Upsert Canonical Plate Kitchen Day Friday (idempotent)" in
-`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+See "Upsert Canonical Vianda Kitchen Day Monday (idempotent)" through
+"Upsert Canonical Vianda Kitchen Day Friday (idempotent)" in
+`docs/postman/collections/000 E2E Vianda Selection.postman_collection.json`.
 
-### Schema Notes (plate kitchen days)
+### Schema Notes (vianda kitchen days)
 
-- `ops.plate_kitchen_days.canonical_key VARCHAR(200) NULL` — added in
-  migration `0012_plate_kitchen_day_canonical_key.sql`.
-- Partial index `uq_plate_kitchen_days_canonical_key` (sparse: only indexed when non-null).
-- `PlateKitchenDayResponseSchema` includes `canonical_key` (nullable string).
+- `ops.vianda_kitchen_days.canonical_key VARCHAR(200) NULL` — added in
+  migration `0012_vianda_kitchen_day_canonical_key.sql`.
+- Partial index `uq_vianda_kitchen_days_canonical_key` (sparse: only indexed when non-null).
+- `ViandaKitchenDayResponseSchema` includes `canonical_key` (nullable string).
 
 ---
 
@@ -852,7 +852,7 @@ where QR codes are created, the supplier login has already set the environment
 3. Restore the supplier token in the test script post-upsert.
 
 See "Upsert Canonical Restaurant QR Code (idempotent)" in
-`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+`docs/postman/collections/000 E2E Vianda Selection.postman_collection.json`.
 
 ### Schema Notes (QR codes)
 
@@ -927,7 +927,7 @@ synchronous admin-token elevation pattern as `PUT /restaurants/by-key`:
 3. The test script restores `{{authToken}}` to the supplier token.
 
 See "Upsert Canonical Restaurant Holiday (idempotent)" in
-`docs/postman/collections/000 E2E Plate Selection.postman_collection.json`.
+`docs/postman/collections/000 E2E Vianda Selection.postman_collection.json`.
 
 ### Schema Notes (restaurant holidays)
 
@@ -1240,7 +1240,7 @@ environment variables set earlier in the collection (e.g. `employeeUserId_PE_01`
 | Postman seed request (create test data before a test run) | `PUT /by-key` |
 | `dev_fixtures.sql` canonical plan row | `INSERT ... ON CONFLICT (canonical_key) DO UPDATE` |
 | Admin creating a real production plan | `POST /plans` |
-| Supplier creating a real production plate | `POST /plates` |
+| Supplier creating a real production vianda | `POST /viandas` |
 | Supplier creating a real production product | `POST /products` |
 | Updating a known existing row | `PUT /{entity}/{id}` |
 
@@ -1263,17 +1263,17 @@ python scripts/cleanup_duplicate_plans.py
 
 Plans with a `canonical_key` are never touched by the cleanup script.
 
-### Plates
+### Viandas
 
 ```bash
 # Dry-run first:
-python scripts/cleanup_duplicate_plates.py --dry-run
+python scripts/cleanup_duplicate_viandas.py --dry-run
 
 # Live run — archives duplicates, keeps the oldest row per restaurant+product:
-python scripts/cleanup_duplicate_plates.py
+python scripts/cleanup_duplicate_viandas.py
 ```
 
-Plates with a `canonical_key` are never touched by the cleanup script.
+Viandas with a `canonical_key` are never touched by the cleanup script.
 
 ### Users
 

@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-New suppliers are created with `status: Active` but have no restaurants, plates, kitchen days, or QR codes. There is no signal of incompleteness, no guidance system, and no automated outreach when suppliers stall during setup. This roadmap adds:
+New suppliers are created with `status: Active` but have no restaurants, viandas, kitchen days, or QR codes. There is no signal of incompleteness, no guidance system, and no automated outreach when suppliers stall during setup. This roadmap adds:
 
 1. **Onboarding status endpoint** — Backend-computed checklist with completion percentage and next step
 2. **JWT onboarding claim** — Fast page-load gating without extra API call
@@ -69,7 +69,7 @@ New suppliers are created with `status: Active` but have no restaurants, plates,
     "has_active_entity_with_payouts": true,
     "has_active_restaurant": true,
     "has_active_product": false,
-    "has_active_plate": false,
+    "has_active_vianda": false,
     "has_active_kitchen_day": false,
     "has_active_qr_code": true
   }
@@ -84,11 +84,11 @@ New suppliers are created with `status: Active` but have no restaurants, plates,
 | `has_active_entity_with_payouts` | `EXISTS(institution_entity_info WHERE institution_id = %s AND status = 'Active' AND NOT is_archived AND payout_onboarding_status = 'complete')` |
 | `has_active_restaurant` | `EXISTS(restaurant_info r JOIN address_info a ON r.address_id = a.address_id WHERE a.institution_id = %s AND r.status = 'Active' AND NOT r.is_archived)` |
 | `has_active_product` | `EXISTS(product_info WHERE institution_id = %s AND status = 'Active' AND NOT is_archived)` |
-| `has_active_plate` | `EXISTS(plate_info p JOIN restaurant_info r ... WHERE institution_id = %s AND p.status = 'Active' AND NOT p.is_archived)` |
-| `has_active_kitchen_day` | `EXISTS(plate_kitchen_days pkd JOIN plate_info p ... WHERE institution_id = %s AND pkd.status = 'Active' AND NOT pkd.is_archived)` |
+| `has_active_vianda` | `EXISTS(vianda_info p JOIN restaurant_info r ... WHERE institution_id = %s AND p.status = 'Active' AND NOT p.is_archived)` |
+| `has_active_kitchen_day` | `EXISTS(vianda_kitchen_days pkd JOIN vianda_info p ... WHERE institution_id = %s AND pkd.status = 'Active' AND NOT pkd.is_archived)` |
 | `has_active_qr_code` | `EXISTS(qr_code q JOIN restaurant_info r ... WHERE institution_id = %s AND q.status = 'Active' AND NOT q.is_archived)` |
 
-**`next_step` dependency order:** address → entity_payout_setup → restaurant → product → plate → kitchen_day → qr_code. Return the first item in the chain that is `false`.
+**`next_step` dependency order:** address → entity_payout_setup → restaurant → product → vianda → kitchen_day → qr_code. Return the first item in the chain that is `false`.
 
 **`onboarding_status` derivation:**
 - `not_started`: all checklist items false
@@ -96,7 +96,7 @@ New suppliers are created with `status: Active` but have no restaurants, plates,
 - `stalled`: some true, some false, and `days_since_last_activity >= 3` (internal only — not exposed to JWT)
 - `in_progress`: otherwise
 
-**`last_activity_date`:** `MAX(modified_date)` across addresses, entities, restaurants, products, plates, kitchen_days, qr_codes for the institution.
+**`last_activity_date`:** `MAX(modified_date)` across addresses, entities, restaurants, products, viandas, kitchen_days, qr_codes for the institution.
 
 **Files to create:**
 - `app/services/onboarding_service.py` — Checklist computation, status derivation
@@ -139,7 +139,7 @@ Add `onboarding_status` to the JWT payload for `role_type` in (`Supplier`, `Empl
       "completion_percentage": 43,
       "days_since_creation": 14,
       "days_since_last_activity": 8,
-      "missing_steps": ["product", "plate", "kitchen_day"]
+      "missing_steps": ["product", "vianda", "kitchen_day"]
     }
   ]
 }
@@ -255,7 +255,7 @@ When archiving/deactivating a resource causes `complete` → `in_progress`:
 - Update `onboarding_status` on next JWT refresh
 - Optionally send notification to Supplier Admin
 
-**Implementation:** Post-operation hook on archive/delete/status-change for restaurants, plates, kitchen_days, qr_codes.
+**Implementation:** Post-operation hook on archive/delete/status-change for restaurants, viandas, kitchen_days, qr_codes.
 
 ---
 

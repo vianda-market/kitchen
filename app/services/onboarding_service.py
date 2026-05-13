@@ -21,7 +21,7 @@ SUPPLIER_CHECKLIST_ORDER = [
     "has_active_entity_with_payouts",
     "has_active_restaurant",
     "has_active_product",
-    "has_active_plate",
+    "has_active_vianda",
     "has_active_kitchen_day",
     "has_active_qr_code",
 ]
@@ -31,7 +31,7 @@ SUPPLIER_NEXT_STEP_LABELS = {
     "has_active_entity_with_payouts": "entity_payout_setup",
     "has_active_restaurant": "restaurant",
     "has_active_product": "product",
-    "has_active_plate": "plate",
+    "has_active_vianda": "vianda",
     "has_active_kitchen_day": "kitchen_day",
     "has_active_qr_code": "qr_code",
 }
@@ -57,13 +57,13 @@ SELECT
         WHERE institution_id = %(iid)s AND status = 'active' AND NOT is_archived
     ) AS has_active_product,
     EXISTS(
-        SELECT 1 FROM ops.plate_info p
+        SELECT 1 FROM ops.vianda_info p
         JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id
         WHERE r.institution_id = %(iid)s AND p.status = 'active' AND NOT p.is_archived
-    ) AS has_active_plate,
+    ) AS has_active_vianda,
     EXISTS(
-        SELECT 1 FROM ops.plate_kitchen_days pkd
-        JOIN ops.plate_info p ON pkd.plate_id = p.plate_id
+        SELECT 1 FROM ops.vianda_kitchen_days pkd
+        JOIN ops.vianda_info p ON pkd.vianda_id = p.vianda_id
         JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id
         WHERE r.institution_id = %(iid)s AND pkd.status = 'active' AND NOT pkd.is_archived
     ) AS has_active_kitchen_day,
@@ -77,8 +77,8 @@ SELECT
         (SELECT MAX(modified_date) FROM ops.institution_entity_info WHERE institution_id = %(iid)s AND NOT is_archived),
         (SELECT MAX(modified_date) FROM ops.restaurant_info WHERE institution_id = %(iid)s AND NOT is_archived),
         (SELECT MAX(modified_date) FROM ops.product_info WHERE institution_id = %(iid)s AND NOT is_archived),
-        (SELECT MAX(p.modified_date) FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT p.is_archived),
-        (SELECT MAX(pkd.modified_date) FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT pkd.is_archived),
+        (SELECT MAX(p.modified_date) FROM ops.vianda_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT p.is_archived),
+        (SELECT MAX(pkd.modified_date) FROM ops.vianda_kitchen_days pkd JOIN ops.vianda_info p ON pkd.vianda_id = p.vianda_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT pkd.is_archived),
         (SELECT MAX(q.modified_date) FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE r.institution_id = %(iid)s AND NOT q.is_archived)
     ) AS last_activity_date
 FROM core.institution_info i
@@ -359,8 +359,8 @@ _SUPPLIER_SUMMARY_CHECKLIST = """
     EXISTS(SELECT 1 FROM ops.institution_entity_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived AND payout_onboarding_status = 'complete') AS has_active_entity_with_payouts,
     EXISTS(SELECT 1 FROM ops.restaurant_info WHERE institution_id = i.institution_id AND status IN ('pending', 'active') AND NOT is_archived) AS has_active_restaurant,
     EXISTS(SELECT 1 FROM ops.product_info WHERE institution_id = i.institution_id AND status = 'active' AND NOT is_archived) AS has_active_product,
-    EXISTS(SELECT 1 FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND p.status = 'active' AND NOT p.is_archived) AS has_active_plate,
-    EXISTS(SELECT 1 FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND pkd.status = 'active' AND NOT pkd.is_archived) AS has_active_kitchen_day,
+    EXISTS(SELECT 1 FROM ops.vianda_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND p.status = 'active' AND NOT p.is_archived) AS has_active_vianda,
+    EXISTS(SELECT 1 FROM ops.vianda_kitchen_days pkd JOIN ops.vianda_info p ON pkd.vianda_id = p.vianda_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND pkd.status = 'active' AND NOT pkd.is_archived) AS has_active_kitchen_day,
     EXISTS(SELECT 1 FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND q.status = 'active' AND NOT q.is_archived) AS has_active_qr_code,"""
 
 _SUPPLIER_SUMMARY_ACTIVITY = """
@@ -369,8 +369,8 @@ _SUPPLIER_SUMMARY_ACTIVITY = """
         (SELECT MAX(modified_date) FROM ops.institution_entity_info WHERE institution_id = i.institution_id AND NOT is_archived),
         (SELECT MAX(modified_date) FROM ops.restaurant_info WHERE institution_id = i.institution_id AND NOT is_archived),
         (SELECT MAX(modified_date) FROM ops.product_info WHERE institution_id = i.institution_id AND NOT is_archived),
-        (SELECT MAX(p.modified_date) FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT p.is_archived),
-        (SELECT MAX(pkd.modified_date) FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT pkd.is_archived),
+        (SELECT MAX(p.modified_date) FROM ops.vianda_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT p.is_archived),
+        (SELECT MAX(pkd.modified_date) FROM ops.vianda_kitchen_days pkd JOIN ops.vianda_info p ON pkd.vianda_id = p.vianda_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT pkd.is_archived),
         (SELECT MAX(q.modified_date) FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE r.institution_id = i.institution_id AND NOT q.is_archived)
     ) AS last_activity_date"""
 
@@ -480,8 +480,8 @@ _ONBOARDING_TABLES = {
     "institution_entity_info": "SELECT institution_id FROM ops.institution_entity_info WHERE institution_entity_id = %s",
     "restaurant_info": "SELECT institution_id FROM ops.restaurant_info WHERE restaurant_id = %s",
     "product_info": "SELECT institution_id FROM ops.product_info WHERE product_id = %s",
-    "plate_info": "SELECT r.institution_id FROM ops.plate_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE p.plate_id = %s",
-    "plate_kitchen_days": "SELECT r.institution_id FROM ops.plate_kitchen_days pkd JOIN ops.plate_info p ON pkd.plate_id = p.plate_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE pkd.plate_kitchen_day_id = %s",
+    "vianda_info": "SELECT r.institution_id FROM ops.vianda_info p JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE p.vianda_id = %s",
+    "vianda_kitchen_days": "SELECT r.institution_id FROM ops.vianda_kitchen_days pkd JOIN ops.vianda_info p ON pkd.vianda_id = p.vianda_id JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id WHERE pkd.vianda_kitchen_day_id = %s",
     "qr_code": "SELECT r.institution_id FROM ops.qr_code q JOIN ops.restaurant_info r ON q.restaurant_id = r.restaurant_id WHERE q.qr_code_id = %s",
     # Employer tables
     "employer_benefits_program": "SELECT institution_id FROM core.employer_benefits_program WHERE program_id = %s",

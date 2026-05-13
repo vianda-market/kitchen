@@ -99,9 +99,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.address.country_required": "Either country_code or country name must be provided, or use place_id.",
         "validation.address.field_required": "Field '{address_field}' is required when place_id is not provided.",
         "validation.address.city_metadata_id_required": "city_metadata_id is required when place_id is not provided.",
-        # validation.plate.*
-        "validation.plate.kitchen_days_empty": "kitchen_days cannot be empty.",
-        "validation.plate.kitchen_days_duplicate": "kitchen_days cannot contain duplicate days.",
+        # validation.vianda.*
+        "validation.vianda.kitchen_days_empty": "kitchen_days cannot be empty.",
+        "validation.vianda.kitchen_days_duplicate": "kitchen_days cannot contain duplicate days.",
         # validation.discretionary.*
         "validation.discretionary.recipient_required": "Either user_id or restaurant_id must be provided.",
         "validation.discretionary.conflicting_recipients": "Cannot specify both user_id and restaurant_id.",
@@ -229,29 +229,29 @@ MESSAGES: dict[str, dict[str, str]] = {
         "subscription.payment_record_not_found": "No subscription payment found for this subscription.",
         "subscription.payment_provider_unavailable": "Payment details not available for this provider.",
         "subscription.access_denied": "You do not have access to this subscription.",
-        # plate_selection.* — lifecycle errors (K10)
-        "plate_selection.not_found": "Plate selection not found.",
-        "plate_selection.immutable_fields": "Cannot modify {fields}. Only pickup_time_range, pickup_intent, and flexible_on_time are editable. To change the plate, cancel this selection and create a new one.",
-        "plate_selection.access_denied": "Not authorized to access this plate selection.",
-        "plate_selection.not_editable": "Plate selection is no longer editable. Edits are allowed until 1 hour before kitchen day opens.",
-        "plate_selection.not_cancellable": "Plate selection is no longer editable. Cancellation is allowed until 1 hour before kitchen day opens.",
-        "plate_selection.duplicate_kitchen_day": "You already have a plate reserved for {kitchen_day}. Continue to cancel your meal and reserve this plate?",
-        # plate_pickup.* — errors (K10)
-        "plate_pickup.access_denied": "Not authorized to access this pickup record.",
-        "plate_pickup.invalid_qr_code": "This QR code is not recognized.",
-        "plate_pickup.wrong_restaurant": "You scanned the wrong restaurant's QR code.",
-        "plate_pickup.no_active_reservation": "No active reservation found for this restaurant.",
-        "plate_pickup.invalid_status": "Cannot perform this action with the current pickup status.",
-        "plate_pickup.invalid_signature": "Invalid QR code signature.",
-        "plate_pickup.cannot_delete": "Cannot delete pickup record with status {pickup_status}. Only pending orders can be deleted.",
-        # plate_review.* — errors (K10)
-        "plate_review.not_found": "Pickup not found.",
-        "plate_review.access_denied": "This pickup does not belong to you.",
-        "plate_review.not_eligible": "You can only review plates you have picked up. Complete the pickup first.",
-        "plate_review.pickup_archived": "Cannot review an archived pickup.",
-        "plate_review.already_exists": "This pickup has already been reviewed. Reviews are immutable.",
-        "plate_review.invalid_portion_rating": "Portion complaints can only be filed for reviews with portion size rating of 1 (small).",
-        "plate_review.complaint_exists": "A portion complaint has already been filed for this review.",
+        # vianda_selection.* — lifecycle errors (K10)
+        "vianda_selection.not_found": "Vianda selection not found.",
+        "vianda_selection.immutable_fields": "Cannot modify {fields}. Only pickup_time_range, pickup_intent, and flexible_on_time are editable. To change the vianda, cancel this selection and create a new one.",
+        "vianda_selection.access_denied": "Not authorized to access this vianda selection.",
+        "vianda_selection.not_editable": "Vianda selection is no longer editable. Edits are allowed until 1 hour before kitchen day opens.",
+        "vianda_selection.not_cancellable": "Vianda selection is no longer editable. Cancellation is allowed until 1 hour before kitchen day opens.",
+        "vianda_selection.duplicate_kitchen_day": "You already have a vianda reserved for {kitchen_day}. Continue to cancel your meal and reserve this vianda?",
+        # vianda_pickup.* — errors (K10)
+        "vianda_pickup.access_denied": "Not authorized to access this pickup record.",
+        "vianda_pickup.invalid_qr_code": "This QR code is not recognized.",
+        "vianda_pickup.wrong_restaurant": "You scanned the wrong restaurant's QR code.",
+        "vianda_pickup.no_active_reservation": "No active reservation found for this restaurant.",
+        "vianda_pickup.invalid_status": "Cannot perform this action with the current pickup status.",
+        "vianda_pickup.invalid_signature": "Invalid QR code signature.",
+        "vianda_pickup.cannot_delete": "Cannot delete pickup record with status {pickup_status}. Only pending orders can be deleted.",
+        # vianda_review.* — errors (K10)
+        "vianda_review.not_found": "Pickup not found.",
+        "vianda_review.access_denied": "This pickup does not belong to you.",
+        "vianda_review.not_eligible": "You can only review viandas you have picked up. Complete the pickup first.",
+        "vianda_review.pickup_archived": "Cannot review an archived pickup.",
+        "vianda_review.already_exists": "This pickup has already been reviewed. Reviews are immutable.",
+        "vianda_review.invalid_portion_rating": "Portion complaints can only be filed for reviews with portion size rating of 1 (small).",
+        "vianda_review.complaint_exists": "A portion complaint has already been filed for this review.",
         # payment_provider.* — Stripe Connect errors (K10)
         "payment_provider.onboarding_required": "Entity has no payout provider account. Complete onboarding first.",
         "payment_provider.not_ready": "Stripe Connect account is not yet enabled for payouts. Supplier must complete onboarding.",
@@ -294,8 +294,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "restaurant.entity_id_required": "institution_entity_id is required.",
         "restaurant.market_required": "A market is required. Send market_id or ensure the user has a primary market.",
         "restaurant.market_access_denied": "market_id must be one of your assigned markets.",
-        "restaurant.active_requires_setup": "Cannot set restaurant to Active. The restaurant must have at least one plate with active plate_kitchen_days and at least one active QR code. Add plate_kitchen_days and create a QR code via POST /api/v1/qr-codes, then try again.",
-        "restaurant.active_requires_plate_days": "Cannot set restaurant to Active. The restaurant must have at least one plate with active plate_kitchen_days. Add and activate plate_kitchen_days for the restaurant's plates, then try again.",
+        "restaurant.active_requires_setup": "Cannot set restaurant to Active. The restaurant must have at least one vianda with active vianda_kitchen_days and at least one active QR code. Add vianda_kitchen_days and create a QR code via POST /api/v1/qr-codes, then try again.",
+        "restaurant.active_requires_vianda_days": "Cannot set restaurant to Active. The restaurant must have at least one vianda with active vianda_kitchen_days. Add and activate vianda_kitchen_days for the restaurant's viandas, then try again.",
         "restaurant.active_requires_qr": "Cannot set restaurant to Active. The restaurant must have at least one active QR code. Create a QR code via POST /api/v1/qr-codes for this restaurant, then try again.",
         "restaurant.active_requires_entity_payouts": "Cannot activate restaurant: the linked institution entity has not completed Stripe Connect. Complete payout onboarding for the entity, then try again.",
         # restaurant_holiday.* — K11
@@ -306,14 +306,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "national_holiday.not_found": "National holiday not found.",
         "national_holiday.update_empty": "No fields provided for update.",
         # push.* — FCM notification copy (K4)
-        "push.pickup_ready_title": "Plate ready",
-        "push.pickup_ready_body": "Did you receive your plate from {restaurant_name}?",
+        "push.pickup_ready_title": "Vianda ready",
+        "push.pickup_ready_body": "Did you receive your vianda from {restaurant_name}?",
         # market.* — K12 (admin + billing sweep)
         "market.not_found": "Market not found.",
         "market.country_not_supported": "Country not supported for new markets. Use GET /api/v1/countries/ for the list of supported countries.",
         "market.super_admin_only": "Only Super Admin can perform this action on the Global Marketplace.",
-        "market.no_coverage_to_activate": "Cannot activate: market has no active restaurant with an active plate on an active weekly kitchen-day. Schedule coverage first, then set status to active.",
-        "market.has_coverage_confirm_deactivate": "This market currently has active plate coverage. Deactivating will hide it from customers immediately. Resubmit with confirm_deactivate=true to proceed.",
+        "market.no_coverage_to_activate": "Cannot activate: market has no active restaurant with an active vianda on an active weekly kitchen-day. Schedule coverage first, then set status to active.",
+        "market.has_coverage_confirm_deactivate": "This market currently has active vianda coverage. Deactivating will hide it from customers immediately. Resubmit with confirm_deactivate=true to proceed.",
         "market.global_cannot_be_archived": "The Global Marketplace cannot be archived.",
         "market.billing_config_not_found": "No billing config found for this market.",
         # ad_zone.* — K12
@@ -362,43 +362,43 @@ MESSAGES: dict[str, dict[str, str]] = {
         "user.duplicate_email_in_system": "Email already exists.",
         # entity.archive.* — K14
         "entity.search_invalid_param": "search_by must be one of: {allowed}.",
-        "entity.archive_active_pickups": "Cannot archive entity: {count} active plate pickup(s) exist. Complete or cancel them first.",
+        "entity.archive_active_pickups": "Cannot archive entity: {count} active vianda pickup(s) exist. Complete or cancel them first.",
         "entity.archive_active_restaurants": "Cannot archive entity: {count} active restaurant(s) must be archived first: {names}.",
-        "restaurant.archive_active_pickups": "Cannot archive restaurant: {count} active plate pickup(s) exist. Complete or cancel them first.",
-        # plate_kitchen_day.* — K14
-        "plate_kitchen_day.not_found": "Plate kitchen day not found.",
-        "plate_kitchen_day.duplicate": "Plate {plate_id} is already assigned to {kitchen_day}.",
-        "plate_kitchen_day.plate_id_immutable": "plate_id cannot be changed on an existing kitchen day; create a new record and archive the old one if needed.",
-        "plate_kitchen_day.archive_failed": "Failed to archive plate kitchen day.",
-        "plate_kitchen_day.update_failed": "Failed to update plate kitchen day.",
-        "plate_kitchen_day.delete_failed": "Failed to delete plate kitchen day.",
-        # restaurant.status.* — K14 (plate selection validation)
+        "restaurant.archive_active_pickups": "Cannot archive restaurant: {count} active vianda pickup(s) exist. Complete or cancel them first.",
+        # vianda_kitchen_day.* — K14
+        "vianda_kitchen_day.not_found": "Vianda kitchen day not found.",
+        "vianda_kitchen_day.duplicate": "Vianda {vianda_id} is already assigned to {kitchen_day}.",
+        "vianda_kitchen_day.vianda_id_immutable": "vianda_id cannot be changed on an existing kitchen day; create a new record and archive the old one if needed.",
+        "vianda_kitchen_day.archive_failed": "Failed to archive vianda kitchen day.",
+        "vianda_kitchen_day.update_failed": "Failed to update vianda kitchen day.",
+        "vianda_kitchen_day.delete_failed": "Failed to delete vianda kitchen day.",
+        # restaurant.status.* — K14 (vianda selection validation)
         "restaurant.archived": "Restaurant '{name}' is archived and cannot accept new orders.",
         "restaurant.entity_archived": "Restaurant '{name}' belongs to an archived entity and cannot accept new orders.",
         "restaurant.unavailable": "Restaurant '{name}' {status_message} and cannot accept new orders. Please try another restaurant.",
         "restaurant.national_holiday": "Restaurant '{name}' cannot accept orders on {date} due to a national holiday. Please select another date.",
         "restaurant.restaurant_holiday": "Restaurant '{name}' is closed on {date} due to a restaurant holiday. Please select another date.",
-        # plate_selection.window.* — K14
-        "plate_selection.pickup_time_required": "pickup_time_range is required and must be in HH:MM-HH:MM format (e.g. 11:30-11:45).",
-        "plate_selection.no_pickup_windows": "No pickup windows available for {kitchen_day} in this market. Please select another day.",
-        "plate_selection.invalid_pickup_window": "pickup_time_range '{pickup_time_range}' is not a valid pickup window for {kitchen_day}. Allowed windows: {allowed_windows}.",
-        "plate_selection.kitchen_day_invalid": "Kitchen is not operational on {kitchen_day}. Available days: {available_days}.",
-        "plate_selection.kitchen_day_not_available": "Plate is not available for {kitchen_day}. Available days: {available_days}.",
-        "plate_selection.kitchen_day_too_far": "Cannot order for {kitchen_day} from {current_day}. Orders are only allowed up to 1 week ahead.",
-        "plate_selection.no_kitchen_days": "No available kitchen days found within the next week. Available days: {available_days}.",
-        # plate_selection.create.* — K14
-        "plate_selection.plate_id_required": "plate_id is required.",
-        "plate_selection.plate_id_invalid": "Invalid plate_id format.",
-        # plate_review.access.* — K14
-        "plate_review.customer_only": "Customers cannot access institution reviews.",
-        "plate_review.no_institution": "No institution assigned.",
-        "plate_review.by_pickup_not_found": "Review not found for this pickup.",
+        # vianda_selection.window.* — K14
+        "vianda_selection.pickup_time_required": "pickup_time_range is required and must be in HH:MM-HH:MM format (e.g. 11:30-11:45).",
+        "vianda_selection.no_pickup_windows": "No pickup windows available for {kitchen_day} in this market. Please select another day.",
+        "vianda_selection.invalid_pickup_window": "pickup_time_range '{pickup_time_range}' is not a valid pickup window for {kitchen_day}. Allowed windows: {allowed_windows}.",
+        "vianda_selection.kitchen_day_invalid": "Kitchen is not operational on {kitchen_day}. Available days: {available_days}.",
+        "vianda_selection.kitchen_day_not_available": "Vianda is not available for {kitchen_day}. Available days: {available_days}.",
+        "vianda_selection.kitchen_day_too_far": "Cannot order for {kitchen_day} from {current_day}. Orders are only allowed up to 1 week ahead.",
+        "vianda_selection.no_kitchen_days": "No available kitchen days found within the next week. Available days: {available_days}.",
+        # vianda_selection.create.* — K14
+        "vianda_selection.vianda_id_required": "vianda_id is required.",
+        "vianda_selection.vianda_id_invalid": "Invalid vianda_id format.",
+        # vianda_review.access.* — K14
+        "vianda_review.customer_only": "Customers cannot access institution reviews.",
+        "vianda_review.no_institution": "No institution assigned.",
+        "vianda_review.by_pickup_not_found": "Review not found for this pickup.",
         # ingredient.* — K14
         "ingredient.not_found": "Ingredient {ingredient_id} not found.",
-        # plate_pickup.staff.* — K14
-        "plate_pickup.staff_only": "Access restricted to restaurant staff.",
-        "plate_pickup.invalid_user_id": "Invalid user ID format.",
-        "plate_pickup.invalid_filter": "Invalid filter parameter.",
+        # vianda_pickup.staff.* — K14
+        "vianda_pickup.staff_only": "Access restricted to restaurant staff.",
+        "vianda_pickup.invalid_user_id": "Invalid user ID format.",
+        "vianda_pickup.invalid_filter": "Invalid filter parameter.",
         # locale.* — K15
         "locale.unsupported": "Unsupported language '{lang}'. Supported: {supported}.",
         # address.* (business-logic) — K15
@@ -480,19 +480,19 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ad_zone.invalid_flywheel_state": "Invalid flywheel state.",
         # coworker.* — K15
         "coworker.employer_required": "You must have an employer assigned to list coworkers.",
-        "coworker.user_ineligible": "One or more users are not eligible coworkers for this plate selection.",
+        "coworker.user_ineligible": "One or more users are not eligible coworkers for this vianda selection.",
         # user.me.* — K15
         "user.use_me_endpoint": "Use the /me endpoint for your own profile.",
         # subscription.* — K15
         "subscription.creation_failed": "Failed to create subscription.",
         "subscription.payment_record_failed": "Failed to record subscription payment.",
-        # plate_review.operation.* — K15
-        "plate_review.creation_failed": "Failed to create plate review.",
-        "plate_review.complaint_failed": "Failed to file portion complaint.",
-        # plate_kitchen_days.* — K15
-        "plate_kitchen_days.list_failed": "Failed to list plate kitchen days.",
-        "plate_kitchen_days.enriched_list_failed": "Failed to get enriched plate kitchen days.",
-        "plate_kitchen_days.enriched_get_failed": "Failed to get enriched plate kitchen day.",
+        # vianda_review.operation.* — K15
+        "vianda_review.creation_failed": "Failed to create vianda review.",
+        "vianda_review.complaint_failed": "Failed to file portion complaint.",
+        # vianda_kitchen_days.* — K15
+        "vianda_kitchen_days.list_failed": "Failed to list vianda kitchen days.",
+        "vianda_kitchen_days.enriched_list_failed": "Failed to get enriched vianda kitchen days.",
+        "vianda_kitchen_days.enriched_get_failed": "Failed to get enriched vianda kitchen day.",
         # national_holiday.* — K15
         "national_holiday.update_failed": "Failed to update national holiday.",
         "national_holiday.delete_failed": "Failed to delete national holiday.",
@@ -517,8 +517,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         # restaurant_holiday.* — K15
         "restaurant_holiday.update_failed": "Failed to update restaurant holiday.",
         "restaurant_holiday.delete_failed": "Failed to delete restaurant holiday.",
-        # plate_selection.* operation — K15
-        "plate_selection.creation_failed": "Failed to create plate selection.",
+        # vianda_selection.* operation — K15
+        "vianda_selection.creation_failed": "Failed to create vianda selection.",
         # enrollment.* extended — K15
         "enrollment.benefit_employee_creation_failed": "Failed to create benefit employee.",
         "enrollment.subscription_creation_failed": "Failed to create subscription for enrollment.",
@@ -537,15 +537,15 @@ MESSAGES: dict[str, dict[str, str]] = {
         # currency_refresh.* — K15
         "currency_refresh.rate_unavailable": "Currency exchange rate not available.",
         # favorite.* — K15
-        "favorite.entity_type_invalid": "Invalid entity type. Must be one of: plate, restaurant.",
+        "favorite.entity_type_invalid": "Invalid entity type. Must be one of: vianda, restaurant.",
         "favorite.not_found": "Entity not found.",
         "favorite.already_added": "Already added to favorites.",
         # notification.* — K15
         "notification.not_found": "Notification not found.",
         # billing.payout.* — K15
         "billing.payout_bill_not_pending": "Only pending bills can be paid out.",
-        # plate_selection.* extended — K15
-        "plate_selection.pickup_intent_invalid": "pickup_intent must be offer, request, or self.",
+        # vianda_selection.* extended — K15
+        "vianda_selection.pickup_intent_invalid": "pickup_intent must be offer, request, or self.",
         # institution.* — K15
         "institution.restricted": "This institution cannot be assigned to a {context}. Use a Supplier institution.",
         # tax_id.* — K15
@@ -588,10 +588,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "user.list_failed": "Failed to retrieve users.",
         "user.enriched_get_failed": "Failed to retrieve user details.",
         "user.market_update_failed": "Failed to update market assignments.",
-        # service.* (product/plate/bill/geolocation helpers) — K16
+        # service.* (product/vianda/bill/geolocation helpers) — K16
         "service.product_list_failed": "Failed to retrieve products.",
         "service.product_search_failed": "Failed to search products.",
-        "service.plate_list_failed": "Failed to retrieve plates.",
+        "service.vianda_list_failed": "Failed to retrieve viandas.",
         "service.bill_list_failed": "Failed to retrieve bills.",
         "service.geolocation_get_failed": "Failed to retrieve geolocation.",
         # upload.* — image-pipeline-uploads-atomic
@@ -705,9 +705,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.address.country_required": "Se debe proporcionar country_code, el nombre del país o place_id.",
         "validation.address.field_required": "El campo '{address_field}' es obligatorio cuando no se proporciona place_id.",
         "validation.address.city_metadata_id_required": "city_metadata_id es obligatorio cuando no se proporciona place_id.",
-        # validation.plate.*
-        "validation.plate.kitchen_days_empty": "kitchen_days no puede estar vacío.",
-        "validation.plate.kitchen_days_duplicate": "kitchen_days no puede contener días duplicados.",
+        # validation.vianda.*
+        "validation.vianda.kitchen_days_empty": "kitchen_days no puede estar vacío.",
+        "validation.vianda.kitchen_days_duplicate": "kitchen_days no puede contener días duplicados.",
         # validation.discretionary.*
         "validation.discretionary.recipient_required": "Se debe proporcionar user_id o restaurant_id.",
         "validation.discretionary.conflicting_recipients": "No se puede especificar user_id y restaurant_id al mismo tiempo.",
@@ -835,29 +835,29 @@ MESSAGES: dict[str, dict[str, str]] = {
         "subscription.payment_record_not_found": "No se encontró un registro de pago para esta suscripción.",
         "subscription.payment_provider_unavailable": "Los detalles de pago no están disponibles para este proveedor.",
         "subscription.access_denied": "No tienes acceso a esta suscripción.",
-        # plate_selection.* — errores de ciclo de vida (K10)
-        "plate_selection.not_found": "Selección de plato no encontrada.",
-        "plate_selection.immutable_fields": "No se puede modificar {fields}. Solo pickup_time_range, pickup_intent y flexible_on_time son editables. Para cambiar el plato, cancela esta selección y crea una nueva.",
-        "plate_selection.access_denied": "No estás autorizado para acceder a esta selección de plato.",
-        "plate_selection.not_editable": "La selección de plato ya no es editable. Las ediciones se permiten hasta 1 hora antes de que abra el kitchen day.",
-        "plate_selection.not_cancellable": "La selección de plato ya no es editable. La cancelación se permite hasta 1 hora antes de que abra el kitchen day.",
-        "plate_selection.duplicate_kitchen_day": "Ya tienes un plato reservado para {kitchen_day}. ¿Deseas cancelar tu comida actual y reservar este plato?",
-        # plate_pickup.* — errores (K10)
-        "plate_pickup.access_denied": "No estás autorizado para acceder a este registro de recogida.",
-        "plate_pickup.invalid_qr_code": "Este código QR no es reconocido.",
-        "plate_pickup.wrong_restaurant": "Escaneaste el código QR de un restaurante incorrecto.",
-        "plate_pickup.no_active_reservation": "No se encontró una reserva activa para este restaurante.",
-        "plate_pickup.invalid_status": "No se puede realizar esta acción con el estado de recogida actual.",
-        "plate_pickup.invalid_signature": "Firma de código QR inválida.",
-        "plate_pickup.cannot_delete": "No se puede eliminar el registro de recogida con estado {pickup_status}. Solo se pueden eliminar pedidos pendientes.",
-        # plate_review.* — errores (K10)
-        "plate_review.not_found": "Recogida no encontrada.",
-        "plate_review.access_denied": "Esta recogida no te pertenece.",
-        "plate_review.not_eligible": "Solo puedes reseñar platos que hayas recogido. Completa la recogida primero.",
-        "plate_review.pickup_archived": "No se puede reseñar una recogida archivada.",
-        "plate_review.already_exists": "Esta recogida ya fue reseñada. Las reseñas son inmutables.",
-        "plate_review.invalid_portion_rating": "Las quejas de porción solo se pueden presentar para reseñas con calificación de porción 1 (pequeña).",
-        "plate_review.complaint_exists": "Ya se presentó una queja de porción para esta reseña.",
+        # vianda_selection.* — errores de ciclo de vida (K10)
+        "vianda_selection.not_found": "Selección de plato no encontrada.",
+        "vianda_selection.immutable_fields": "No se puede modificar {fields}. Solo pickup_time_range, pickup_intent y flexible_on_time son editables. Para cambiar el plato, cancela esta selección y crea una nueva.",
+        "vianda_selection.access_denied": "No estás autorizado para acceder a esta selección de plato.",
+        "vianda_selection.not_editable": "La selección de plato ya no es editable. Las ediciones se permiten hasta 1 hora antes de que abra el kitchen day.",
+        "vianda_selection.not_cancellable": "La selección de plato ya no es editable. La cancelación se permite hasta 1 hora antes de que abra el kitchen day.",
+        "vianda_selection.duplicate_kitchen_day": "Ya tienes un plato reservado para {kitchen_day}. ¿Deseas cancelar tu comida actual y reservar este plato?",
+        # vianda_pickup.* — errores (K10)
+        "vianda_pickup.access_denied": "No estás autorizado para acceder a este registro de recogida.",
+        "vianda_pickup.invalid_qr_code": "Este código QR no es reconocido.",
+        "vianda_pickup.wrong_restaurant": "Escaneaste el código QR de un restaurante incorrecto.",
+        "vianda_pickup.no_active_reservation": "No se encontró una reserva activa para este restaurante.",
+        "vianda_pickup.invalid_status": "No se puede realizar esta acción con el estado de recogida actual.",
+        "vianda_pickup.invalid_signature": "Firma de código QR inválida.",
+        "vianda_pickup.cannot_delete": "No se puede eliminar el registro de recogida con estado {pickup_status}. Solo se pueden eliminar pedidos pendientes.",
+        # vianda_review.* — errores (K10)
+        "vianda_review.not_found": "Recogida no encontrada.",
+        "vianda_review.access_denied": "Esta recogida no te pertenece.",
+        "vianda_review.not_eligible": "Solo puedes reseñar platos que hayas recogido. Completa la recogida primero.",
+        "vianda_review.pickup_archived": "No se puede reseñar una recogida archivada.",
+        "vianda_review.already_exists": "Esta recogida ya fue reseñada. Las reseñas son inmutables.",
+        "vianda_review.invalid_portion_rating": "Las quejas de porción solo se pueden presentar para reseñas con calificación de porción 1 (pequeña).",
+        "vianda_review.complaint_exists": "Ya se presentó una queja de porción para esta reseña.",
         # payment_provider.* — errores de Stripe Connect (K10)
         "payment_provider.onboarding_required": "La entidad no tiene cuenta de proveedor de pagos. Completa el registro primero.",
         "payment_provider.not_ready": "La cuenta Stripe Connect aún no está habilitada para pagos. El proveedor debe completar el registro.",
@@ -900,8 +900,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "restaurant.entity_id_required": "Se requiere institution_entity_id.",
         "restaurant.market_required": "Se requiere un mercado. Envía market_id o asegúrate de que el usuario tenga un mercado principal.",
         "restaurant.market_access_denied": "market_id debe ser uno de tus mercados asignados.",
-        "restaurant.active_requires_setup": "No se puede activar el restaurante. Debe tener al menos un plato con plate_kitchen_days activos y al menos un código QR activo. Agrega plate_kitchen_days y crea un código QR.",
-        "restaurant.active_requires_plate_days": "No se puede activar el restaurante. Debe tener al menos un plato con plate_kitchen_days activos.",
+        "restaurant.active_requires_setup": "No se puede activar el restaurante. Debe tener al menos un plato con vianda_kitchen_days activos y al menos un código QR activo. Agrega vianda_kitchen_days y crea un código QR.",
+        "restaurant.active_requires_vianda_days": "No se puede activar el restaurante. Debe tener al menos un plato con vianda_kitchen_days activos.",
         "restaurant.active_requires_qr": "No se puede activar el restaurante. Debe tener al menos un código QR activo. Crea un código QR para este restaurante.",
         "restaurant.active_requires_entity_payouts": "No se puede activar el restaurante: la entidad institucional vinculada no ha completado Stripe Connect. Completa el proceso de pago para la entidad e inténtalo de nuevo.",
         # restaurant_holiday.* — K11
@@ -971,40 +971,40 @@ MESSAGES: dict[str, dict[str, str]] = {
         "entity.archive_active_pickups": "No se puede archivar la entidad: existen {count} recogida(s) activa(s). Completa o cancélalas primero.",
         "entity.archive_active_restaurants": "No se puede archivar la entidad: {count} restaurante(s) activo(s) debe(n) archivarse primero: {names}.",
         "restaurant.archive_active_pickups": "No se puede archivar el restaurante: existen {count} recogida(s) activa(s). Completa o cancélalas primero.",
-        # plate_kitchen_day.* — K14
-        "plate_kitchen_day.not_found": "Día de cocina del plato no encontrado.",
-        "plate_kitchen_day.duplicate": "El plato {plate_id} ya está asignado a {kitchen_day}.",
-        "plate_kitchen_day.plate_id_immutable": "plate_id no puede modificarse en un día de cocina existente; crea un nuevo registro y archiva el anterior.",
-        "plate_kitchen_day.archive_failed": "Error al archivar el día de cocina del plato.",
-        "plate_kitchen_day.update_failed": "Error al actualizar el día de cocina del plato.",
-        "plate_kitchen_day.delete_failed": "Error al eliminar el día de cocina del plato.",
+        # vianda_kitchen_day.* — K14
+        "vianda_kitchen_day.not_found": "Día de cocina del plato no encontrado.",
+        "vianda_kitchen_day.duplicate": "El plato {vianda_id} ya está asignado a {kitchen_day}.",
+        "vianda_kitchen_day.vianda_id_immutable": "vianda_id no puede modificarse en un día de cocina existente; crea un nuevo registro y archiva el anterior.",
+        "vianda_kitchen_day.archive_failed": "Error al archivar el día de cocina del plato.",
+        "vianda_kitchen_day.update_failed": "Error al actualizar el día de cocina del plato.",
+        "vianda_kitchen_day.delete_failed": "Error al eliminar el día de cocina del plato.",
         # restaurant.status.* — K14
         "restaurant.archived": "El restaurante '{name}' está archivado y no puede aceptar nuevos pedidos.",
         "restaurant.entity_archived": "El restaurante '{name}' pertenece a una entidad archivada y no puede aceptar nuevos pedidos.",
         "restaurant.unavailable": "El restaurante '{name}' {status_message} y no puede aceptar nuevos pedidos. Por favor intenta con otro restaurante.",
         "restaurant.national_holiday": "El restaurante '{name}' no puede aceptar pedidos el {date} debido a un feriado nacional. Por favor selecciona otra fecha.",
         "restaurant.restaurant_holiday": "El restaurante '{name}' está cerrado el {date} por feriado del restaurante. Por favor selecciona otra fecha.",
-        # plate_selection.window.* — K14
-        "plate_selection.pickup_time_required": "pickup_time_range es obligatorio y debe estar en formato HH:MM-HH:MM (ej. 11:30-11:45).",
-        "plate_selection.no_pickup_windows": "No hay ventanas de recogida disponibles para {kitchen_day} en este mercado. Por favor selecciona otro día.",
-        "plate_selection.invalid_pickup_window": "pickup_time_range '{pickup_time_range}' no es una ventana de recogida válida para {kitchen_day}. Ventanas permitidas: {allowed_windows}.",
-        "plate_selection.kitchen_day_invalid": "La cocina no opera el {kitchen_day}. Días disponibles: {available_days}.",
-        "plate_selection.kitchen_day_not_available": "El plato no está disponible el {kitchen_day}. Días disponibles: {available_days}.",
-        "plate_selection.kitchen_day_too_far": "No se puede pedir para {kitchen_day} desde {current_day}. Los pedidos solo se permiten con hasta 1 semana de anticipación.",
-        "plate_selection.no_kitchen_days": "No se encontraron días de cocina disponibles en la próxima semana. Días disponibles: {available_days}.",
-        # plate_selection.create.* — K14
-        "plate_selection.plate_id_required": "plate_id es obligatorio.",
-        "plate_selection.plate_id_invalid": "Formato de plate_id inválido.",
-        # plate_review.access.* — K14
-        "plate_review.customer_only": "Los clientes no pueden acceder a las reseñas de la institución.",
-        "plate_review.no_institution": "No hay institución asignada.",
-        "plate_review.by_pickup_not_found": "Reseña no encontrada para esta recogida.",
+        # vianda_selection.window.* — K14
+        "vianda_selection.pickup_time_required": "pickup_time_range es obligatorio y debe estar en formato HH:MM-HH:MM (ej. 11:30-11:45).",
+        "vianda_selection.no_pickup_windows": "No hay ventanas de recogida disponibles para {kitchen_day} en este mercado. Por favor selecciona otro día.",
+        "vianda_selection.invalid_pickup_window": "pickup_time_range '{pickup_time_range}' no es una ventana de recogida válida para {kitchen_day}. Ventanas permitidas: {allowed_windows}.",
+        "vianda_selection.kitchen_day_invalid": "La cocina no opera el {kitchen_day}. Días disponibles: {available_days}.",
+        "vianda_selection.kitchen_day_not_available": "El plato no está disponible el {kitchen_day}. Días disponibles: {available_days}.",
+        "vianda_selection.kitchen_day_too_far": "No se puede pedir para {kitchen_day} desde {current_day}. Los pedidos solo se permiten con hasta 1 semana de anticipación.",
+        "vianda_selection.no_kitchen_days": "No se encontraron días de cocina disponibles en la próxima semana. Días disponibles: {available_days}.",
+        # vianda_selection.create.* — K14
+        "vianda_selection.vianda_id_required": "vianda_id es obligatorio.",
+        "vianda_selection.vianda_id_invalid": "Formato de vianda_id inválido.",
+        # vianda_review.access.* — K14
+        "vianda_review.customer_only": "Los clientes no pueden acceder a las reseñas de la institución.",
+        "vianda_review.no_institution": "No hay institución asignada.",
+        "vianda_review.by_pickup_not_found": "Reseña no encontrada para esta recogida.",
         # ingredient.* — K14
         "ingredient.not_found": "Ingrediente {ingredient_id} no encontrado.",
-        # plate_pickup.staff.* — K14
-        "plate_pickup.staff_only": "Acceso restringido al personal del restaurante.",
-        "plate_pickup.invalid_user_id": "Formato de ID de usuario inválido.",
-        "plate_pickup.invalid_filter": "Parámetro de filtro inválido.",
+        # vianda_pickup.staff.* — K14
+        "vianda_pickup.staff_only": "Acceso restringido al personal del restaurante.",
+        "vianda_pickup.invalid_user_id": "Formato de ID de usuario inválido.",
+        "vianda_pickup.invalid_filter": "Parámetro de filtro inválido.",
         # locale.* — K15
         "locale.unsupported": "Idioma no soportado '{locale}'. Soportados: {supported}.",
         # address.* (business-logic) — K15
@@ -1092,13 +1092,13 @@ MESSAGES: dict[str, dict[str, str]] = {
         # subscription.* — K15
         "subscription.creation_failed": "No se pudo crear la suscripción.",
         "subscription.payment_record_failed": "No se pudo registrar el pago de suscripción.",
-        # plate_review.operation.* — K15
-        "plate_review.creation_failed": "No se pudo crear la reseña del plato.",
-        "plate_review.complaint_failed": "No se pudo registrar la queja de porción.",
-        # plate_kitchen_days.* — K15
-        "plate_kitchen_days.list_failed": "Error al listar los días de cocina.",
-        "plate_kitchen_days.enriched_list_failed": "Error al obtener los días de cocina enriquecidos.",
-        "plate_kitchen_days.enriched_get_failed": "Error al obtener el día de cocina enriquecido.",
+        # vianda_review.operation.* — K15
+        "vianda_review.creation_failed": "No se pudo crear la reseña del plato.",
+        "vianda_review.complaint_failed": "No se pudo registrar la queja de porción.",
+        # vianda_kitchen_days.* — K15
+        "vianda_kitchen_days.list_failed": "Error al listar los días de cocina.",
+        "vianda_kitchen_days.enriched_list_failed": "Error al obtener los días de cocina enriquecidos.",
+        "vianda_kitchen_days.enriched_get_failed": "Error al obtener el día de cocina enriquecido.",
         # national_holiday.* — K15
         "national_holiday.update_failed": "No se pudo actualizar el feriado nacional.",
         "national_holiday.delete_failed": "No se pudo eliminar el feriado nacional.",
@@ -1123,8 +1123,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         # restaurant_holiday.* — K15
         "restaurant_holiday.update_failed": "No se pudo actualizar el feriado del restaurante.",
         "restaurant_holiday.delete_failed": "No se pudo eliminar el feriado del restaurante.",
-        # plate_selection.* operation — K15
-        "plate_selection.creation_failed": "No se pudo crear la selección de plato.",
+        # vianda_selection.* operation — K15
+        "vianda_selection.creation_failed": "No se pudo crear la selección de plato.",
         # enrollment.* extended — K15
         "enrollment.benefit_employee_creation_failed": "No se pudo crear el empleado beneficiario.",
         "enrollment.subscription_creation_failed": "No se pudo crear la suscripción para la inscripción.",
@@ -1143,15 +1143,15 @@ MESSAGES: dict[str, dict[str, str]] = {
         # currency_refresh.* — K15
         "currency_refresh.rate_unavailable": "Tipo de cambio de moneda no disponible.",
         # favorite.* — K15
-        "favorite.entity_type_invalid": "Tipo de entidad inválido. Debe ser: plate o restaurant.",
+        "favorite.entity_type_invalid": "Tipo de entidad inválido. Debe ser: vianda o restaurant.",
         "favorite.not_found": "Entidad no encontrada.",
         "favorite.already_added": "Ya está en favoritos.",
         # notification.* — K15
         "notification.not_found": "Notificación no encontrada.",
         # billing.payout.* — K15
         "billing.payout_bill_not_pending": "Solo las facturas pendientes pueden ser pagadas.",
-        # plate_selection.* extended — K15
-        "plate_selection.pickup_intent_invalid": "pickup_intent debe ser offer, request o self.",
+        # vianda_selection.* extended — K15
+        "vianda_selection.pickup_intent_invalid": "pickup_intent debe ser offer, request o self.",
         # institution.* — K15
         "institution.restricted": "Esta institución no puede asignarse a un {context}. Usa una institución Supplier.",
         # tax_id.* — K15
@@ -1194,10 +1194,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "user.list_failed": "Error al obtener los usuarios.",
         "user.enriched_get_failed": "Error al obtener los detalles del usuario.",
         "user.market_update_failed": "Error al actualizar las asignaciones de mercado.",
-        # service.* (product/plate/bill/geolocation helpers) — K16
+        # service.* (product/vianda/bill/geolocation helpers) — K16
         "service.product_list_failed": "Error al obtener los productos.",
         "service.product_search_failed": "Error al buscar productos.",
-        "service.plate_list_failed": "Error al obtener los platos.",
+        "service.vianda_list_failed": "Error al obtener los platos.",
         "service.bill_list_failed": "Error al obtener las facturas.",
         "service.geolocation_get_failed": "Error al obtener la geolocalización.",
         # upload.* — image-pipeline-uploads-atomic
@@ -1311,9 +1311,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "validation.address.country_required": "É necessário fornecer country_code, o nome do país ou place_id.",
         "validation.address.field_required": "O campo '{address_field}' é obrigatório quando place_id não é fornecido.",
         "validation.address.city_metadata_id_required": "city_metadata_id é obrigatório quando place_id não é fornecido.",
-        # validation.plate.*
-        "validation.plate.kitchen_days_empty": "kitchen_days não pode estar vazio.",
-        "validation.plate.kitchen_days_duplicate": "kitchen_days não pode conter dias duplicados.",
+        # validation.vianda.*
+        "validation.vianda.kitchen_days_empty": "kitchen_days não pode estar vazio.",
+        "validation.vianda.kitchen_days_duplicate": "kitchen_days não pode conter dias duplicados.",
         # validation.discretionary.*
         "validation.discretionary.recipient_required": "É necessário fornecer user_id ou restaurant_id.",
         "validation.discretionary.conflicting_recipients": "Não é possível especificar user_id e restaurant_id ao mesmo tempo.",
@@ -1441,29 +1441,29 @@ MESSAGES: dict[str, dict[str, str]] = {
         "subscription.payment_record_not_found": "Nenhum registro de pagamento encontrado para esta assinatura.",
         "subscription.payment_provider_unavailable": "Detalhes de pagamento não disponíveis para este provedor.",
         "subscription.access_denied": "Você não tem acesso a esta assinatura.",
-        # plate_selection.* — erros de ciclo de vida (K10)
-        "plate_selection.not_found": "Seleção de prato não encontrada.",
-        "plate_selection.immutable_fields": "Não é possível modificar {fields}. Apenas pickup_time_range, pickup_intent e flexible_on_time são editáveis. Para alterar o prato, cancele esta seleção e crie uma nova.",
-        "plate_selection.access_denied": "Não autorizado a acessar esta seleção de prato.",
-        "plate_selection.not_editable": "A seleção de prato não é mais editável. Edições são permitidas até 1 hora antes da abertura do kitchen day.",
-        "plate_selection.not_cancellable": "A seleção de prato não é mais editável. O cancelamento é permitido até 1 hora antes da abertura do kitchen day.",
-        "plate_selection.duplicate_kitchen_day": "Você já tem um prato reservado para {kitchen_day}. Deseja cancelar sua refeição atual e reservar este prato?",
-        # plate_pickup.* — erros (K10)
-        "plate_pickup.access_denied": "Não autorizado a acessar este registro de retirada.",
-        "plate_pickup.invalid_qr_code": "Este código QR não é reconhecido.",
-        "plate_pickup.wrong_restaurant": "Você escaneou o código QR do restaurante errado.",
-        "plate_pickup.no_active_reservation": "Nenhuma reserva ativa encontrada para este restaurante.",
-        "plate_pickup.invalid_status": "Não é possível realizar esta ação com o status de retirada atual.",
-        "plate_pickup.invalid_signature": "Assinatura de código QR inválida.",
-        "plate_pickup.cannot_delete": "Não é possível excluir o registro de retirada com status {pickup_status}. Apenas pedidos pendentes podem ser excluídos.",
-        # plate_review.* — erros (K10)
-        "plate_review.not_found": "Retirada não encontrada.",
-        "plate_review.access_denied": "Esta retirada não pertence a você.",
-        "plate_review.not_eligible": "Você só pode avaliar pratos que retirou. Complete a retirada primeiro.",
-        "plate_review.pickup_archived": "Não é possível avaliar uma retirada arquivada.",
-        "plate_review.already_exists": "Esta retirada já foi avaliada. As avaliações são imutáveis.",
-        "plate_review.invalid_portion_rating": "Reclamações de porção só podem ser feitas para avaliações com nota de porção 1 (pequena).",
-        "plate_review.complaint_exists": "Uma reclamação de porção já foi registrada para esta avaliação.",
+        # vianda_selection.* — erros de ciclo de vida (K10)
+        "vianda_selection.not_found": "Seleção de prato não encontrada.",
+        "vianda_selection.immutable_fields": "Não é possível modificar {fields}. Apenas pickup_time_range, pickup_intent e flexible_on_time são editáveis. Para alterar o prato, cancele esta seleção e crie uma nova.",
+        "vianda_selection.access_denied": "Não autorizado a acessar esta seleção de prato.",
+        "vianda_selection.not_editable": "A seleção de prato não é mais editável. Edições são permitidas até 1 hora antes da abertura do kitchen day.",
+        "vianda_selection.not_cancellable": "A seleção de prato não é mais editável. O cancelamento é permitido até 1 hora antes da abertura do kitchen day.",
+        "vianda_selection.duplicate_kitchen_day": "Você já tem um prato reservado para {kitchen_day}. Deseja cancelar sua refeição atual e reservar este prato?",
+        # vianda_pickup.* — erros (K10)
+        "vianda_pickup.access_denied": "Não autorizado a acessar este registro de retirada.",
+        "vianda_pickup.invalid_qr_code": "Este código QR não é reconhecido.",
+        "vianda_pickup.wrong_restaurant": "Você escaneou o código QR do restaurante errado.",
+        "vianda_pickup.no_active_reservation": "Nenhuma reserva ativa encontrada para este restaurante.",
+        "vianda_pickup.invalid_status": "Não é possível realizar esta ação com o status de retirada atual.",
+        "vianda_pickup.invalid_signature": "Assinatura de código QR inválida.",
+        "vianda_pickup.cannot_delete": "Não é possível excluir o registro de retirada com status {pickup_status}. Apenas pedidos pendentes podem ser excluídos.",
+        # vianda_review.* — erros (K10)
+        "vianda_review.not_found": "Retirada não encontrada.",
+        "vianda_review.access_denied": "Esta retirada não pertence a você.",
+        "vianda_review.not_eligible": "Você só pode avaliar pratos que retirou. Complete a retirada primeiro.",
+        "vianda_review.pickup_archived": "Não é possível avaliar uma retirada arquivada.",
+        "vianda_review.already_exists": "Esta retirada já foi avaliada. As avaliações são imutáveis.",
+        "vianda_review.invalid_portion_rating": "Reclamações de porção só podem ser feitas para avaliações com nota de porção 1 (pequena).",
+        "vianda_review.complaint_exists": "Uma reclamação de porção já foi registrada para esta avaliação.",
         # payment_provider.* — erros do Stripe Connect (K10)
         "payment_provider.onboarding_required": "A entidade não tem conta de provedor de pagamento. Complete o cadastro primeiro.",
         "payment_provider.not_ready": "A conta Stripe Connect ainda não está habilitada para pagamentos. O fornecedor deve completar o cadastro.",
@@ -1506,8 +1506,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "restaurant.entity_id_required": "institution_entity_id é obrigatório.",
         "restaurant.market_required": "Um mercado é necessário. Envie market_id ou certifique-se de que o usuário tem um mercado principal.",
         "restaurant.market_access_denied": "market_id deve ser um dos seus mercados atribuídos.",
-        "restaurant.active_requires_setup": "Não é possível ativar o restaurante. Ele deve ter pelo menos um prato com plate_kitchen_days ativos e pelo menos um código QR ativo.",
-        "restaurant.active_requires_plate_days": "Não é possível ativar o restaurante. Ele deve ter pelo menos um prato com plate_kitchen_days ativos.",
+        "restaurant.active_requires_setup": "Não é possível ativar o restaurante. Ele deve ter pelo menos um prato com vianda_kitchen_days ativos e pelo menos um código QR ativo.",
+        "restaurant.active_requires_vianda_days": "Não é possível ativar o restaurante. Ele deve ter pelo menos um prato com vianda_kitchen_days ativos.",
         "restaurant.active_requires_qr": "Não é possível ativar o restaurante. Ele deve ter pelo menos um código QR ativo. Crie um código QR para este restaurante.",
         "restaurant.active_requires_entity_payouts": "Não é possível ativar o restaurante: a entidade institucional vinculada não concluiu o Stripe Connect. Conclua o processo de pagamento para a entidade e tente novamente.",
         # restaurant_holiday.* — K11
@@ -1577,40 +1577,40 @@ MESSAGES: dict[str, dict[str, str]] = {
         "entity.archive_active_pickups": "Não é possível arquivar a entidade: existem {count} retirada(s) ativa(s). Complete ou cancele-as primeiro.",
         "entity.archive_active_restaurants": "Não é possível arquivar a entidade: {count} restaurante(s) ativo(s) deve(m) ser arquivado(s) primeiro: {names}.",
         "restaurant.archive_active_pickups": "Não é possível arquivar o restaurante: existem {count} retirada(s) ativa(s). Complete ou cancele-as primeiro.",
-        # plate_kitchen_day.* — K14
-        "plate_kitchen_day.not_found": "Dia de cozinha do prato não encontrado.",
-        "plate_kitchen_day.duplicate": "O prato {plate_id} já está atribuído a {kitchen_day}.",
-        "plate_kitchen_day.plate_id_immutable": "plate_id não pode ser alterado em um dia de cozinha existente; crie um novo registro e arquive o antigo.",
-        "plate_kitchen_day.archive_failed": "Falha ao arquivar o dia de cozinha do prato.",
-        "plate_kitchen_day.update_failed": "Falha ao atualizar o dia de cozinha do prato.",
-        "plate_kitchen_day.delete_failed": "Falha ao excluir o dia de cozinha do prato.",
+        # vianda_kitchen_day.* — K14
+        "vianda_kitchen_day.not_found": "Dia de cozinha do prato não encontrado.",
+        "vianda_kitchen_day.duplicate": "O prato {vianda_id} já está atribuído a {kitchen_day}.",
+        "vianda_kitchen_day.vianda_id_immutable": "vianda_id não pode ser alterado em um dia de cozinha existente; crie um novo registro e arquive o antigo.",
+        "vianda_kitchen_day.archive_failed": "Falha ao arquivar o dia de cozinha do prato.",
+        "vianda_kitchen_day.update_failed": "Falha ao atualizar o dia de cozinha do prato.",
+        "vianda_kitchen_day.delete_failed": "Falha ao excluir o dia de cozinha do prato.",
         # restaurant.status.* — K14
         "restaurant.archived": "O restaurante '{name}' está arquivado e não pode aceitar novos pedidos.",
         "restaurant.entity_archived": "O restaurante '{name}' pertence a uma entidade arquivada e não pode aceitar novos pedidos.",
         "restaurant.unavailable": "O restaurante '{name}' {status_message} e não pode aceitar novos pedidos. Por favor tente outro restaurante.",
         "restaurant.national_holiday": "O restaurante '{name}' não pode aceitar pedidos em {date} devido a um feriado nacional. Por favor selecione outra data.",
         "restaurant.restaurant_holiday": "O restaurante '{name}' está fechado em {date} devido a um feriado do restaurante. Por favor selecione outra data.",
-        # plate_selection.window.* — K14
-        "plate_selection.pickup_time_required": "pickup_time_range é obrigatório e deve estar no formato HH:MM-HH:MM (ex. 11:30-11:45).",
-        "plate_selection.no_pickup_windows": "Não há janelas de retirada disponíveis para {kitchen_day} neste mercado. Por favor selecione outro dia.",
-        "plate_selection.invalid_pickup_window": "pickup_time_range '{pickup_time_range}' não é uma janela de retirada válida para {kitchen_day}. Janelas permitidas: {allowed_windows}.",
-        "plate_selection.kitchen_day_invalid": "A cozinha não opera em {kitchen_day}. Dias disponíveis: {available_days}.",
-        "plate_selection.kitchen_day_not_available": "O prato não está disponível em {kitchen_day}. Dias disponíveis: {available_days}.",
-        "plate_selection.kitchen_day_too_far": "Não é possível pedir para {kitchen_day} a partir de {current_day}. Pedidos são permitidos com até 1 semana de antecedência.",
-        "plate_selection.no_kitchen_days": "Nenhum dia de cozinha disponível encontrado na próxima semana. Dias disponíveis: {available_days}.",
-        # plate_selection.create.* — K14
-        "plate_selection.plate_id_required": "plate_id é obrigatório.",
-        "plate_selection.plate_id_invalid": "Formato de plate_id inválido.",
-        # plate_review.access.* — K14
-        "plate_review.customer_only": "Clientes não podem acessar avaliações da instituição.",
-        "plate_review.no_institution": "Nenhuma instituição atribuída.",
-        "plate_review.by_pickup_not_found": "Avaliação não encontrada para esta retirada.",
+        # vianda_selection.window.* — K14
+        "vianda_selection.pickup_time_required": "pickup_time_range é obrigatório e deve estar no formato HH:MM-HH:MM (ex. 11:30-11:45).",
+        "vianda_selection.no_pickup_windows": "Não há janelas de retirada disponíveis para {kitchen_day} neste mercado. Por favor selecione outro dia.",
+        "vianda_selection.invalid_pickup_window": "pickup_time_range '{pickup_time_range}' não é uma janela de retirada válida para {kitchen_day}. Janelas permitidas: {allowed_windows}.",
+        "vianda_selection.kitchen_day_invalid": "A cozinha não opera em {kitchen_day}. Dias disponíveis: {available_days}.",
+        "vianda_selection.kitchen_day_not_available": "O prato não está disponível em {kitchen_day}. Dias disponíveis: {available_days}.",
+        "vianda_selection.kitchen_day_too_far": "Não é possível pedir para {kitchen_day} a partir de {current_day}. Pedidos são permitidos com até 1 semana de antecedência.",
+        "vianda_selection.no_kitchen_days": "Nenhum dia de cozinha disponível encontrado na próxima semana. Dias disponíveis: {available_days}.",
+        # vianda_selection.create.* — K14
+        "vianda_selection.vianda_id_required": "vianda_id é obrigatório.",
+        "vianda_selection.vianda_id_invalid": "Formato de vianda_id inválido.",
+        # vianda_review.access.* — K14
+        "vianda_review.customer_only": "Clientes não podem acessar avaliações da instituição.",
+        "vianda_review.no_institution": "Nenhuma instituição atribuída.",
+        "vianda_review.by_pickup_not_found": "Avaliação não encontrada para esta retirada.",
         # ingredient.* — K14
         "ingredient.not_found": "Ingrediente {ingredient_id} não encontrado.",
-        # plate_pickup.staff.* — K14
-        "plate_pickup.staff_only": "Acesso restrito à equipe do restaurante.",
-        "plate_pickup.invalid_user_id": "Formato de ID de usuário inválido.",
-        "plate_pickup.invalid_filter": "Parâmetro de filtro inválido.",
+        # vianda_pickup.staff.* — K14
+        "vianda_pickup.staff_only": "Acesso restrito à equipe do restaurante.",
+        "vianda_pickup.invalid_user_id": "Formato de ID de usuário inválido.",
+        "vianda_pickup.invalid_filter": "Parâmetro de filtro inválido.",
         # locale.* — K15
         "locale.unsupported": "Idioma não suportado '{locale}'. Suportados: {supported}.",
         # address.* (business-logic) — K15
@@ -1698,13 +1698,13 @@ MESSAGES: dict[str, dict[str, str]] = {
         # subscription.* — K15
         "subscription.creation_failed": "Falha ao criar a assinatura.",
         "subscription.payment_record_failed": "Falha ao registrar o pagamento da assinatura.",
-        # plate_review.operation.* — K15
-        "plate_review.creation_failed": "Falha ao criar a avaliação do prato.",
-        "plate_review.complaint_failed": "Falha ao registrar a reclamação de porção.",
-        # plate_kitchen_days.* — K15
-        "plate_kitchen_days.list_failed": "Falha ao listar os dias de cozinha.",
-        "plate_kitchen_days.enriched_list_failed": "Falha ao obter os dias de cozinha enriquecidos.",
-        "plate_kitchen_days.enriched_get_failed": "Falha ao obter o dia de cozinha enriquecido.",
+        # vianda_review.operation.* — K15
+        "vianda_review.creation_failed": "Falha ao criar a avaliação do prato.",
+        "vianda_review.complaint_failed": "Falha ao registrar a reclamação de porção.",
+        # vianda_kitchen_days.* — K15
+        "vianda_kitchen_days.list_failed": "Falha ao listar os dias de cozinha.",
+        "vianda_kitchen_days.enriched_list_failed": "Falha ao obter os dias de cozinha enriquecidos.",
+        "vianda_kitchen_days.enriched_get_failed": "Falha ao obter o dia de cozinha enriquecido.",
         # national_holiday.* — K15
         "national_holiday.update_failed": "Falha ao atualizar o feriado nacional.",
         "national_holiday.delete_failed": "Falha ao excluir o feriado nacional.",
@@ -1729,8 +1729,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         # restaurant_holiday.* — K15
         "restaurant_holiday.update_failed": "Falha ao atualizar o feriado do restaurante.",
         "restaurant_holiday.delete_failed": "Falha ao excluir o feriado do restaurante.",
-        # plate_selection.* operation — K15
-        "plate_selection.creation_failed": "Falha ao criar a seleção de prato.",
+        # vianda_selection.* operation — K15
+        "vianda_selection.creation_failed": "Falha ao criar a seleção de prato.",
         # enrollment.* extended — K15
         "enrollment.benefit_employee_creation_failed": "Falha ao criar o funcionário beneficiário.",
         "enrollment.subscription_creation_failed": "Falha ao criar a assinatura para a inscrição.",
@@ -1749,15 +1749,15 @@ MESSAGES: dict[str, dict[str, str]] = {
         # currency_refresh.* — K15
         "currency_refresh.rate_unavailable": "Taxa de câmbio de moeda não disponível.",
         # favorite.* — K15
-        "favorite.entity_type_invalid": "Tipo de entidade inválido. Deve ser: plate ou restaurant.",
+        "favorite.entity_type_invalid": "Tipo de entidade inválido. Deve ser: vianda ou restaurant.",
         "favorite.not_found": "Entidade não encontrada.",
         "favorite.already_added": "Já adicionado aos favoritos.",
         # notification.* — K15
         "notification.not_found": "Notificação não encontrada.",
         # billing.payout.* — K15
         "billing.payout_bill_not_pending": "Somente faturas pendentes podem ser pagas.",
-        # plate_selection.* extended — K15
-        "plate_selection.pickup_intent_invalid": "pickup_intent deve ser offer, request ou self.",
+        # vianda_selection.* extended — K15
+        "vianda_selection.pickup_intent_invalid": "pickup_intent deve ser offer, request ou self.",
         # institution.* — K15
         "institution.restricted": "Esta instituição não pode ser atribuída a um {context}. Use uma instituição Supplier.",
         # tax_id.* — K15
@@ -1800,10 +1800,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "user.list_failed": "Falha ao recuperar os usuários.",
         "user.enriched_get_failed": "Falha ao recuperar os detalhes do usuário.",
         "user.market_update_failed": "Falha ao atualizar as atribuições de mercado.",
-        # service.* (product/plate/bill/geolocation helpers) — K16
+        # service.* (product/vianda/bill/geolocation helpers) — K16
         "service.product_list_failed": "Falha ao recuperar os produtos.",
         "service.product_search_failed": "Falha ao pesquisar produtos.",
-        "service.plate_list_failed": "Falha ao recuperar os pratos.",
+        "service.vianda_list_failed": "Falha ao recuperar os pratos.",
         "service.bill_list_failed": "Falha ao recuperar as faturas.",
         "service.geolocation_get_failed": "Falha ao recuperar a geolocalização.",
         # upload.* — image-pipeline-uploads-atomic

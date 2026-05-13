@@ -17,7 +17,7 @@ def bucket_portion_size(average: float | None, review_count: int) -> str:
 
     Args:
         average: Raw average portion size rating (1-3) from reviews
-        review_count: Number of reviews for the plate
+        review_count: Number of reviews for the vianda
 
     Returns:
         One of: 'light', 'standard', 'large', 'insufficient_reviews'

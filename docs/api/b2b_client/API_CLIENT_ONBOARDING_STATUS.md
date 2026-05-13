@@ -58,7 +58,7 @@ Every Supplier/Employer JWT token includes an `onboarding_status` claim:
     "has_active_entity_with_payouts": true,
     "has_active_restaurant": true,
     "has_active_product": false,
-    "has_active_plate": false,
+    "has_active_vianda": false,
     "has_active_kitchen_day": false,
     "has_active_qr_code": false
   }
@@ -89,8 +89,8 @@ These are checked in dependency order — `next_step` returns the first `false`:
 | `has_active_entity_with_payouts` | Active entity with `payout_onboarding_status = 'complete'` | `entity_payout_setup` | address |
 | `has_active_restaurant` | Non-archived restaurant in `pending` or `active` status — "usable" for nav gating (lazy-activation-aware; see note below) | `restaurant` | address, entity |
 | `has_active_product` | Active, non-archived product | `product` | — |
-| `has_active_plate` | Active plate linked to a restaurant | `plate` | restaurant, product |
-| `has_active_kitchen_day` | Active kitchen day on a plate | `kitchen_day` | plate |
+| `has_active_vianda` | Active vianda linked to a restaurant | `vianda` | restaurant, product |
+| `has_active_kitchen_day` | Active kitchen day on a vianda | `kitchen_day` | vianda |
 | `has_active_qr_code` | Active QR code on a restaurant | `qr_code` | restaurant |
 
 ### Error Responses
@@ -137,15 +137,15 @@ const nav = {
   "Entities":     data.checklist.has_active_address,
   "Restaurants":  data.checklist.has_active_entity_with_payouts,
   "Products":     true,  // independent of restaurant
-  "Plates":       data.checklist.has_active_restaurant && data.checklist.has_active_product,
-  "Kitchen Days": data.checklist.has_active_plate,
+  "Viandas":       data.checklist.has_active_restaurant && data.checklist.has_active_product,
+  "Kitchen Days": data.checklist.has_active_vianda,
   "QR Codes":     data.checklist.has_active_restaurant,
 };
 ```
 
 ### Note on `has_active_restaurant` and lazy activation
 
-`has_active_restaurant` counts any non-archived restaurant with `status IN ('pending', 'active')`. A restaurant starts in `pending` status and is promoted to `active` lazily once plate_kitchen_days and a QR code exist (see `RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md`). The checklist uses the broader "usable" definition so that the **Plates** and **QR Codes** nav items unlock as soon as a restaurant record exists — the supplier doesn't need to manually activate it first.
+`has_active_restaurant` counts any non-archived restaurant with `status IN ('pending', 'active')`. A restaurant starts in `pending` status and is promoted to `active` lazily once vianda_kitchen_days and a QR code exist (see `RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md`). The checklist uses the broader "usable" definition so that the **Viandas** and **QR Codes** nav items unlock as soon as a restaurant record exists — the supplier doesn't need to manually activate it first.
 
 ### 4. Regression Handling
 

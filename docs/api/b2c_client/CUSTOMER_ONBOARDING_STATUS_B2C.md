@@ -11,7 +11,7 @@
 The backend tracks whether a Customer has completed onboarding (email verification + active subscription). The mobile app can use this to:
 
 - **Show subscribe prompts** — when `onboarding_status != "complete"`, prompt the user to subscribe
-- **Gate features** — disable plate browsing or ordering until subscribed
+- **Gate features** — disable vianda browsing or ordering until subscribed
 - **Fast page-load check** via JWT `onboarding_status` claim — no extra API call needed
 - **Benefit employee awareness** — benefit employees see the same status; their subscription may be employer-paid
 

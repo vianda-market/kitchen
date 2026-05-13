@@ -11,7 +11,7 @@
 
 National holidays are **country-scoped** calendar dates stored in `national_holidays`. They affect product behavior platform-wide for that country:
 
-- **Plate selection / kitchen days**: customers generally cannot pick a kitchen day that falls on a national holiday for their country (see validation in plate-selection flows).
+- **Vianda selection / kitchen days**: customers generally cannot pick a kitchen day that falls on a national holiday for their country (see validation in vianda-selection flows).
 - **Billing**: institution billing can skip entities when the bill date is a national holiday for that country.
 
 They are separate from **restaurant-specific** closures (`restaurant_holidays`), which are per restaurant.

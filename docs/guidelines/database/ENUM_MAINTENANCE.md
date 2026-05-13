@@ -61,7 +61,7 @@ ALTER TYPE kitchen_day_enum ADD VALUE 'Saturday';
 If seed data uses the enum value, update it:
 ```sql
 -- app/db/seed.sql
-INSERT INTO plate_kitchen_days (..., kitchen_day, ...) VALUES 
+INSERT INTO vianda_kitchen_days (..., kitchen_day, ...) VALUES 
 (..., 'Saturday'::kitchen_day_enum, ...);  -- ← Use new value with enum casting
 ```
 
@@ -108,7 +108,7 @@ ALTER TYPE kitchen_day_enum ADD VALUE 'Saturday';
 ### Step 3: Update Seed Data (if needed)
 ```sql
 -- app/db/seed.sql
-INSERT INTO plate_kitchen_days (plate_id, kitchen_day, ...) VALUES
+INSERT INTO vianda_kitchen_days (vianda_id, kitchen_day, ...) VALUES
 ('uuid', 'Saturday'::kitchen_day_enum, ...);
 ```
 

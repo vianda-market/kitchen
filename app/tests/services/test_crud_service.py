@@ -19,7 +19,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict
 
 from app.config import Status
-from app.dto.models import PlateKitchenDaysDTO
+from app.dto.models import ViandaKitchenDaysDTO
 from app.security.institution_scope import InstitutionScope
 from app.services.crud_service import CRUDService
 
@@ -83,11 +83,11 @@ def join_scoping_service():
 def multi_join_scoping_service():
     """CRUDService with JOIN-based scoping (multiple JOINs)"""
     return CRUDService(
-        table_name="plate_kitchen_days",
-        dto_class=PlateKitchenDaysDTO,
-        id_column="plate_kitchen_day_id",
+        table_name="vianda_kitchen_days",
+        dto_class=ViandaKitchenDaysDTO,
+        id_column="vianda_kitchen_day_id",
         institution_join_path=[
-            ("INNER", "plate_info", "p", "plate_kitchen_days.plate_id = p.plate_id"),
+            ("INNER", "vianda_info", "p", "vianda_kitchen_days.vianda_id = p.vianda_id"),
             ("INNER", "restaurant_info", "r", "p.restaurant_id = r.restaurant_id"),
         ],
         institution_table_alias="r",
@@ -118,11 +118,11 @@ class TestBuildJoinQueryWithScope:
         """Test query building without scope"""
         query, params = multi_join_scoping_service._build_join_query_with_scope(scope=None, include_archived=False)
 
-        assert "SELECT plate_kitchen_days.*" in query
-        assert "FROM plate_kitchen_days" in query
-        assert "INNER JOIN plate_info p" in query
+        assert "SELECT vianda_kitchen_days.*" in query
+        assert "FROM vianda_kitchen_days" in query
+        assert "INNER JOIN vianda_info p" in query
         assert "INNER JOIN restaurant_info r" in query
-        assert "plate_kitchen_days.is_archived = FALSE" in query
+        assert "vianda_kitchen_days.is_archived = FALSE" in query
         assert "r.institution_id" not in query  # No scoping
         assert len(params) == 0
 
@@ -132,10 +132,10 @@ class TestBuildJoinQueryWithScope:
             scope=global_scope, include_archived=False
         )
 
-        assert "SELECT plate_kitchen_days.*" in query
-        assert "INNER JOIN plate_info p" in query
+        assert "SELECT vianda_kitchen_days.*" in query
+        assert "INNER JOIN vianda_info p" in query
         assert "INNER JOIN restaurant_info r" in query
-        assert "plate_kitchen_days.is_archived = FALSE" in query
+        assert "vianda_kitchen_days.is_archived = FALSE" in query
         assert "r.institution_id" not in query  # Global scope doesn't filter
         assert len(params) == 0
 
@@ -145,11 +145,11 @@ class TestBuildJoinQueryWithScope:
             scope=supplier_scope, include_archived=False
         )
 
-        assert "SELECT plate_kitchen_days.*" in query
-        assert "INNER JOIN plate_info p" in query
+        assert "SELECT vianda_kitchen_days.*" in query
+        assert "INNER JOIN vianda_info p" in query
         assert "INNER JOIN restaurant_info r" in query
         assert "r.institution_id = %s::uuid" in query
-        assert "plate_kitchen_days.is_archived = FALSE" in query
+        assert "vianda_kitchen_days.is_archived = FALSE" in query
         assert len(params) == 1
         assert params[0] == str(supplier_scope.institution_id)
 
@@ -159,7 +159,7 @@ class TestBuildJoinQueryWithScope:
             scope=supplier_scope, include_archived=True
         )
 
-        assert "plate_kitchen_days.is_archived = FALSE" not in query
+        assert "vianda_kitchen_days.is_archived = FALSE" not in query
         assert "r.institution_id = %s::uuid" in query
         assert len(params) == 1
 
@@ -168,11 +168,11 @@ class TestBuildJoinQueryWithScope:
         query, params = multi_join_scoping_service._build_join_query_with_scope(
             scope=supplier_scope,
             include_archived=False,
-            select_fields="plate_kitchen_days.plate_kitchen_day_id, plate_kitchen_days.kitchen_day",
+            select_fields="vianda_kitchen_days.vianda_kitchen_day_id, vianda_kitchen_days.kitchen_day",
         )
 
-        assert "SELECT plate_kitchen_days.plate_kitchen_day_id, plate_kitchen_days.kitchen_day" in query
-        assert "plate_kitchen_days.*" not in query
+        assert "SELECT vianda_kitchen_days.vianda_kitchen_day_id, vianda_kitchen_days.kitchen_day" in query
+        assert "vianda_kitchen_days.*" not in query
 
     def test_build_join_query_custom_order_by(self, multi_join_scoping_service, supplier_scope):
         """Test query building with custom ORDER BY"""
@@ -189,13 +189,13 @@ class TestBuildJoinQueryWithScope:
             scope=supplier_scope,
             include_archived=False,
             additional_conditions=[
-                ("plate_kitchen_days.kitchen_day = %s", ["monday"]),
-                ("p.plate_id = %s::uuid", [str(uuid4())]),
+                ("vianda_kitchen_days.kitchen_day = %s", ["monday"]),
+                ("p.vianda_id = %s::uuid", [str(uuid4())]),
             ],
         )
 
-        assert "plate_kitchen_days.kitchen_day = %s" in query
-        assert "p.plate_id = %s::uuid" in query
+        assert "vianda_kitchen_days.kitchen_day = %s" in query
+        assert "p.vianda_id = %s::uuid" in query
         assert len(params) == 3  # institution_id + 2 additional conditions
 
     def test_build_join_query_requires_join_path(self, direct_scoping_service, supplier_scope):
@@ -212,8 +212,8 @@ class TestGetAllWithJoinScoping:
         """Test get_all() without scope"""
         mock_db_read.return_value = [
             {
-                "plate_kitchen_day_id": uuid4(),
-                "plate_id": uuid4(),
+                "vianda_kitchen_day_id": uuid4(),
+                "vianda_id": uuid4(),
                 "kitchen_day": "Monday",
                 "status": Status.ACTIVE,
                 "is_archived": False,
@@ -226,10 +226,10 @@ class TestGetAllWithJoinScoping:
         results = multi_join_scoping_service.get_all(mock_db, scope=None)
 
         assert len(results) == 1
-        assert isinstance(results[0], PlateKitchenDaysDTO)
+        assert isinstance(results[0], ViandaKitchenDaysDTO)
         # Verify query includes JOINs but no institution filter
         call_args = mock_db_read.call_args
-        assert "INNER JOIN plate_info p" in call_args[0][0]
+        assert "INNER JOIN vianda_info p" in call_args[0][0]
         assert "INNER JOIN restaurant_info r" in call_args[0][0]
         assert "r.institution_id" not in call_args[0][0]
 
@@ -238,8 +238,8 @@ class TestGetAllWithJoinScoping:
         """Test get_all() with global scope (Internal)"""
         mock_db_read.return_value = [
             {
-                "plate_kitchen_day_id": uuid4(),
-                "plate_id": uuid4(),
+                "vianda_kitchen_day_id": uuid4(),
+                "vianda_id": uuid4(),
                 "kitchen_day": "Monday",
                 "status": Status.ACTIVE,
                 "is_archived": False,
@@ -262,8 +262,8 @@ class TestGetAllWithJoinScoping:
         institution_id = supplier_scope.institution_id
         mock_db_read.return_value = [
             {
-                "plate_kitchen_day_id": uuid4(),
-                "plate_id": uuid4(),
+                "vianda_kitchen_day_id": uuid4(),
+                "vianda_id": uuid4(),
                 "kitchen_day": "Monday",
                 "status": Status.ACTIVE,
                 "is_archived": False,
@@ -311,8 +311,8 @@ class TestGetByIdWithJoinScoping:
         """Test get_by_id() without scope"""
         record_id = uuid4()
         mock_db_read.return_value = {
-            "plate_kitchen_day_id": record_id,
-            "plate_id": uuid4(),
+            "vianda_kitchen_day_id": record_id,
+            "vianda_id": uuid4(),
             "kitchen_day": "Monday",
             "status": Status.ACTIVE,
             "is_archived": False,
@@ -324,11 +324,11 @@ class TestGetByIdWithJoinScoping:
         result = multi_join_scoping_service.get_by_id(record_id, mock_db, scope=None)
 
         assert result is not None
-        assert isinstance(result, PlateKitchenDaysDTO)
-        assert result.plate_kitchen_day_id == record_id
+        assert isinstance(result, ViandaKitchenDaysDTO)
+        assert result.vianda_kitchen_day_id == record_id
         # Verify query includes JOINs but no institution filter
         call_args = mock_db_read.call_args
-        assert "INNER JOIN plate_info p" in call_args[0][0]
+        assert "INNER JOIN vianda_info p" in call_args[0][0]
         assert "r.institution_id" not in call_args[0][0]
 
     @patch("app.services.crud_service.db_read")
@@ -337,8 +337,8 @@ class TestGetByIdWithJoinScoping:
         record_id = uuid4()
         institution_id = supplier_scope.institution_id
         mock_db_read.return_value = {
-            "plate_kitchen_day_id": record_id,
-            "plate_id": uuid4(),
+            "vianda_kitchen_day_id": record_id,
+            "vianda_id": uuid4(),
             "kitchen_day": "Monday",
             "status": Status.ACTIVE,
             "is_archived": False,
@@ -427,12 +427,12 @@ class TestValidateJoinBasedScope:
         mock_db_read.return_value = {"institution_id": institution_id}
 
         # Should not raise an exception
-        multi_join_scoping_service._validate_join_based_scope(mock_db, supplier_scope, "plate_id", foreign_key_value)
+        multi_join_scoping_service._validate_join_based_scope(mock_db, supplier_scope, "vianda_id", foreign_key_value)
 
         # Verify validation query was executed
         call_args = mock_db_read.call_args
         assert "SELECT r.institution_id" in call_args[0][0]
-        assert "FROM plate_info p" in call_args[0][0]
+        assert "FROM vianda_info p" in call_args[0][0]
         assert "INNER JOIN restaurant_info r" in call_args[0][0]
 
     @patch("app.utils.db.db_read")
@@ -447,7 +447,7 @@ class TestValidateJoinBasedScope:
         # Should raise HTTPException
         with pytest.raises(HTTPException) as exc_info:
             multi_join_scoping_service._validate_join_based_scope(
-                mock_db, supplier_scope, "plate_id", foreign_key_value
+                mock_db, supplier_scope, "vianda_id", foreign_key_value
             )
 
         assert exc_info.value.status_code == 403
@@ -466,7 +466,7 @@ class TestValidateJoinBasedScope:
         # Should raise HTTPException
         with pytest.raises(HTTPException) as exc_info:
             multi_join_scoping_service._validate_join_based_scope(
-                mock_db, supplier_scope, "plate_id", foreign_key_value
+                mock_db, supplier_scope, "vianda_id", foreign_key_value
             )
 
         assert exc_info.value.status_code == 404
@@ -479,7 +479,7 @@ class TestValidateJoinBasedScope:
         foreign_key_value = uuid4()
 
         # Should not execute validation query for global scope
-        multi_join_scoping_service._validate_join_based_scope(mock_db, global_scope, "plate_id", foreign_key_value)
+        multi_join_scoping_service._validate_join_based_scope(mock_db, global_scope, "vianda_id", foreign_key_value)
 
         # No database call should be made for global scope
         mock_db_read.assert_not_called()
@@ -496,7 +496,7 @@ class TestCreateWithJoinScoping:
     ):
         """Test create() validates foreign key belongs to scoped institution"""
         institution_id = supplier_scope.institution_id
-        plate_id = uuid4()
+        vianda_id = uuid4()
 
         # Mock validation query (as dict for fetch_one=True) - from utils.db
         mock_utils_db_read.return_value = {"institution_id": institution_id}
@@ -507,8 +507,8 @@ class TestCreateWithJoinScoping:
 
         # Mock get_by_id after insert - from crud_service
         mock_crud_db_read.return_value = {
-            "plate_kitchen_day_id": new_id,
-            "plate_id": plate_id,
+            "vianda_kitchen_day_id": new_id,
+            "vianda_id": vianda_id,
             "kitchen_day": "Monday",
             "status": Status.ACTIVE,
             "is_archived": False,
@@ -517,7 +517,7 @@ class TestCreateWithJoinScoping:
             "modified_date": datetime.now(UTC),
         }
 
-        data = {"plate_id": plate_id, "kitchen_day": "Monday", "modified_by": uuid4()}
+        data = {"vianda_id": vianda_id, "kitchen_day": "Monday", "modified_by": uuid4()}
 
         result = multi_join_scoping_service.create(data, mock_db, scope=supplier_scope)
 
@@ -533,12 +533,12 @@ class TestCreateWithJoinScoping:
     ):
         """Test create() fails when foreign key belongs to different institution"""
         different_institution_id = uuid4()
-        plate_id = uuid4()
+        vianda_id = uuid4()
 
         # Mock validation query returning different institution (as dict for fetch_one=True)
         mock_db_read.return_value = {"institution_id": different_institution_id}
 
-        data = {"plate_id": plate_id, "kitchen_day": "Monday", "modified_by": uuid4()}
+        data = {"vianda_id": vianda_id, "kitchen_day": "Monday", "modified_by": uuid4()}
 
         with pytest.raises(HTTPException) as exc_info:
             multi_join_scoping_service.create(data, mock_db, scope=supplier_scope)
@@ -558,7 +558,7 @@ class TestUpdateWithJoinScoping:
         """Test update() validates foreign key when updating"""
         record_id = uuid4()
         institution_id = supplier_scope.institution_id
-        new_plate_id = uuid4()
+        new_vianda_id = uuid4()
 
         # Mock validation query (from utils.db)
         mock_utils_db_read.return_value = {"institution_id": institution_id}
@@ -566,8 +566,8 @@ class TestUpdateWithJoinScoping:
         # Mock get_by_id (existing record) and after update (from crud_service)
         mock_crud_db_read.side_effect = [
             {  # First call: get_by_id
-                "plate_kitchen_day_id": record_id,
-                "plate_id": uuid4(),
+                "vianda_kitchen_day_id": record_id,
+                "vianda_id": uuid4(),
                 "kitchen_day": "Monday",
                 "status": Status.ACTIVE,
                 "is_archived": False,
@@ -576,8 +576,8 @@ class TestUpdateWithJoinScoping:
                 "modified_date": datetime.now(UTC),
             },
             {  # Second call: get_by_id after update
-                "plate_kitchen_day_id": record_id,
-                "plate_id": new_plate_id,
+                "vianda_kitchen_day_id": record_id,
+                "vianda_id": new_vianda_id,
                 "kitchen_day": "Tuesday",
                 "status": Status.ACTIVE,
                 "is_archived": False,
@@ -589,12 +589,12 @@ class TestUpdateWithJoinScoping:
 
         mock_db_update.return_value = 1
 
-        data = {"plate_id": new_plate_id, "kitchen_day": "Tuesday"}
+        data = {"vianda_id": new_vianda_id, "kitchen_day": "Tuesday"}
 
         result = multi_join_scoping_service.update(record_id, data, mock_db, scope=supplier_scope)
 
         assert result is not None
-        # Verify validation was called for the new plate_id
+        # Verify validation was called for the new vianda_id
         assert mock_utils_db_read.called
         # Verify get_by_id was called
         assert mock_crud_db_read.call_count >= 2
@@ -607,15 +607,15 @@ class TestUpdateWithJoinScoping:
         """Test update() fails when new foreign key belongs to different institution"""
         record_id = uuid4()
         different_institution_id = uuid4()
-        new_plate_id = uuid4()
+        new_vianda_id = uuid4()
 
         # Mock validation query (from utils.db) - returns different institution
         mock_utils_db_read.return_value = {"institution_id": different_institution_id}
 
         # Mock get_by_id (existing record) - from crud_service
         mock_crud_db_read.return_value = {
-            "plate_kitchen_day_id": record_id,
-            "plate_id": uuid4(),
+            "vianda_kitchen_day_id": record_id,
+            "vianda_id": uuid4(),
             "kitchen_day": "Monday",
             "status": Status.ACTIVE,
             "is_archived": False,
@@ -624,7 +624,7 @@ class TestUpdateWithJoinScoping:
             "modified_date": datetime.now(UTC),
         }
 
-        data = {"plate_id": new_plate_id, "kitchen_day": "Tuesday"}
+        data = {"vianda_id": new_vianda_id, "kitchen_day": "Tuesday"}
 
         with pytest.raises(HTTPException) as exc_info:
             multi_join_scoping_service.update(record_id, data, mock_db, scope=supplier_scope)
@@ -646,8 +646,8 @@ class TestSoftDeleteWithJoinScoping:
 
         # Mock get_by_id (existing record)
         mock_db_read.return_value = {
-            "plate_kitchen_day_id": record_id,
-            "plate_id": uuid4(),
+            "vianda_kitchen_day_id": record_id,
+            "vianda_id": uuid4(),
             "kitchen_day": "Monday",
             "status": Status.ACTIVE,
             "is_archived": False,

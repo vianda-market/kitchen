@@ -68,12 +68,6 @@ from app.routes.payment_methods.mercado_pago import router as mercado_pago_route
 
 # Phone pre-validation (unauthenticated, real-time form feedback)
 from app.routes.phone import router as phone_router
-from app.routes.plate_kitchen_days import router as plate_kitchen_days_router
-from app.routes.plate_pickup import router as plate_pickup_router
-from app.routes.plate_review import router as plate_review_router
-
-# Complex routes (business logic)
-from app.routes.plate_selection import router as plate_selection_router
 from app.routes.provinces import router as provinces_router
 from app.routes.qr_code import router as qr_code_router
 from app.routes.restaurant import router as restaurant_router
@@ -86,6 +80,12 @@ from app.routes.user import router as user_router
 from app.routes.user_onboarding import router as user_onboarding_router
 from app.routes.user_public import auth_router as password_recovery_router
 from app.routes.user_public import router as user_public_router
+from app.routes.vianda_kitchen_days import router as vianda_kitchen_days_router
+from app.routes.vianda_pickup import router as vianda_pickup_router
+from app.routes.vianda_review import router as vianda_review_router
+
+# Complex routes (business logic)
+from app.routes.vianda_selection import router as vianda_selection_router
 from app.routes.workplace_group import admin_router as workplace_group_admin_router
 from app.routes.workplace_group import router as workplace_group_router
 from app.utils.db_pool import get_db_pool
@@ -157,12 +157,12 @@ OPENAPI_TAGS = [
     {"name": "Subscriptions", "description": "Subscription CRUD"},
     {"name": "Institutions", "description": "Institution CRUD"},
     {"name": "Payment Methods", "description": "Payment method CRUD"},
-    {"name": "Plates", "description": "Plate CRUD"},
+    {"name": "Viandas", "description": "Vianda CRUD"},
     {"name": "Geolocations", "description": "Geolocation CRUD"},
-    {"name": "Plate Selections", "description": "Plate selection CRUD"},
-    {"name": "Plate Selection", "description": "Plate selection flows"},
-    {"name": "Plate Pickup", "description": "Plate pickup management"},
-    {"name": "Plate Reviews", "description": "Plate review ratings"},
+    {"name": "Vianda Selections", "description": "Vianda selection CRUD"},
+    {"name": "Vianda Selection", "description": "Vianda selection flows"},
+    {"name": "Vianda Pickup", "description": "Vianda pickup management"},
+    {"name": "Vianda Reviews", "description": "Vianda review ratings"},
     {"name": "Favorites", "description": "User favorites"},
     {"name": "Employers", "description": "Employer entities"},
     {"name": "Employer Program", "description": "Employer Benefits Program — config, enrollment, billing"},
@@ -171,7 +171,7 @@ OPENAPI_TAGS = [
     {"name": "Onboarding", "description": "Supplier/employer onboarding status tracking"},
     {"name": "User Onboarding", "description": "Customer onboarding status (user-level)"},
     {"name": "Institution Entities", "description": "Institutions and entities"},
-    {"name": "Plate Kitchen Days", "description": "Kitchen day scheduling"},
+    {"name": "Vianda Kitchen Days", "description": "Kitchen day scheduling"},
     {"name": "Restaurants", "description": "Restaurant management"},
     {"name": "Restaurant Balances", "description": "Restaurant balance and credits"},
     {"name": "Restaurant Transactions", "description": "Restaurant transactions"},
@@ -556,17 +556,17 @@ def create_app() -> FastAPI:
     app.include_router(v1_password_recovery_router)
 
     # Versioned complex routes (v1)
-    v1_plate_selection_router = create_versioned_router("api", ["Plate Selection"], APIVersion.V1)
-    v1_plate_selection_router.include_router(plate_selection_router)
-    app.include_router(v1_plate_selection_router)
+    v1_vianda_selection_router = create_versioned_router("api", ["Vianda Selection"], APIVersion.V1)
+    v1_vianda_selection_router.include_router(vianda_selection_router)
+    app.include_router(v1_vianda_selection_router)
 
-    v1_plate_pickup_router = create_versioned_router("api", ["Plate Pickup"], APIVersion.V1)
-    v1_plate_pickup_router.include_router(plate_pickup_router)
-    app.include_router(v1_plate_pickup_router)
+    v1_vianda_pickup_router = create_versioned_router("api", ["Vianda Pickup"], APIVersion.V1)
+    v1_vianda_pickup_router.include_router(vianda_pickup_router)
+    app.include_router(v1_vianda_pickup_router)
 
-    v1_plate_review_router = create_versioned_router("api", ["Plate Reviews"], APIVersion.V1)
-    v1_plate_review_router.include_router(plate_review_router)
-    app.include_router(v1_plate_review_router)
+    v1_vianda_review_router = create_versioned_router("api", ["Vianda Reviews"], APIVersion.V1)
+    v1_vianda_review_router.include_router(vianda_review_router)
+    app.include_router(v1_vianda_review_router)
 
     v1_notification_banner_router = create_versioned_router("api", ["Notification Banners"], APIVersion.V1)
     v1_notification_banner_router.include_router(notification_banner_router)
@@ -590,9 +590,9 @@ def create_app() -> FastAPI:
     v1_qr_code_router.include_router(qr_code_router)
     app.include_router(v1_qr_code_router)
 
-    v1_plate_kitchen_days_router = create_versioned_router("api", ["Plate Kitchen Days"], APIVersion.V1)
-    v1_plate_kitchen_days_router.include_router(plate_kitchen_days_router)
-    app.include_router(v1_plate_kitchen_days_router)
+    v1_vianda_kitchen_days_router = create_versioned_router("api", ["Vianda Kitchen Days"], APIVersion.V1)
+    v1_vianda_kitchen_days_router.include_router(vianda_kitchen_days_router)
+    app.include_router(v1_vianda_kitchen_days_router)
 
     v1_restaurant_router = create_versioned_router("api", ["Restaurants"], APIVersion.V1)
     v1_restaurant_router.include_router(restaurant_router)

@@ -4,7 +4,7 @@ Unit tests for the onboarding checklist SQL — verifies the lazy-activation-awa
 
 Changed: `has_active_restaurant` now counts restaurants with status IN ('pending', 'active')
 rather than only status = 'active'.  This prevents a circular dependency where a supplier
-cannot access the plate/QR routes required to trigger lazy activation because the checklist
+cannot access the vianda/QR routes required to trigger lazy activation because the checklist
 still shows `has_active_restaurant = false` for a pending restaurant.
 
 These tests only inspect the SQL string constants — no DB required.
@@ -53,10 +53,10 @@ class TestSupplierChecklistRestaurantSQL:
 
     def test_other_status_filters_unchanged(self):
         """Other checklist items still use status = 'active' (only restaurant changed)."""
-        # address, entity, product, plate should still be active-only
+        # address, entity, product, vianda should still be active-only
         # Confirm 'active' appears multiple times (for the unchanged items)
         active_count = _SUPPLIER_CHECKLIST_SQL.count("status = 'active'")
         assert active_count >= 4, (
-            "Expected at least 4 'status = active' clauses for address, entity, product, plate, "
+            "Expected at least 4 'status = active' clauses for address, entity, product, vianda, "
             f"kitchen_day, qr_code subqueries; found {active_count}."
         )

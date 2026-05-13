@@ -528,7 +528,7 @@ def dashboard_entry():
 
 
 def kitchen_start_promotion_entry(location_id: str | None = None):
-    """Entry point for kitchen start promotion cron. Promotes locked plate selections to live."""
+    """Entry point for kitchen start promotion cron. Promotes locked vianda selections to live."""
     from app.services.cron.kitchen_start_promotion import run_kitchen_start_promotion
 
     return run_kitchen_start_promotion(location_id=location_id)

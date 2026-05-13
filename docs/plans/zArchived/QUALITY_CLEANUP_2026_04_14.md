@@ -142,7 +142,7 @@ ruff check --select F841,B007,SIM103 --fix --unsafe-fixes .
 | `app/security/scoping.py` | 516 | None | Authorization bypass |
 | `app/security/entity_scoping.py` | ~300 | None | Entity-level access control |
 | `app/auth/security.py` | 55 | None (covered indirectly) | Token handling |
-| `app/services/plate_selection_promotion_service.py` | 252 | None | Promotion logic |
+| `app/services/vianda_selection_promotion_service.py` | 252 | None | Promotion logic |
 
 ### 12. Install missing optional test dependencies in CI
 
@@ -153,8 +153,8 @@ ruff check --select F841,B007,SIM103 --fix --unsafe-fixes .
 ### 13. Expand mutation testing scope
 
 Current scope: 4 Tier 1 files (credit/billing). Next targets after baseline is stable:
-- `app/services/plate_selection_validation.py` — 452 lines, only 137 test lines
-- `app/services/plate_pickup_service.py` — 1106 lines, only 272 test lines
+- `app/services/vianda_selection_validation.py` — 452 lines, only 137 test lines
+- `app/services/vianda_pickup_service.py` — 1106 lines, only 272 test lines
 - `app/security/scoping.py` — needs tests first (P3 #11)
 
 ---

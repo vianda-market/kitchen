@@ -62,7 +62,7 @@ The API exposes the following enum types:
 | `status_user` | **User status only** (e.g. user edit form) | `active`, `inactive` |
 | `status_restaurant` | **Restaurant status only** (e.g. restaurant create/edit) | `active`, `pending`, `inactive` |
 | `status_discretionary` | Discretionary request lifecycle | `pending`, `cancelled`, `approved`, `rejected` |
-| `status_plate_pickup` | Plate pickup / order status | `pending`, `arrived`, `completed`, `cancelled` |
+| `status_vianda_pickup` | Vianda pickup / order status | `pending`, `arrived`, `completed`, `cancelled` |
 | `status_bill` | Bill status | `pending`, `processed`, `cancelled` |
 | `address_type` | Address classification | `restaurant`, `customer_home`, `entity_billing` |
 | `role_type` | User role types | `internal`, `supplier`, `customer`, `employer` |
@@ -85,7 +85,7 @@ Status values are **context-specific**. The backend exposes a single `status_enu
 - **User** entity: only `active` and `inactive` are valid. Showing `arrived` or `processed` in the user edit form would be wrong and can be rejected by the API.
 - **Restaurant** entity: only `active`, `pending`, and `inactive` are valid. Use `status_restaurant` or `GET /api/v1/enums/status?context=restaurant` for the restaurant status dropdown.
 - **Discretionary** requests: `pending`, `cancelled`, `approved`, `rejected`.
-- **Plate pickup / orders**: `pending`, `arrived`, `completed`, `cancelled`.
+- **Vianda pickup / orders**: `pending`, `arrived`, `completed`, `cancelled`.
 - **Bills**: `pending`, `processed`, `cancelled`.
 
 ### Option 1: Use context-scoped keys from GET /enums/
@@ -97,7 +97,7 @@ When you call `GET /api/v1/enums/`, the response includes both the full list and
 | User create/edit (status field) | `status_user` | `["active", "inactive"]` |
 | Restaurant create/edit (status field) | `status_restaurant` | `["active", "pending", "inactive"]` |
 | Discretionary request forms | `status_discretionary` | `["pending", "cancelled", "approved", "rejected"]` |
-| Plate pickup / order status | `status_plate_pickup` | `["pending", "arrived", "completed", "cancelled"]` |
+| Vianda pickup / order status | `status_vianda_pickup` | `["pending", "arrived", "completed", "cancelled"]` |
 | Bill status | `status_bill` | `["pending", "processed", "cancelled"]` |
 | Generic / unknown entity | `status` | `["active", "pending", "inactive"]` |
 
@@ -109,14 +109,14 @@ For a single enum fetch, you can request status filtered by context:
 
 **Endpoint**: `GET /api/v1/enums/status?context={context}`
 
-**Query parameter**: `context` (optional). Valid values: `user`, `restaurant`, `discretionary`, `plate_pickup`, `bill`.
+**Query parameter**: `context` (optional). Valid values: `user`, `restaurant`, `discretionary`, `vianda_pickup`, `bill`.
 
 | Request | Response |
 |---------|----------|
 | `GET /api/v1/enums/status` | `["active", "pending", "inactive"]` |
 | `GET /api/v1/enums/status?context=user` | `["active", "inactive"]` |
 | `GET /api/v1/enums/status?context=restaurant` | `["active", "pending", "inactive"]` |
-| `GET /api/v1/enums/status?context=plate_pickup` | `["pending", "arrived", "completed", "cancelled"]` |
+| `GET /api/v1/enums/status?context=vianda_pickup` | `["pending", "arrived", "completed", "cancelled"]` |
 | `GET /api/v1/enums/status?context=bill` | `["pending", "processed", "cancelled"]` |
 | `GET /api/v1/enums/status?context=discretionary` | `["pending", "cancelled", "approved", "rejected"]` |
 
@@ -168,7 +168,7 @@ The filtering is in the **backend response**: `GET /api/v1/enums/` must return t
 - **If the backend returns only `status` (no `status_user`)**: Client can derive user options from `status` by keeping only `"active"` and `"inactive"`, or use a hardcoded fallback `["active", "inactive"]` and log a console warning so you know the backend needs updating.
 - **If the enums request fails**: Use the same fallback and existing console.warn.
 
-**Backend**: The backend always injects `status_user`, `status_discretionary`, `status_plate_pickup`, and `status_bill` into the response. If your response doesn’t include them, ensure the server was restarted after the latest code and test with browser cache disabled (e.g. DevTools → Network → "Disable cache") or a hard refresh.
+**Backend**: The backend always injects `status_user`, `status_discretionary`, `status_vianda_pickup`, and `status_bill` into the response. If your response doesn’t include them, ensure the server was restarted after the latest code and test with browser cache disabled (e.g. DevTools → Network → "Disable cache") or a hard refresh.
 
 ---
 
@@ -223,7 +223,7 @@ Each enum key maps to an object with `values` (canonical lowercase codes) and `l
 
 > **Note**: Example above shows English labels (`?language=en`). With `?language=es`, labels would be localized: `"active": "Activo"`, `"internal": "Interno"`, etc. All other enum keys (address_type, street_type, transaction_type, pickup_type, discretionary_reason, etc.) follow the same `{values, labels}` structure.
 
-Use `status_user`, `status_restaurant`, `status_discretionary`, `status_plate_pickup`, or `status_bill` for entity-specific status dropdowns (see [Filtering Status by Context](#filtering-status-by-context)).
+Use `status_user`, `status_restaurant`, `status_discretionary`, `status_vianda_pickup`, or `status_bill` for entity-specific status dropdowns (see [Filtering Status by Context](#filtering-status-by-context)).
 
 **Headers**:
 - `Cache-Control: public, max-age=3600` - Frontend should cache for 1 hour
@@ -243,7 +243,7 @@ Retrieve values for a single enum type.
 - `enum_name` (required): Name of the enum type (e.g., `status`, `role_type`, `subscription_status`)
 
 **Query Parameters** (optional):
-- `context`: For `enum_name=status` only. Restricts to a subset: `user`, `restaurant`, `discretionary`, `plate_pickup`, `bill`. Omit for the full status list.
+- `context`: For `enum_name=status` only. Restricts to a subset: `user`, `restaurant`, `discretionary`, `vianda_pickup`, `bill`. Omit for the full status list.
 
 **Authorization**: Bearer token (any authenticated user)
 
@@ -340,7 +340,7 @@ Retrieve institution types the current user can create/assign when creating or e
 ### cURL
 
 ```bash
-# Get all enums (includes status_user, status_plate_pickup, etc.)
+# Get all enums (includes status_user, status_vianda_pickup, etc.)
 curl -X GET "http://localhost:8000/api/v1/enums/" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 
@@ -455,7 +455,7 @@ Use **context-scoped** status so the dropdown only shows valid values for that e
 import React, { useEffect, useState } from 'react';
 import { getEnums, type EnumMap } from '../services/enumService';
 
-type StatusContext = 'user' | 'discretionary' | 'plate_pickup' | 'bill';
+type StatusContext = 'user' | 'discretionary' | 'vianda_pickup' | 'bill';
 
 interface StatusDropdownProps {
   value: string;
@@ -495,7 +495,7 @@ All enum types use lowercase slug values — these are what the API sends and ac
 export type Status = 'active' | 'inactive' | 'pending' | 'arrived' | 'handed_out' | 'completed' | 'cancelled' | 'processed';
 export type UserStatus = 'active' | 'inactive';
 export type RestaurantStatus = 'active' | 'pending' | 'inactive';
-export type PlatePickupStatus = 'pending' | 'arrived' | 'handed_out' | 'completed' | 'cancelled';
+export type ViandaPickupStatus = 'pending' | 'arrived' | 'handed_out' | 'completed' | 'cancelled';
 export type BillStatus = 'pending' | 'processed' | 'cancelled';
 export type SubscriptionStatus = 'active' | 'on_hold' | 'pending' | 'cancelled';
 export type RoleType = 'internal' | 'supplier' | 'customer' | 'employer';
@@ -741,12 +741,12 @@ pytest app/tests/services/test_enum_service.py -v
 ### 2026-02-21 - Restaurant status context
 
 - Added **`status_restaurant`** to GET /enums/ response: `["Active", "Pending", "Inactive"]` for restaurant create/edit forms.
-- Added **`context=restaurant`** to GET /enums/status query parameter. Use for restaurant status dropdown so only Active, Pending, and Inactive are shown. See [RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md](RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md) for business rules.
+- Added **`context=restaurant`** to GET /enums/status query parameter. Use for restaurant status dropdown so only Active, Pending, and Inactive are shown. See [RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md](RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md) for business rules.
 
 ### 2026-02-10 - Status context filtering
 
-- Added context-scoped status keys: `status_user`, `status_restaurant`, `status_discretionary`, `status_plate_pickup`, `status_bill` in GET /enums/ response.
-- Added optional query parameter `context` to GET /enums/status (values: `user`, `restaurant`, `discretionary`, `plate_pickup`, `bill`) to return only status values valid for that context.
+- Added context-scoped status keys: `status_user`, `status_restaurant`, `status_discretionary`, `status_vianda_pickup`, `status_bill` in GET /enums/ response.
+- Added optional query parameter `context` to GET /enums/status (values: `user`, `restaurant`, `discretionary`, `vianda_pickup`, `bill`) to return only status values valid for that context.
 - Documented how to filter status fields by context so user edit forms show only Active/Inactive and restaurant forms show only Active, Pending, Inactive (see [Filtering Status by Context](#filtering-status-by-context)).
 
 ### 2026-02-08 - Initial Release

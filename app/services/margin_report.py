@@ -73,11 +73,11 @@ def get_margin_report(
     """
     Compute per-market margin over a date range.
 
-    Joins restaurant_transaction → plate_selection → subscription → plan to resolve
-    each redemption to the plan tier the customer was on when they redeemed the plate.
+    Joins restaurant_transaction → vianda_selection → subscription → plan to resolve
+    each redemption to the plan tier the customer was on when they redeemed the vianda.
 
-    Only transactions with a linked plate_selection (real plate redemptions) are
-    counted. Discretionary transactions (plate_selection_id IS NULL) are excluded
+    Only transactions with a linked vianda_selection (real vianda redemptions) are
+    counted. Discretionary transactions (vianda_selection_id IS NULL) are excluded
     because they do not represent a margin-bearing redemption event.
 
     Args:
@@ -118,12 +118,12 @@ def get_margin_report(
 
     # Aggregate credits redeemed per plan tier.
     # Join path:
-    #   restaurant_transaction (rt) — has plate_selection_id
-    #     → plate_selection (ps) — links to subscription_id
+    #   restaurant_transaction (rt) — has vianda_selection_id
+    #     → vianda_selection (ps) — links to subscription_id
     #       → subscription (s) — has plan_id
     #         → plan_info (p) — has credit_cost_local_currency
     # Filter: rt.market is determined via the restaurant's institution_entity → currency_metadata → market_info.
-    # Simplification: use ps.market_id (plate_selection stores market_id) if available,
+    # Simplification: use ps.market_id (vianda_selection stores market_id) if available,
     # otherwise join through subscription.
     rows = db_read(
         """
@@ -133,13 +133,13 @@ def get_margin_report(
             p.credit_cost_local_currency,
             SUM(rt.credit) AS credits_redeemed
         FROM billing.restaurant_transaction rt
-        JOIN ops.plate_selection ps ON ps.plate_selection_id = rt.plate_selection_id
+        JOIN ops.vianda_selection ps ON ps.vianda_selection_id = rt.vianda_selection_id
         JOIN customer.subscription s ON s.subscription_id = ps.subscription_id
         JOIN customer.plan_info p ON p.plan_id = s.plan_id
         WHERE s.market_id = %s
           AND rt.ordered_timestamp >= %s
           AND rt.ordered_timestamp <= %s
-          AND rt.plate_selection_id IS NOT NULL
+          AND rt.vianda_selection_id IS NOT NULL
           AND rt.is_archived = FALSE
         GROUP BY p.plan_id, p.name, p.credit_cost_local_currency
         ORDER BY p.credit_cost_local_currency DESC

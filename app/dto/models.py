@@ -138,10 +138,10 @@ class ImageAssetDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateDTO(BaseModel):
-    """Pure DTO for plate data. Savings are computed on the fly (e.g. explore by-city) from price, credit, and user plan credit_cost_local_currency. expected_payout_local_currency set by DB trigger."""
+class ViandaDTO(BaseModel):
+    """Pure DTO for vianda data. Savings are computed on the fly (e.g. explore by-city) from price, credit, and user plan credit_cost_local_currency. expected_payout_local_currency set by DB trigger."""
 
-    plate_id: UUID
+    vianda_id: UUID
     product_id: UUID
     restaurant_id: UUID
     price: Decimal
@@ -158,13 +158,13 @@ class PlateDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateReviewDTO(BaseModel):
-    """Pure DTO for plate review data. One review per pickup; immutable after creation."""
+class ViandaReviewDTO(BaseModel):
+    """Pure DTO for vianda review data. One review per pickup; immutable after creation."""
 
-    plate_review_id: UUID
+    vianda_review_id: UUID
     user_id: UUID
-    plate_id: UUID
-    plate_pickup_id: UUID
+    vianda_id: UUID
+    vianda_pickup_id: UUID
     stars_rating: int
     portion_size_rating: int
     would_order_again: bool | None = None
@@ -201,8 +201,8 @@ class PortionComplaintDTO(BaseModel):
     """Pure DTO for portion complaint data. Filed when customer rates portion size as 1 and chooses to complain."""
 
     complaint_id: UUID
-    plate_pickup_id: UUID
-    plate_review_id: UUID | None = None
+    vianda_pickup_id: UUID
+    vianda_review_id: UUID | None = None
     user_id: UUID
     restaurant_id: UUID
     photo_storage_path: str | None = None
@@ -215,11 +215,11 @@ class PortionComplaintDTO(BaseModel):
 
 
 class UserFavoriteDTO(BaseModel):
-    """Pure DTO for user favorite data. Polymorphic: entity_type is 'plate' or 'restaurant'; entity_id is plate_id or restaurant_id."""
+    """Pure DTO for user favorite data. Polymorphic: entity_type is 'vianda' or 'restaurant'; entity_id is vianda_id or restaurant_id."""
 
     favorite_id: UUID
     user_id: UUID
-    entity_type: str  # 'plate' | 'restaurant'
+    entity_type: str  # 'vianda' | 'restaurant'
     entity_id: UUID
     created_date: datetime
 
@@ -701,7 +701,7 @@ class RestaurantTransactionDTO(BaseModel):
 
     transaction_id: UUID
     restaurant_id: UUID
-    plate_selection_id: UUID | None = None
+    vianda_selection_id: UUID | None = None
     discretionary_id: UUID | None = None
     currency_metadata_id: UUID
     was_collected: bool = False
@@ -731,7 +731,7 @@ class ClientTransactionDTO(BaseModel):
     transaction_id: UUID
     user_id: UUID
     source: str
-    plate_selection_id: UUID | None = None
+    vianda_selection_id: UUID | None = None
     discretionary_id: UUID | None = None
     credit: int
     is_archived: bool = False
@@ -745,16 +745,16 @@ class ClientTransactionDTO(BaseModel):
 
 
 # =============================================================================
-# PLATE SELECTION & PICKUP DTOs
+# VIANDA SELECTION & PICKUP DTOs
 # =============================================================================
 
 
-class PlateSelectionDTO(BaseModel):
-    """Pure DTO for plate selection data"""
+class ViandaSelectionDTO(BaseModel):
+    """Pure DTO for vianda selection data"""
 
-    plate_selection_id: UUID
+    vianda_selection_id: UUID
     user_id: UUID
-    plate_id: UUID
+    vianda_id: UUID
     restaurant_id: UUID
     product_id: UUID
     qr_code_id: UUID
@@ -778,7 +778,7 @@ class PickupPreferencesDTO(BaseModel):
     """Pure DTO for pickup preferences data"""
 
     preference_id: UUID
-    plate_selection_id: UUID
+    vianda_selection_id: UUID
     user_id: UUID
     pickup_type: str
     target_pickup_time: datetime | None = None
@@ -800,11 +800,11 @@ class MessagingPreferencesDTO(BaseModel):
 
     user_id: UUID
     notify_coworker_pickup_alert: bool = True
-    notify_plate_readiness_alert: bool = True
+    notify_vianda_readiness_alert: bool = True
     notify_promotions_push: bool = True
     notify_promotions_email: bool = True
     coworkers_can_see_my_orders: bool = True
-    can_participate_in_plate_pickups: bool = True
+    can_participate_in_vianda_pickups: bool = True
     created_date: datetime
     modified_date: datetime
 
@@ -1216,11 +1216,11 @@ class NationalHolidayDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateKitchenDaysDTO(BaseModel):
-    """Pure DTO for plate kitchen days data"""
+class ViandaKitchenDaysDTO(BaseModel):
+    """Pure DTO for vianda kitchen days data"""
 
-    plate_kitchen_day_id: UUID
-    plate_id: UUID
+    vianda_kitchen_day_id: UUID
+    vianda_id: UUID
     kitchen_day: str = Field(..., max_length=20)
     status: Status
     is_archived: bool
@@ -1233,14 +1233,14 @@ class PlateKitchenDaysDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlatePickupLiveDTO(BaseModel):
-    """Pure DTO for plate pickup live data"""
+class ViandaPickupLiveDTO(BaseModel):
+    """Pure DTO for vianda pickup live data"""
 
-    plate_pickup_id: UUID
-    plate_selection_id: UUID
+    vianda_pickup_id: UUID
+    vianda_selection_id: UUID
     user_id: UUID
     restaurant_id: UUID
-    plate_id: UUID
+    vianda_id: UUID
     product_id: UUID
     qr_code_id: UUID
     qr_code_payload: str = Field(..., max_length=255)

@@ -52,14 +52,14 @@ CREATE INDEX IF NOT EXISTS idx_restaurant_id_active ON ops.restaurant_info(resta
 
 CREATE INDEX IF NOT EXISTS idx_restaurant_history_restaurant_id ON audit.restaurant_history(restaurant_id);
 
-CREATE INDEX IF NOT EXISTS idx_plate_selection_active ON customer.plate_selection_info(plate_selection_id, kitchen_day);
+CREATE INDEX IF NOT EXISTS idx_vianda_selection_active ON customer.vianda_selection_info(vianda_selection_id, kitchen_day);
 
--- Partial unique index: one non-archived plate selection per (user_id, kitchen_day).
+-- Partial unique index: one non-archived vianda selection per (user_id, kitchen_day).
 -- Archived records do not count; user can create new selection after cancelling.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_plate_selection_user_kitchen_day_active
-    ON customer.plate_selection_info(user_id, kitchen_day) WHERE is_archived = FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vianda_selection_user_kitchen_day_active
+    ON customer.vianda_selection_info(user_id, kitchen_day) WHERE is_archived = FALSE;
 
-CREATE INDEX IF NOT EXISTS idx_plate_pickup_live_active ON customer.plate_pickup_live(plate_pickup_id, is_archived);
+CREATE INDEX IF NOT EXISTS idx_vianda_pickup_live_active ON customer.vianda_pickup_live(vianda_pickup_id, is_archived);
 
 CREATE INDEX IF NOT EXISTS idx_product_history_product_id ON audit.product_history(product_id);
 
@@ -70,9 +70,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_plan_info_canonical_key
     ON customer.plan_info (canonical_key)
     WHERE canonical_key IS NOT NULL;
 
--- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc plates)
-CREATE UNIQUE INDEX IF NOT EXISTS uq_plate_info_canonical_key
-    ON ops.plate_info (canonical_key)
+-- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc viandas)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_vianda_info_canonical_key
+    ON ops.vianda_info (canonical_key)
     WHERE canonical_key IS NOT NULL;
 
 -- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc users)
@@ -100,9 +100,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_product_info_canonical_key
     ON ops.product_info (canonical_key)
     WHERE canonical_key IS NOT NULL;
 
--- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc plate kitchen days)
-CREATE UNIQUE INDEX IF NOT EXISTS uq_plate_kitchen_days_canonical_key
-    ON ops.plate_kitchen_days (canonical_key)
+-- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc vianda kitchen days)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_vianda_kitchen_days_canonical_key
+    ON ops.vianda_kitchen_days (canonical_key)
     WHERE canonical_key IS NOT NULL;
 
 -- Partial unique index: canonical_key is unique when not null (sparse to avoid blocking ad-hoc qr codes)
@@ -129,14 +129,14 @@ CREATE INDEX IF NOT EXISTS idx_institution_settlement_history_current ON audit.i
 -- idx_credit_currency_history_* retired — core.credit_currency_info + audit.credit_currency_history dropped.
 -- Currency history now lives on audit.currency_metadata_history (indexed via PK).
 
-CREATE INDEX IF NOT EXISTS idx_plate_kitchen_days_plate_id ON ops.plate_kitchen_days(plate_id);
-CREATE INDEX IF NOT EXISTS idx_plate_kitchen_days_kitchen_day ON ops.plate_kitchen_days(kitchen_day);
-CREATE INDEX IF NOT EXISTS idx_plate_kitchen_days_active ON ops.plate_kitchen_days(plate_id, kitchen_day, is_archived);
+CREATE INDEX IF NOT EXISTS idx_vianda_kitchen_days_vianda_id ON ops.vianda_kitchen_days(vianda_id);
+CREATE INDEX IF NOT EXISTS idx_vianda_kitchen_days_kitchen_day ON ops.vianda_kitchen_days(kitchen_day);
+CREATE INDEX IF NOT EXISTS idx_vianda_kitchen_days_active ON ops.vianda_kitchen_days(vianda_id, kitchen_day, is_archived);
 
--- Partial unique index: only one active (non-archived) record per (plate_id, kitchen_day).
+-- Partial unique index: only one active (non-archived) record per (vianda_id, kitchen_day).
 -- Archived records do not count toward uniqueness, allowing edit Friday->Tuesday when Tuesday was archived.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_plate_kitchen_days_plate_day_active
-    ON ops.plate_kitchen_days(plate_id, kitchen_day) WHERE is_archived = FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vianda_kitchen_days_vianda_day_active
+    ON ops.vianda_kitchen_days(vianda_id, kitchen_day) WHERE is_archived = FALSE;
 
 -- Optimized indexes for ops.restaurant_holidays (as per RESTAURANT_HOLIDAY_API_PLAN.md)
 -- Drop legacy UNIQUE constraint if present. Partial unique index below enforces uniqueness only for non-archived rows.
@@ -160,18 +160,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_restaurant_holidays_canonical_key
     ON ops.restaurant_holidays (canonical_key)
     WHERE canonical_key IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_plate_kitchen_days_history_plate_kitchen_day_id ON audit.plate_kitchen_days_history(plate_kitchen_day_id);
-CREATE INDEX IF NOT EXISTS idx_plate_kitchen_days_history_current ON audit.plate_kitchen_days_history(plate_kitchen_day_id, is_current);
+CREATE INDEX IF NOT EXISTS idx_vianda_kitchen_days_history_vianda_kitchen_day_id ON audit.vianda_kitchen_days_history(vianda_kitchen_day_id);
+CREATE INDEX IF NOT EXISTS idx_vianda_kitchen_days_history_current ON audit.vianda_kitchen_days_history(vianda_kitchen_day_id, is_current);
 
--- customer.plate_review_info: partial unique index so archived reviews do not block new reviews for same pickup
-ALTER TABLE customer.plate_review_info DROP CONSTRAINT IF EXISTS plate_review_info_plate_pickup_id_key;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_plate_review_plate_pickup_active
-    ON customer.plate_review_info(plate_pickup_id) WHERE is_archived = FALSE;
+-- customer.vianda_review_info: partial unique index so archived reviews do not block new reviews for same pickup
+ALTER TABLE customer.vianda_review_info DROP CONSTRAINT IF EXISTS vianda_review_info_vianda_pickup_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vianda_review_vianda_pickup_active
+    ON customer.vianda_review_info(vianda_pickup_id) WHERE is_archived = FALSE;
 
 -- Indexes for status and transaction type history tables removed - tables deprecated
 
 -- Indexes for QR code pickup flow
-CREATE INDEX IF NOT EXISTS idx_plate_pickup_live_user_status ON customer.plate_pickup_live(user_id, status, is_archived) WHERE is_archived = false;
+CREATE INDEX IF NOT EXISTS idx_vianda_pickup_live_user_status ON customer.vianda_pickup_live(user_id, status, is_archived) WHERE is_archived = false;
 CREATE INDEX IF NOT EXISTS idx_qr_code_id ON ops.qr_code(qr_code_id);
 CREATE INDEX IF NOT EXISTS idx_restaurant_transaction_status ON billing.restaurant_transaction(status, was_collected);
 

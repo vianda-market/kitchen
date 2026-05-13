@@ -105,7 +105,7 @@ Returns active markets with country name, language, phone prefix. Use for countr
 
 | Call | Returns | Use case |
 |------|---------|----------|
-| `GET /leads/markets` (no param) | Only markets with **active plate coverage** | Customer coverage checker, customer interest form |
+| `GET /leads/markets` (no param) | Only markets with **active vianda coverage** | Customer coverage checker, customer interest form |
 | `GET /leads/markets?audience=supplier` | All active non-global markets | Supplier/employer interest forms (they need to see all countries to express interest in markets we haven't launched yet) |
 
 The default (no param) is intentionally restrictive — if the parameter is missing or unrecognized, only served countries are returned.
@@ -120,7 +120,7 @@ GET /api/v1/leads/cities?country_code={code}
 GET /api/v1/leads/cities?country_code={code}&audience=supplier
 ```
 
-**Default (no `audience` param):** Returns city names that have at least one active restaurant with plates and QR codes.
+**Default (no `audience` param):** Returns city names that have at least one active restaurant with viandas and QR codes.
 
 **`audience=supplier`:** Returns a broader union of city names from three sources:
 - `external.geonames_city` (GeoNames raw data for the country)
@@ -458,7 +458,7 @@ These are admin-mutable content endpoints — markets get activated, cities get 
 | `GET /leads/cities` (default + coverage modes) | `Cache-Control: public, max-age=60` | `Cache-Control: no-store` |
 | `GET /leads/email-registered` | `Cache-Control: no-store` | `Cache-Control: no-store` |
 
-**Why `max-age=60` (not 3600):** Admin activates a market (marks it active, adds a restaurant, configures a plate, adds a QR). Under the old 1-hour TTL, the customer signup dropdowns would not reflect the activation for up to 60 minutes. Under `max-age=60`, propagation lag is at most ~60 seconds — matching the server-side process-local in-memory cache TTL.
+**Why `max-age=60` (not 3600):** Admin activates a market (marks it active, adds a restaurant, configures a vianda, adds a QR). Under the old 1-hour TTL, the customer signup dropdowns would not reflect the activation for up to 60 minutes. Under `max-age=60`, propagation lag is at most ~60 seconds — matching the server-side process-local in-memory cache TTL.
 
 **Why `no-store` on empty:** An empty list means the country has not yet been activated. If a pre-activation user's request returns `[]` and CDN/browser caches it for 60 seconds (or longer), they will see empty dropdowns even after admin completes activation. `no-store` prevents any intermediate cache from holding an empty response, so the next page load fetches fresh data.
 

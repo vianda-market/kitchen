@@ -112,4 +112,4 @@ To check whether a product has an image or to get image URLs, call `GET /api/v1/
 ## Related Documentation
 
 - [API_CLIENT_UPLOADS.md](./API_CLIENT_UPLOADS.md) — Full image upload pipeline reference (endpoints, state machine, polling, moderation)
-- [PLATE_API_CLIENT](../shared_client/PLATE_API_CLIENT.md) — Plates use products; enriched plates include `product_image_url` derived from the image pipeline
+- [VIANDA_API_CLIENT](../shared_client/VIANDA_API_CLIENT.md) — Viandas use products; enriched viandas include `product_image_url` derived from the image pipeline

@@ -6,7 +6,7 @@ No new orders are accepted after **1:30 PM local time** (market timezone) for th
 
 ## Restaurant price and credit
 
-Restaurants can update plate **price** and **credit** at any time; changes are live. Clients should refresh (e.g. on entering explore or pull-to-refresh) so users see current values.
+Restaurants can update vianda **price** and **credit** at any time; changes are live. Clients should refresh (e.g. on entering explore or pull-to-refresh) so users see current values.
 
 ## Billing and data window
 

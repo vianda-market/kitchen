@@ -31,7 +31,7 @@ Accessibility is primarily a frontend and design concern. Backend contributes in
 |------|-------------|
 | **Error messages** | Return clear, actionable `detail` messages. Avoid raw stack traces or technical jargon. Messages should be understandable when read by a screen reader. |
 | **Response structure** | Use consistent field names and shapes so client can reliably map to accessible labels (e.g. `label` vs `name` for display text). |
-| **Semantic data** | Where the API returns content for display (e.g. plate names, restaurant info), ensure it is suitable for alt text or announcements. No special backend changes required if data is already descriptive. |
+| **Semantic data** | Where the API returns content for display (e.g. vianda names, restaurant info), ensure it is suitable for alt text or announcements. No special backend changes required if data is already descriptive. |
 | **Rate limit / error responses** | Include human-readable messages in 429, 500 responses so the client can announce them accessibly. |
 
 ### Questions for backend

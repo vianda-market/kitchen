@@ -24,8 +24,8 @@
 | 5 | [USER_MODEL_FOR_CLIENTS.md](../shared_client/USER_MODEL_FOR_CLIENTS.md#3-username-and-email-lowercase) | Username/email normalized to lowercase; apply `.toLowerCase().trim()` before sending |
 | 6 | [SCOPING_BEHAVIOR_FOR_UI.md](../shared_client/SCOPING_BEHAVIOR_FOR_UI.md) | Institution/user scoping; backend enforces |
 | 7 | [BULK_API_PATTERN.md](../shared_client/BULK_API_PATTERN.md) | Bulk operations are atomic |
-| 8 | [PLATE_API_CLIENT.md](../shared_client/PLATE_API_CLIENT.md) | Plate create/update and tables/modals: do not include savings; enriched endpoint (ingredients, pickup_instructions); plate selection and pickup pending |
-| 9 | [CREDIT_AND_CURRENCY_CLIENT.md](../shared_client/CREDIT_AND_CURRENCY_CLIENT.md) | Credit currency, plan/restaurant/entity currency from market, plate payouts, B2C savings |
+| 8 | [VIANDA_API_CLIENT.md](../shared_client/VIANDA_API_CLIENT.md) | Vianda create/update and tables/modals: do not include savings; enriched endpoint (ingredients, pickup_instructions); vianda selection and pickup pending |
+| 9 | [CREDIT_AND_CURRENCY_CLIENT.md](../shared_client/CREDIT_AND_CURRENCY_CLIENT.md) | Credit currency, plan/restaurant/entity currency from market, vianda payouts, B2C savings |
 | 10 | [PAYMENT_METHOD_CHANGES_B2B.md](./PAYMENT_METHOD_CHANGES_B2B.md) | **Institution bank account and fintech links removed.** Remove all related pages, modals, and API calls. Use subscription with-payment and institution settlement pipeline only. |
 | 11 | [API_CLIENT_USER_PAYMENT_SUMMARY.md](./API_CLIENT_USER_PAYMENT_SUMMARY.md) | Employee payment portal — `GET /api/v1/user-payment-summary` (Internal only); read-only table showing which customers have Stripe cards registered |
 

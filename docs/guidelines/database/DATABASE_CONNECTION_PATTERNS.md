@@ -38,7 +38,7 @@ result = db_read(query, (param1, param2), connection=db, fetch_one=True)
 record_id = db_insert("user_info", user_data, connection=db)
 success = db_update("user_info", update_data, where_clause, connection=db)
 db_delete("user_info", {"user_id": user_id}, connection=db, soft=True)
-ids = db_batch_insert("plate_kitchen_days", data_list, connection=db)
+ids = db_batch_insert("vianda_kitchen_days", data_list, connection=db)
 
 # ❌ INCORRECT - Don't use positional argument
 result = db_read(query, (param1, param2), db, fetch_one=True)

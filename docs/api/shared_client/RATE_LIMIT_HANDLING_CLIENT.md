@@ -22,7 +22,7 @@ Some endpoints have tighter limits for Free-tier users:
 |---|---|
 | `GET /addresses/suggest` | 30 req/min |
 | `GET /restaurants/explorer` | 20 req/min |
-| `GET /plate-selections/*` | 30 req/min |
+| `GET /vianda-selections/*` | 30 req/min |
 | `GET /cuisines/*` | 60 req/min |
 
 ---

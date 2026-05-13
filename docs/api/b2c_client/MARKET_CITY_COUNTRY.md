@@ -13,7 +13,7 @@ Returns active markets for UI dropdowns. Response contains `country_code`, `coun
 
 | Call | Returns | Use case |
 |------|---------|----------|
-| `GET /leads/markets` (no param) | Only markets with **active plate coverage** | B2C app signup dropdown, marketing site customer flow |
+| `GET /leads/markets` (no param) | Only markets with **active vianda coverage** | B2C app signup dropdown, marketing site customer flow |
 | `GET /leads/markets?audience=supplier` | All active non-global markets | Marketing site supplier/employer interest form |
 
 **Default (no param) is restrictive.** Unrecognized `audience` values fall back to the customer list.
@@ -47,7 +47,7 @@ Returns city names for lead forms and signup. Supports `audience` parameter.
 
 | Call | Returns | Use case |
 |------|---------|----------|
-| `GET /leads/cities?country_code=AR` (no param) | Cities with ≥1 active restaurant with plates + QR | B2C app signup, customer lead form |
+| `GET /leads/cities?country_code=AR` (no param) | Cities with ≥1 active restaurant with viandas + QR | B2C app signup, customer lead form |
 | `GET /leads/cities?country_code=AR&audience=supplier` | All cities from GeoNames ∪ curated ∪ crowd-sourced | Marketing site supplier interest form |
 
 **Supplier audience guarantee**: for any country returned by `/leads/markets?audience=supplier`, the supplier-audience cities response is guaranteed non-empty.

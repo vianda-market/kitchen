@@ -108,14 +108,14 @@ def _serialize_market(market: dict) -> dict:
     return result
 
 
-def market_has_active_plate_coverage(market_id: UUID, db) -> bool:
+def market_has_active_vianda_coverage(market_id: UUID, db) -> bool:
     """
-    True when the market has at least one institution → restaurant → plate → plate_kitchen_days
+    True when the market has at least one institution → restaurant → vianda → vianda_kitchen_days
     chain, all active and non-archived. Mirrors the EXISTS subquery in get_markets_with_coverage
     and is the shared "operational coverage" predicate used by both the /leads/countries filter
     and admin status override validation.
 
-    Weekly recurring coverage (plate_kitchen_days is day-of-week) means a single active row
+    Weekly recurring coverage (vianda_kitchen_days is day-of-week) means a single active row
     implies continuous forward coverage. A calendar-date refinement (e.g. "active in the next
     30 days") is tracked in docs/plans/market-status-cron.md.
     """
@@ -126,8 +126,8 @@ def market_has_active_plate_coverage(market_id: UUID, db) -> bool:
             FROM core.institution_market im_sub
             JOIN core.institution_info i ON i.institution_id = im_sub.institution_id
             JOIN ops.restaurant_info r ON r.institution_id = i.institution_id
-            JOIN ops.plate_info p ON p.restaurant_id = r.restaurant_id
-            JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+            JOIN ops.vianda_info p ON p.restaurant_id = r.restaurant_id
+            JOIN ops.vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id
             WHERE im_sub.market_id = %s
               AND i.status = 'active' AND i.is_archived = FALSE
               AND r.status = 'active' AND r.is_archived = FALSE
@@ -147,7 +147,7 @@ def market_has_active_plate_coverage(market_id: UUID, db) -> bool:
 def get_markets_with_coverage(db) -> list[dict]:
     """
     Return active non-global markets that have at least one
-    institution -> restaurant -> plate -> plate_kitchen_days chain, all active.
+    institution -> restaurant -> vianda -> vianda_kitchen_days chain, all active.
     Used by GET /leads/markets (default, no audience param).
     """
     query = """
@@ -163,8 +163,8 @@ def get_markets_with_coverage(db) -> list[dict]:
               FROM core.institution_market im_sub
               JOIN core.institution_info i ON i.institution_id = im_sub.institution_id
               JOIN ops.restaurant_info r ON r.institution_id = i.institution_id
-              JOIN ops.plate_info p ON p.restaurant_id = r.restaurant_id
-              JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+              JOIN ops.vianda_info p ON p.restaurant_id = r.restaurant_id
+              JOIN ops.vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id
               WHERE im_sub.market_id = m.market_id
                 AND i.status = 'active' AND i.is_archived = FALSE
                 AND r.status = 'active' AND r.is_archived = FALSE
@@ -179,9 +179,9 @@ def get_markets_with_coverage(db) -> list[dict]:
 
 def get_coverage_flags_for_markets(market_ids: list[str], db) -> set[str]:
     """
-    Return set of market_id strings that have active plate coverage.
+    Return set of market_id strings that have active vianda coverage.
 
-    Batch alternative to calling market_has_active_plate_coverage per market — single query
+    Batch alternative to calling market_has_active_vianda_coverage per market — single query
     for all market_ids. Used by GET /leads/markets supplier audience to annotate has_active_kitchens.
     """
     if not market_ids:
@@ -192,8 +192,8 @@ def get_coverage_flags_for_markets(market_ids: list[str], db) -> set[str]:
         FROM core.institution_market im_sub
         JOIN core.institution_info i ON i.institution_id = im_sub.institution_id
         JOIN ops.restaurant_info r ON r.institution_id = i.institution_id
-        JOIN ops.plate_info p ON p.restaurant_id = r.restaurant_id
-        JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+        JOIN ops.vianda_info p ON p.restaurant_id = r.restaurant_id
+        JOIN ops.vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id
         WHERE im_sub.market_id = ANY(%s::uuid[])
           AND i.status = 'active' AND i.is_archived = FALSE
           AND r.status = 'active' AND r.is_archived = FALSE

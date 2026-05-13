@@ -46,7 +46,7 @@
 **Functions That Were Previously Fixed**:
 1. ~~`get_all_by_user_address_city()`~~ - No longer duplicated
 2. ~~`get_all_active_for_today_by_user_address_city()`~~ - No longer duplicated
-3. ~~`get_by_plate_selection_id()`~~ - Only 1 instance exists (already marked DEPRECATED)
+3. ~~`get_by_vianda_selection_id()`~~ - Only 1 instance exists (already marked DEPRECATED)
 
 **Conclusion**: The codebase is clean and production-ready ✅
 
@@ -68,7 +68,7 @@ python-multipart: 0.0.9 ✅
 
 **Passed Tests**:
 - ✅ All authentication tests
-- ✅ All service layer tests (credit, address, plate selection, etc.)
+- ✅ All service layer tests (credit, address, vianda selection, etc.)
 - ✅ All CRUD tests
 - ✅ All business logic tests
 - ✅ All validation tests

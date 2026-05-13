@@ -156,8 +156,8 @@ It means a code mutation (e.g., changing `>=` to `>`, `+` to `-`) was not caught
 
 **Expanding scope later:**
 Add files to `paths_to_mutate` in `pyproject.toml`. Good next candidates:
-- `app/services/plate_selection_validation.py` (Tier 2 — under-tested)
-- `app/services/plate_pickup_service.py` (Tier 2 — under-tested)
+- `app/services/vianda_selection_validation.py` (Tier 2 — under-tested)
+- `app/services/vianda_pickup_service.py` (Tier 2 — under-tested)
 - `app/security/scoping.py` (Tier 3 — needs tests first)
 
 ## 8. Optional: Add Integration Test Job (later)

@@ -149,7 +149,7 @@ const [restaurants, mapSnapshot] = await Promise.all([
 ]);
 ```
 
-The by-city endpoint returns restaurant data (plates, kitchen days, etc.). The map snapshot returns only the visual map and pin positions. They complement each other.
+The by-city endpoint returns restaurant data (viandas, kitchen days, etc.). The map snapshot returns only the visual map and pin positions. They complement each other.
 
 ---
 

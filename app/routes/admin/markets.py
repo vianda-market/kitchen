@@ -30,7 +30,7 @@ from app.schemas.consolidated_schemas import (
 )
 from app.services.entity_service import get_enriched_market_by_id, get_enriched_markets
 from app.services.error_handling import handle_business_operation
-from app.services.market_service import is_global_market, market_has_active_plate_coverage, market_service
+from app.services.market_service import is_global_market, market_has_active_vianda_coverage, market_service
 from app.utils.country import resolve_country_name
 from app.utils.log import log_error
 from app.utils.pagination import PaginationParams, get_pagination_params, set_pagination_headers
@@ -369,7 +369,7 @@ async def update_market(
     # These keep the `status` field honest in the absence of the auto-flip cron
     # (tracked in docs/plans/market-status-cron.md).
     if market_data.status is not None and not is_global_market(market_id):
-        has_coverage = market_has_active_plate_coverage(market_id, db)
+        has_coverage = market_has_active_vianda_coverage(market_id, db)
         if market_data.status == Status.ACTIVE and not has_coverage:
             raise envelope_exception(ErrorCode.MARKET_NO_COVERAGE_TO_ACTIVATE, status=400, locale=locale)
         if market_data.status == Status.INACTIVE and has_coverage and not market_data.confirm_deactivate:

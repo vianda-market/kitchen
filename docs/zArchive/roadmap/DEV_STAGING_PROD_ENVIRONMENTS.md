@@ -13,11 +13,11 @@
 
 ---
 
-## 1. Kitchen Start Promotion (plate_pickup_live)
+## 1. Kitchen Start Promotion (vianda_pickup_live)
 
 ### Current Behavior
 
-`kitchen_start_promotion` promotes `plate_selection_info` rows to `plate_pickup_live` only when:
+`kitchen_start_promotion` promotes `vianda_selection_info` rows to `vianda_pickup_live` only when:
 
 - Current day is Monday–Friday (kitchen day)
 - Current time in market timezone >= `business_hours.open` (e.g. 11:30 AM Argentina)
@@ -71,4 +71,4 @@ This causes E2E and local flows to fail when run outside business hours or on we
 ## 4. Related Documents
 
 - [billing/MARKET_SPECIFIC_KITCHEN_DAY_CONFIGURATION.md](../billing/MARKET_SPECIFIC_KITCHEN_DAY_CONFIGURATION.md) — Kitchen day and business hours configuration
-- [postman/collections/000 E2E Plate Selection](../postman/collections/) — E2E collection; resilient to outside-kitchen-hours via `pm.execution.skipRequest` when no pickups
+- [postman/collections/000 E2E Vianda Selection](../postman/collections/) — E2E collection; resilient to outside-kitchen-hours via `pm.execution.skipRequest` when no pickups

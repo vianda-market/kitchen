@@ -60,7 +60,7 @@
     "fields": [
       {
         "cast": "text",
-        "context": "plate_pickup",
+        "context": "vianda_pickup",
         "enum_ref": "Status",
         "key": "status",
         "kind": "select",
@@ -129,7 +129,7 @@
       },
       {
         "cast": "uuid",
-        "key": "plate_id",
+        "key": "vianda_id",
         "kind": "multi-select"
       }
     ]
@@ -187,99 +187,6 @@
         "cast": "bool",
         "key": "rollover",
         "kind": "toggle"
-      }
-    ]
-  },
-  {
-    "entity": "plates",
-    "fields": [
-      {
-        "cast": "text",
-        "context": "plate",
-        "enum_ref": "Status",
-        "key": "status",
-        "kind": "select",
-        "values": [
-          "active",
-          "inactive"
-        ]
-      },
-      {
-        "cast": "uuid",
-        "key": "market_id",
-        "kind": "select"
-      },
-      {
-        "cast": "uuid",
-        "key": "restaurant_id",
-        "kind": "select"
-      },
-      {
-        "cast": "date",
-        "key": "plate_date_from",
-        "kind": "range-bound"
-      },
-      {
-        "cast": "date",
-        "key": "plate_date_to",
-        "kind": "range-bound"
-      },
-      {
-        "cast": "uuid",
-        "key": "cuisine_id",
-        "kind": "multi-select"
-      },
-      {
-        "cast": "text",
-        "enum_ref": "DietaryFlag",
-        "key": "dietary",
-        "kind": "multi-select",
-        "values": [
-          "vegan",
-          "vegetarian",
-          "gluten_free",
-          "dairy_free",
-          "nut_free",
-          "halal",
-          "kosher"
-        ]
-      },
-      {
-        "cast": "int",
-        "key": "price_from",
-        "kind": "range-bound"
-      },
-      {
-        "cast": "int",
-        "key": "price_to",
-        "kind": "range-bound"
-      },
-      {
-        "cast": "int",
-        "key": "credit_from",
-        "kind": "range-bound"
-      },
-      {
-        "cast": "int",
-        "key": "credit_to",
-        "kind": "range-bound"
-      },
-      {
-        "cast": "bool",
-        "key": "has_image",
-        "kind": "toggle"
-      },
-      {
-        "cast": "text",
-        "enum_ref": "PortionSizeDisplay",
-        "key": "portion_size",
-        "kind": "multi-select",
-        "values": [
-          "light",
-          "standard",
-          "large",
-          "insufficient_reviews"
-        ]
       }
     ]
   },
@@ -358,6 +265,99 @@
         "cast": "uuid",
         "key": "institution_entity_id",
         "kind": "multi-select"
+      }
+    ]
+  },
+  {
+    "entity": "viandas",
+    "fields": [
+      {
+        "cast": "text",
+        "context": "vianda",
+        "enum_ref": "Status",
+        "key": "status",
+        "kind": "select",
+        "values": [
+          "active",
+          "inactive"
+        ]
+      },
+      {
+        "cast": "uuid",
+        "key": "market_id",
+        "kind": "select"
+      },
+      {
+        "cast": "uuid",
+        "key": "restaurant_id",
+        "kind": "select"
+      },
+      {
+        "cast": "date",
+        "key": "vianda_date_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "date",
+        "key": "vianda_date_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "uuid",
+        "key": "cuisine_id",
+        "kind": "multi-select"
+      },
+      {
+        "cast": "text",
+        "enum_ref": "DietaryFlag",
+        "key": "dietary",
+        "kind": "multi-select",
+        "values": [
+          "vegan",
+          "vegetarian",
+          "gluten_free",
+          "dairy_free",
+          "nut_free",
+          "halal",
+          "kosher"
+        ]
+      },
+      {
+        "cast": "int",
+        "key": "price_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "int",
+        "key": "price_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "int",
+        "key": "credit_from",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "int",
+        "key": "credit_to",
+        "kind": "range-bound"
+      },
+      {
+        "cast": "bool",
+        "key": "has_image",
+        "kind": "toggle"
+      },
+      {
+        "cast": "text",
+        "enum_ref": "PortionSizeDisplay",
+        "key": "portion_size",
+        "kind": "multi-select",
+        "values": [
+          "light",
+          "standard",
+          "large",
+          "insufficient_reviews"
+        ]
       }
     ]
   }

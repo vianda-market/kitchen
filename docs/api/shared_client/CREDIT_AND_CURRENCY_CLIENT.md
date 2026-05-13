@@ -2,7 +2,7 @@
 
 **Audience:** Client app agents (B2B kitchen-web, B2C mobile, any frontend integrating with the Kitchen API).
 
-This document explains credit values, currency management, plan pricing, plate payouts, restaurant balance, and savings calculations in one place.
+This document explains credit values, currency management, plan pricing, vianda payouts, restaurant balance, and savings calculations in one place.
 
 ---
 
@@ -14,8 +14,8 @@ This document explains credit values, currency management, plan pricing, plate p
 | `currency_conversion_usd` | credit_currency_info | Local units per 1 USD (for plan pricing). |
 | `credit_cost_local_currency` | plan_info | Plan price ÷ credit (local currency per credit). Set by backend trigger. |
 | `credit_cost_usd` | plan_info | USD equivalent per credit. Set by backend trigger. |
-| `expected_payout_local_currency` | plate_info | `credit × credit_value_local_currency`. Set by backend trigger. Read-only. |
-| `market_credit_value_local_currency` | Restaurant enriched API | Same as credit_value_local_currency for the restaurant’s market. Use for live payout preview when creating plates. |
+| `expected_payout_local_currency` | vianda_info | `credit × credit_value_local_currency`. Set by backend trigger. Read-only. |
+| `market_credit_value_local_currency` | Restaurant enriched API | Same as credit_value_local_currency for the restaurant’s market. Use for live payout preview when creating viandas. |
 
 ---
 
@@ -96,15 +96,15 @@ Restaurants inherit credit currency from their institution entity.
 
 ---
 
-## 5. Plate expected payout and live preview (B2B)
+## 5. Vianda expected payout and live preview (B2B)
 
 ### Stored value — read-only, backend-set
 
-`expected_payout_local_currency` = `credit × credit_value_local_currency` (amount the supplier receives per plate in local currency). The backend trigger sets this on plate INSERT/UPDATE. Do not send `expected_payout_local_currency` on create or update.
+`expected_payout_local_currency` = `credit × credit_value_local_currency` (amount the supplier receives per vianda in local currency). The backend trigger sets this on vianda INSERT/UPDATE. Do not send `expected_payout_local_currency` on create or update.
 
-### Live preview when creating a plate
+### Live preview when creating a vianda
 
-When the Supplier creates a plate, they need live feedback before submit. Call:
+When the Supplier creates a vianda, they need live feedback before submit. Call:
 
 - `GET /api/v1/restaurants/enriched/`, or
 - `GET /api/v1/restaurants/enriched/{restaurant_id}`
@@ -119,7 +119,7 @@ This is only for preview; the stored value is written by the backend trigger on 
 
 ## 6. B2C explore — savings
 
-`GET /api/v1/restaurants/by-city` returns `restaurants[].plates` with `savings` (integer 0–100).
+`GET /api/v1/restaurants/by-city` returns `restaurants[].viandas` with `savings` (integer 0–100).
 
 ### Formula
 
@@ -136,7 +136,7 @@ Savings are computed on the fly; the client should refresh when entering explore
 
 ### UI
 
-Show savings as a percentage per plate (e.g. "15% off", "Save 15%"). Use `price` and `credit` for secondary display (e.g. "X credits · $Y").
+Show savings as a percentage per vianda (e.g. "15% off", "Save 15%"). Use `price` and `credit` for secondary display (e.g. "X credits · $Y").
 
 ---
 
@@ -146,7 +146,7 @@ When a customer arrives (QR scan), the restaurant balance is updated with:
 
 `credits × credit_value_local_currency`
 
-No-show orders use a discounted amount based on the supplier’s `no_show_discount` (from `billing.supplier_terms`). The plate API does not accept or return savings; savings appear only in B2C explore.
+No-show orders use a discounted amount based on the supplier’s `no_show_discount` (from `billing.supplier_terms`). The vianda API does not accept or return savings; savings appear only in B2C explore.
 
 ---
 
@@ -159,7 +159,7 @@ No-show orders use a discounted amount based on the supplier’s `no_show_discou
 | Plan create/update | `credit_currency_id`, `rollover`, `rollover_cap`, `credit_cost_local_currency`, `credit_cost_usd` |
 | Restaurant create/update | `credit_currency_id` |
 | Institution entity create/update | `credit_currency_id` |
-| Plate create/update | `savings`, `expected_payout_local_currency`, `no_show_discount` |
+| Vianda create/update | `savings`, `expected_payout_local_currency`, `no_show_discount` |
 
 ---
 
@@ -174,4 +174,4 @@ No-show orders use a discounted amount based on the supplier’s `no_show_discou
 - Plan form: market dropdown only; no credit currency selector.
 - Restaurant form: institution entity determines currency; no credit currency selector.
 - Institution entity form: address determines market and currency; no credit currency selector.
-- Plate create: use `GET /restaurants/enriched/` to get `market_credit_value_local_currency` for live payout preview; do not add an input for `expected_payout_local_currency`.
+- Vianda create: use `GET /restaurants/enriched/` to get `market_credit_value_local_currency` for live payout preview; do not add an input for `expected_payout_local_currency`.

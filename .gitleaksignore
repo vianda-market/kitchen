@@ -66,3 +66,25 @@ bc59b5602d8e286641e0415fab4c8b14fe83745e:docs/zArchive/api/shared_client/PASSWOR
 bc59b5602d8e286641e0415fab4c8b14fe83745e:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:1045
 bc59b5602d8e286641e0415fab4c8b14fe83745e:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:1050
 
+# orphan commit 17773ba (origin/rename/plate-to-vianda) — same placeholder
+# tokens as above (docs examples, no real secrets). This commit is an
+# unreachable orphan created during the plate→vianda rename session; it will
+# be pruned from GitHub when the remote branch is deleted post-merge.
+17773ba8d57f24962d508a011949641d31ad8663:docs/api/b2c_client/CUSTOMER_SIGNUP_EMAIL_VERIFICATION.md:generic-api-key:209
+17773ba8d57f24962d508a011949641d31ad8663:docs/api/internal/PASSWORD_RECOVERY.md:generic-api-key:67
+17773ba8d57f24962d508a011949641d31ad8663:docs/api/internal/PASSWORD_RECOVERY.md:generic-api-key:101
+17773ba8d57f24962d508a011949641d31ad8663:docs/api/internal/PASSWORD_RECOVERY.md:generic-api-key:132
+17773ba8d57f24962d508a011949641d31ad8663:docs/archival/ARCHIVAL_SYSTEM_IMPLEMENTATION.md:curl-auth-header:93
+17773ba8d57f24962d508a011949641d31ad8663:docs/archival/ARCHIVAL_SYSTEM_IMPLEMENTATION.md:curl-auth-header:97
+17773ba8d57f24962d508a011949641d31ad8663:docs/archival/ARCHIVAL_SYSTEM_IMPLEMENTATION.md:curl-auth-header:101
+17773ba8d57f24962d508a011949641d31ad8663:docs/api/shared_client/ENUM_SERVICE_API.md:curl-auth-header:344
+17773ba8d57f24962d508a011949641d31ad8663:docs/api/shared_client/ENUM_SERVICE_API.md:curl-auth-header:348
+17773ba8d57f24962d508a011949641d31ad8663:docs/api/shared_client/ENUM_SERVICE_API.md:curl-auth-header:352
+17773ba8d57f24962d508a011949641d31ad8663:docs/readme/START_SERVER.md:curl-auth-header:62
+17773ba8d57f24962d508a011949641d31ad8663:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:214
+17773ba8d57f24962d508a011949641d31ad8663:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:380
+17773ba8d57f24962d508a011949641d31ad8663:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:381
+17773ba8d57f24962d508a011949641d31ad8663:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:1040
+17773ba8d57f24962d508a011949641d31ad8663:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:1045
+17773ba8d57f24962d508a011949641d31ad8663:docs/zArchive/api/shared_client/PASSWORD_RECOVERY_CLIENT.md:generic-api-key:1050
+

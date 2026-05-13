@@ -1,16 +1,16 @@
 """
 Favorite Entity Type Enumeration
 
-Defines the valid entity types that can be favorited (plate or restaurant).
+Defines the valid entity types that can be favorited (vianda or restaurant).
 """
 
 from enum import Enum
 
 
 class FavoriteEntityType(str, Enum):
-    """Valid favorite entity types - plate or restaurant"""
+    """Valid favorite entity types - vianda or restaurant"""
 
-    PLATE = "plate"
+    VIANDA = "vianda"
     RESTAURANT = "restaurant"
 
     @classmethod

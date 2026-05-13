@@ -29,7 +29,7 @@ If a user tries to access data outside their scope, the backend will return a `4
 **Resources**:
 - Restaurants
 - Products
-- Plates (for Suppliers - see special case below)
+- Viandas (for Suppliers - see special case below)
 - QR Codes
 - Institution Entities
 - Institution Bank Accounts
@@ -38,8 +38,8 @@ If a user tries to access data outside their scope, the backend will return a `4
 - Restaurant Balance Info
 
 **Example**:
-- A Supplier from "Acme Restaurant" can only see restaurants, products, and plates from "Acme Restaurant"
-- An Employee can see restaurants, products, and plates from all institutions
+- A Supplier from "Acme Restaurant" can only see restaurants, products, and viandas from "Acme Restaurant"
+- An Employee can see restaurants, products, and viandas from all institutions
 
 ---
 
@@ -60,14 +60,14 @@ If a user tries to access data outside their scope, the backend will return a `4
 
 ## Special Cases
 
-### Plates API
+### Viandas API
 
 **Behavior**: 
-- **Customers**: Can GET all plates (no scoping) to browse available meals, but cannot create/modify them
-- **Suppliers**: Can only see plates from their institution's restaurants
-- **Employees**: Can see all plates
+- **Customers**: Can GET all viandas (no scoping) to browse available meals, but cannot create/modify them
+- **Suppliers**: Can only see viandas from their institution's restaurants
+- **Employees**: Can see all viandas
 
-**Why**: Customers need to browse all available meals to make selections, but they cannot create or modify plates.
+**Why**: Customers need to browse all available meals to make selections, but they cannot create or modify viandas.
 
 ---
 
@@ -296,21 +296,21 @@ const createAddress = async (addressData) => {
 };
 ```
 
-### Example 4: Plates Browsing (Customer)
+### Example 4: Viandas Browsing (Customer)
 
 ```typescript
-// ✅ GOOD: Customers can GET all plates (no scoping for browsing)
+// ✅ GOOD: Customers can GET all viandas (no scoping for browsing)
 const fetchPlates = async () => {
-  const response = await fetch('/plates/enriched/', {
+  const response = await fetch('/viandas/enriched/', {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   
-  const plates = await response.json();
-  // Customers see all plates (for browsing)
-  // Suppliers see only their institution's plates
-  // Employees see all plates
+  const viandas = await response.json();
+  // Customers see all viandas (for browsing)
+  // Suppliers see only their institution's viandas
+  // Employees see all viandas
   
-  return plates;
+  return viandas;
 };
 ```
 

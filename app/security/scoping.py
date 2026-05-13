@@ -35,7 +35,7 @@ class InstitutionScope:
     """
     Represents the institution access scope for the current user.
 
-    Used for resources that belong to institutions (restaurants, products, plates, etc.).
+    Used for resources that belong to institutions (restaurants, products, viandas, etc.).
 
     Behavior:
     - Internal Admin/Super Admin: Global access (can see all institutions)

@@ -107,7 +107,7 @@ This section describes what is **in place now** so both B2B and B2C agents imple
 - **One active subscription per user per market** (DB constraint). Each subscription has its own balance, renewal date, hold status.
 - **Plans are market-specific.** Filter plans by market: `GET /api/v1/plans/enriched/?market_id={market_id}`. Use only non-Global `market_id`.
 - **Create subscription:** `POST /api/v1/subscriptions/` with `user_id` and `plan_id`; market is derived from the plan. **409** if user already has an active subscription in that market.
-- **Hold:** `POST /api/v1/subscriptions/{id}/hold` and `.../resume`. On Hold = not billed, plate selection not allowed; auto-resume after hold end date.
+- **Hold:** `POST /api/v1/subscriptions/{id}/hold` and `.../resume`. On Hold = not billed, vianda selection not allowed; auto-resume after hold end date.
 - **GET /api/v1/subscriptions/me** returns subscriptions with `market_id`, `market_name`, `country_code` for display. Show market context (name, currency) in all subscription UIs.
 
 ---

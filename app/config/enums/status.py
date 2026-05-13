@@ -16,9 +16,9 @@ STATUS_CONTEXTS: dict[str, list["Status"]] = {
     "general": [],  # Active, Pending, Inactive
     "user": [],  # Active, Inactive
     "restaurant": [],  # Active, Pending, Inactive
-    "plate_pickup": [],  # Pending, Arrived, Handed_Out, Completed, Cancelled
+    "vianda_pickup": [],  # Pending, Arrived, Handed_Out, Completed, Cancelled
     "bill": [],  # Pending, Processed, Cancelled
-    "plate": [],  # Active, Inactive (catalog visibility; no pickup-lifecycle states)
+    "vianda": [],  # Active, Inactive (catalog visibility; no pickup-lifecycle states)
     "plan": [],  # Active, Inactive (plan offering state; never pending/processed)
 }
 
@@ -30,7 +30,7 @@ class Status(str, Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
 
-    # Order / plate pickup statuses
+    # Order / vianda pickup statuses
     PENDING = "pending"
     ARRIVED = "arrived"
     HANDED_OUT = "handed_out"
@@ -79,7 +79,7 @@ def _ensure_contexts_filled() -> None:
     STATUS_CONTEXTS["general"] = [Status.ACTIVE, Status.PENDING, Status.INACTIVE]
     STATUS_CONTEXTS["user"] = [Status.ACTIVE, Status.INACTIVE]
     STATUS_CONTEXTS["restaurant"] = [Status.ACTIVE, Status.PENDING, Status.INACTIVE]
-    STATUS_CONTEXTS["plate_pickup"] = [
+    STATUS_CONTEXTS["vianda_pickup"] = [
         Status.PENDING,
         Status.ARRIVED,
         Status.HANDED_OUT,
@@ -87,10 +87,10 @@ def _ensure_contexts_filled() -> None:
         Status.CANCELLED,
     ]
     STATUS_CONTEXTS["bill"] = [Status.PENDING, Status.PROCESSED, Status.CANCELLED]
-    # plate_info: catalog visibility only — admins toggle active/inactive.
+    # vianda_info: catalog visibility only — admins toggle active/inactive.
     # No pickup-lifecycle states (pending/arrived/completed/cancelled) apply here;
-    # those belong to plate_pickup context. processed is billing-only.
-    STATUS_CONTEXTS["plate"] = [Status.ACTIVE, Status.INACTIVE]
+    # those belong to vianda_pickup context. processed is billing-only.
+    STATUS_CONTEXTS["vianda"] = [Status.ACTIVE, Status.INACTIVE]
     # plan_info: offering state only — active (offered) or inactive (withdrawn).
     # Never pending/processed (no approval or billing workflow on plan itself).
     STATUS_CONTEXTS["plan"] = [Status.ACTIVE, Status.INACTIVE]

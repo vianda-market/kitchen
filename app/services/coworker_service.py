@@ -3,7 +3,7 @@ Coworker service for post-reservation pickup flow.
 
 Provides get_coworkers_with_eligibility for the "Offer to pick up" flow:
 - List coworkers (same employer) with eligibility for notification
-- Eligible: no plate selection for same kitchen_day
+- Eligible: no vianda selection for same kitchen_day
 - Ineligible: has order for different restaurant or conflicting pickup time
 """
 
@@ -18,13 +18,13 @@ from app.utils.db import db_read
 from app.utils.log import log_info
 
 
-def _fetch_plate_selection_context(
-    plate_selection_id: UUID,
+def _fetch_vianda_selection_context(
+    vianda_selection_id: UUID,
     current_user_id: UUID,
     db: psycopg2.extensions.connection,
 ) -> dict[str, Any]:
     """
-    Fetch the plate selection row joined to user context and verify ownership.
+    Fetch the vianda selection row joined to user context and verify ownership.
 
     Returns the combined ps + user row on success.
     Raises HTTPException 404 if not found, 403 if owned by another user.
@@ -33,25 +33,25 @@ def _fetch_plate_selection_context(
         """
         SELECT ps.kitchen_day, ps.restaurant_id, ps.pickup_time_range,
                u.employer_entity_id, u.employer_address_id, u.workplace_group_id
-        FROM plate_selection_info ps
+        FROM vianda_selection_info ps
         JOIN user_info u ON ps.user_id = u.user_id
-        WHERE ps.plate_selection_id = %s AND ps.is_archived = FALSE
+        WHERE ps.vianda_selection_id = %s AND ps.is_archived = FALSE
         """,
-        (str(plate_selection_id),),
+        (str(vianda_selection_id),),
         connection=db,
         fetch_one=True,
     )
     if not ps_row:
-        raise envelope_exception(ErrorCode.PLATE_SELECTION_NOT_FOUND, status=404, locale="en")
+        raise envelope_exception(ErrorCode.VIANDA_SELECTION_NOT_FOUND, status=404, locale="en")
 
     owner_check = db_read(
-        "SELECT user_id FROM plate_selection_info WHERE plate_selection_id = %s",
-        (str(plate_selection_id),),
+        "SELECT user_id FROM vianda_selection_info WHERE vianda_selection_id = %s",
+        (str(vianda_selection_id),),
         connection=db,
         fetch_one=True,
     )
     if owner_check and str(owner_check.get("user_id")) != str(current_user_id):
-        raise envelope_exception(ErrorCode.PLATE_SELECTION_ACCESS_DENIED, status=403, locale="en")
+        raise envelope_exception(ErrorCode.VIANDA_SELECTION_ACCESS_DENIED, status=403, locale="en")
 
     return ps_row  # type: ignore[return-value]
 
@@ -60,7 +60,7 @@ def _resolve_coworker_match_key(
     ps_row: dict[str, Any],
 ) -> tuple[str, Any]:
     """
-    Determine the coworker matching field and value from the plate selection context.
+    Determine the coworker matching field and value from the vianda selection context.
 
     Returns (match_field, match_value): field is 'workplace_group_id' or 'employer_entity_id'.
     Raises HTTPException 403 if neither is set.
@@ -85,7 +85,7 @@ def _fetch_coworkers_by_scope(
     """
     Fetch coworkers scoped to the same workplace group, employer+address, or employer-no-address.
 
-    Only active, non-archived users who opt in to plate pickup participation are returned.
+    Only active, non-archived users who opt in to vianda pickup participation are returned.
     """
     if match_field == "workplace_group_id":
         rows = db_read(
@@ -95,7 +95,7 @@ def _fetch_coworkers_by_scope(
             INNER JOIN user_messaging_preferences ump ON u.user_id = ump.user_id
             WHERE u.workplace_group_id = %s AND u.user_id != %s
               AND u.is_archived = FALSE AND u.status = 'active'
-              AND ump.can_participate_in_plate_pickups = TRUE
+              AND ump.can_participate_in_vianda_pickups = TRUE
             ORDER BY u.first_name, u.last_name
             """,
             (str(match_value), str(current_user_id)),
@@ -112,7 +112,7 @@ def _fetch_coworkers_by_scope(
             WHERE u.employer_entity_id = %s AND u.user_id != %s
               AND u.employer_address_id = %s
               AND u.is_archived = FALSE AND u.status = 'active'
-              AND ump.can_participate_in_plate_pickups = TRUE
+              AND ump.can_participate_in_vianda_pickups = TRUE
             ORDER BY u.first_name, u.last_name
             """,
             (str(match_value), str(current_user_id), str(employer_address_id)),
@@ -129,7 +129,7 @@ def _fetch_coworkers_by_scope(
         WHERE u.employer_entity_id = %s AND u.user_id != %s
           AND u.employer_address_id IS NULL
           AND u.is_archived = FALSE AND u.status = 'active'
-          AND ump.can_participate_in_plate_pickups = TRUE
+          AND ump.can_participate_in_vianda_pickups = TRUE
         ORDER BY u.first_name, u.last_name
         """,
         (str(match_value), str(current_user_id)),
@@ -149,12 +149,12 @@ def _evaluate_coworker_eligibility(
     Determine eligibility for a single coworker on the given kitchen day.
 
     Returns (eligible, ineligibility_reason).
-    Eligible when the coworker has no plate selection for the same kitchen day.
+    Eligible when the coworker has no vianda selection for the same kitchen day.
     """
     existing = db_read(
         """
         SELECT restaurant_id, pickup_time_range
-        FROM plate_selection_info
+        FROM vianda_selection_info
         WHERE user_id = %s AND kitchen_day = %s AND is_archived = FALSE
         """,
         (str(user_id), kitchen_day),
@@ -209,7 +209,7 @@ def _build_coworker_results(
 
 
 def get_coworkers_with_eligibility(
-    plate_selection_id: UUID,
+    vianda_selection_id: UUID,
     current_user_id: UUID,
     db: psycopg2.extensions.connection,
 ) -> list[dict[str, Any]]:
@@ -217,11 +217,11 @@ def get_coworkers_with_eligibility(
     Get coworkers (same employer) with eligibility for pickup notification.
 
     Eligibility:
-    - Eligible: coworker has no plate_selection for the same kitchen_day (any restaurant)
-    - Ineligible: coworker has a plate_selection for a different restaurant or conflicting pickup time
+    - Eligible: coworker has no vianda_selection for the same kitchen_day (any restaurant)
+    - Ineligible: coworker has a vianda_selection for a different restaurant or conflicting pickup time
 
     Args:
-        plate_selection_id: The plate selection (offer) to scope coworkers for
+        vianda_selection_id: The vianda selection (offer) to scope coworkers for
         current_user_id: Current user (must have employer_entity_id)
         db: Database connection
 
@@ -231,7 +231,7 @@ def get_coworkers_with_eligibility(
     Raises:
         HTTPException 403 if current user has no employer_entity_id
     """
-    ps_row = _fetch_plate_selection_context(plate_selection_id, current_user_id, db)
+    ps_row = _fetch_vianda_selection_context(vianda_selection_id, current_user_id, db)
 
     match_field, match_value = _resolve_coworker_match_key(ps_row)
 
@@ -246,7 +246,7 @@ def get_coworkers_with_eligibility(
 
 
 def notify_coworkers(
-    plate_selection_id: UUID,
+    vianda_selection_id: UUID,
     user_ids: list[UUID],
     current_user_id: UUID,
     db: psycopg2.extensions.connection,
@@ -255,7 +255,7 @@ def notify_coworkers(
     Record coworker pickup notifications. Validates all user_ids are eligible.
 
     Args:
-        plate_selection_id: The plate selection (offer) context
+        vianda_selection_id: The vianda selection (offer) context
         user_ids: List of coworker user_ids to notify
         current_user_id: Current user (notifier)
         db: Database connection
@@ -266,7 +266,7 @@ def notify_coworkers(
     Raises:
         HTTPException 400 if any user_id is not eligible
     """
-    coworkers = get_coworkers_with_eligibility(plate_selection_id, current_user_id, db)
+    coworkers = get_coworkers_with_eligibility(vianda_selection_id, current_user_id, db)
     eligible_ids = {str(c["user_id"]) for c in coworkers if c["eligible"]}
 
     for uid in user_ids:
@@ -280,12 +280,12 @@ def notify_coworkers(
         for notified_id in user_ids:
             cursor.execute(
                 """
-                INSERT INTO coworker_pickup_notification (plate_selection_id, notifier_user_id, notified_user_id)
+                INSERT INTO coworker_pickup_notification (vianda_selection_id, notifier_user_id, notified_user_id)
                 VALUES (%s, %s, %s)
                 """,
-                (str(plate_selection_id), str(current_user_id), str(notified_id)),
+                (str(vianda_selection_id), str(current_user_id), str(notified_id)),
             )
 
     db.commit()
-    log_info(f"Notified {len(user_ids)} coworkers for plate_selection {plate_selection_id}")
+    log_info(f"Notified {len(user_ids)} coworkers for vianda_selection {vianda_selection_id}")
     return {"notified_count": len(user_ids)}

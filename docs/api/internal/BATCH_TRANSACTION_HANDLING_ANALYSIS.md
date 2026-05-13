@@ -96,7 +96,7 @@ def db_batch_insert(table: str, data_list: List[dict], connection=None):
 **Approach**: Use raw SQL with explicit transaction management in the endpoint
 
 ```python
-def create_plate_kitchen_days(...):
+def create_vianda_kitchen_days(...):
     with connection.cursor() as cursor:
         try:
             for day in kitchen_days:
@@ -181,10 +181,10 @@ def db_batch_insert(table: str, data_list: List[dict], connection=None):
     
     Example:
         data_list = [
-            {"plate_id": "uuid1", "kitchen_day": "Monday"},
-            {"plate_id": "uuid1", "kitchen_day": "Tuesday"}
+            {"vianda_id": "uuid1", "kitchen_day": "Monday"},
+            {"vianda_id": "uuid1", "kitchen_day": "Tuesday"}
         ]
-        ids = db_batch_insert("plate_kitchen_days", data_list, connection)
+        ids = db_batch_insert("vianda_kitchen_days", data_list, connection)
         # Returns: [uuid1, uuid2] (primary key IDs)
     """
     if not data_list:
@@ -252,30 +252,30 @@ def db_batch_insert(table: str, data_list: List[dict], connection=None):
 ### Usage in Endpoint
 
 ```python
-@router.post("/", response_model=List[PlateKitchenDayResponseSchema])
-def create_plate_kitchen_days(
-    payload: PlateKitchenDayCreateSchema,  # kitchen_days: List[str]
+@router.post("/", response_model=List[ViandaKitchenDayResponseSchema])
+def create_vianda_kitchen_days(
+    payload: ViandaKitchenDayCreateSchema,  # kitchen_days: List[str]
     ...
 ):
     def create_operation(connection: psycopg2.extensions.connection):
-        # Validate plate exists
-        plate = plate_service.get_by_id(payload.plate_id, connection)
-        if not plate:
-            raise HTTPException(status_code=404, detail=f"Plate not found: {payload.plate_id}")
+        # Validate vianda exists
+        vianda = vianda_service.get_by_id(payload.vianda_id, connection)
+        if not vianda:
+            raise HTTPException(status_code=404, detail=f"Vianda not found: {payload.vianda_id}")
         
         # Validate all days before creating any
         for day in payload.kitchen_days:
-            if _check_unique_constraint(payload.plate_id, day, connection):
+            if _check_unique_constraint(payload.vianda_id, day, connection):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Plate {payload.plate_id} is already assigned to {day}"
+                    detail=f"Vianda {payload.vianda_id} is already assigned to {day}"
                 )
         
         # Prepare data for batch insert
         data_list = []
         for day in payload.kitchen_days:
             data_list.append({
-                "plate_id": str(payload.plate_id),
+                "vianda_id": str(payload.vianda_id),
                 "kitchen_day": day,
                 "is_archived": False,
                 "modified_by": current_user["user_id"]
@@ -283,21 +283,21 @@ def create_plate_kitchen_days(
         
         # Batch insert all days atomically
         from app.utils.db import db_batch_insert
-        inserted_ids = db_batch_insert("plate_kitchen_days", data_list, connection)
+        inserted_ids = db_batch_insert("vianda_kitchen_days", data_list, connection)
         
         # Fetch created records to return
         created_days = []
         for inserted_id in inserted_ids:
-            kitchen_day = plate_kitchen_days_service.get_by_id(
+            kitchen_day = vianda_kitchen_days_service.get_by_id(
                 UUID(inserted_id), connection, scope=scope
             )
             if kitchen_day:
                 created_days.append(kitchen_day)
         
-        log_info(f"Created {len(created_days)} kitchen days for plate {payload.plate_id}")
+        log_info(f"Created {len(created_days)} kitchen days for vianda {payload.vianda_id}")
         return created_days
     
-    return handle_business_operation(create_operation, db, "create plate kitchen days")
+    return handle_business_operation(create_operation, db, "create vianda kitchen days")
 ```
 
 ## Future Use Cases
@@ -307,7 +307,7 @@ The `db_batch_insert` function can be reused for:
 1. **Bulk user creation** - Create multiple users at once
 2. **Bulk address creation** - Create multiple addresses
 3. **Bulk product creation** - Create multiple products
-4. **Bulk plate creation** - Create multiple plates
+4. **Bulk vianda creation** - Create multiple viandas
 5. **Any other bulk operations** - Future needs
 
 ## Comparison Table

@@ -70,7 +70,7 @@ There are no `packages/api`, `packages/types`, `packages/utils` shared across re
 - **New repo** when built
 - **Tech**: React Native + React Native Web (Expo)
 - **Platforms**: iOS, Android, Web (one codebase for B2C)
-- Uses: Auth, signup, plans, subscriptions, payment methods, plates, plate selection, plate pickup, addresses, client bills, markets, enums
+- Uses: Auth, signup, plans, subscriptions, payment methods, viandas, vianda selection, vianda pickup, addresses, client bills, markets, enums
 - Same OpenAPI codegen and client docs as kitchen-web
 - Focus on Customer-accessible endpoints per [API_PERMISSIONS_BY_ROLE.md](../api/API_PERMISSIONS_BY_ROLE.md)
 
@@ -104,7 +104,7 @@ Restaurants and customers should not share the same frontend app. Different audi
 ### Phase 3: B2C Readiness
 
 - [ ] Validate [API_PERMISSIONS_BY_ROLE.md](../api/API_PERMISSIONS_BY_ROLE.md) against implementation
-- [ ] Ensure B2C endpoints are stable: auth, signup, plans, subscriptions, payment methods, plates, plate selection, plate pickup, addresses, client bills, markets, enums
+- [ ] Ensure B2C endpoints are stable: auth, signup, plans, subscriptions, payment methods, viandas, vianda selection, vianda pickup, addresses, client bills, markets, enums
 - [ ] Route organization: consider grouping by consumer (client, employee, supplier) via tags or folders
 
 ### Phase 4: Technical Roadmap Alignment
@@ -146,8 +146,8 @@ See [docs/deployment/handshake-checklist.md](../deployment/handshake-checklist.m
 
 | Consumer | Routes / APIs |
 |----------|----------------|
-| **B2C (Customer)** | Auth, signup, plans, subscriptions, payment methods, plates, plate selection, plate pickup, addresses, client bills, markets, enums |
-| **Restaurant (Supplier)** | Restaurants, products, QR codes, institution bank/entity, restaurant balance/transactions, plate kitchen days, holidays |
+| **B2C (Customer)** | Auth, signup, plans, subscriptions, payment methods, viandas, vianda selection, vianda pickup, addresses, client bills, markets, enums |
+| **Restaurant (Supplier)** | Restaurants, products, QR codes, institution bank/entity, restaurant balance/transactions, vianda kitchen days, holidays |
 | **Backoffice (Employee)** | Credit currencies, discretionary, archival, markets, all CRUD + enriched endpoints |
 
 See [API_PERMISSIONS_BY_ROLE.md](../api/API_PERMISSIONS_BY_ROLE.md) for detailed permission matrices.

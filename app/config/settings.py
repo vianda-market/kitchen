@@ -151,7 +151,7 @@ class Settings(BaseSettings):
         "client_bills": 365,  # Financial records - 1 year
         "client_transactions": 90,  # Client payments - 90 days
         # Operational tables (MEDIUM PRIORITY)
-        "plate_selections": 60,  # Order history - 60 days
+        "vianda_selections": 60,  # Order history - 60 days
         "payment_methods": 365,  # Payment methods - 1 year
         "plans": 730,  # Service plans - 2 years
         "qr_codes": 180,  # QR codes - 180 days

@@ -100,7 +100,7 @@ The `centroid` field is the recommended camera anchor point. It is `null` only w
 |---|---|---|
 | `"city"` | No `center_lat`/`center_lng` provided | Precomputed city centroid (mean of all active restaurant coords, refreshed weekly). Camera should anchor here and call `fitBounds`. |
 | `"user_nearest"` | User anchor provided AND nearest restaurant ≤ 10 km away | Nearest restaurant to the user's address. Camera anchors on an actual restaurant — guarantees at least one pin under the camera. |
-| `"city_fallback"` | User anchor provided BUT nearest restaurant > 10 km away | User is outside the restaurant cluster. City centroid used instead; response still returns restaurants sorted from city center. Show a caption like "No plates near you yet — showing Miraflores". |
+| `"city_fallback"` | User anchor provided BUT nearest restaurant > 10 km away | User is outside the restaurant cluster. City centroid used instead; response still returns restaurants sorted from city center. Show a caption like "No viandas near you yet — showing Miraflores". |
 
 ### `more_available` and `omitted_count` fields
 
@@ -176,14 +176,14 @@ if (pinsResp.more_available) {
 const captions = {
   city: `Showing restaurants in ${cityName}`,
   user_nearest: `Showing restaurants near you`,
-  city_fallback: `No plates near you yet — showing ${cityName}`,
+  city_fallback: `No viandas near you yet — showing ${cityName}`,
 };
 renderCaption(captions[pinsResp.centroid?.source ?? 'city']);
 
 // Render markers
 pinsResp.markers.forEach(pin => {
   // Add Mapbox marker at [pin.lng, pin.lat]
-  // On tap: open restaurant detail / plate modal using pin.restaurant_id
+  // On tap: open restaurant detail / vianda modal using pin.restaurant_id
 });
 ```
 

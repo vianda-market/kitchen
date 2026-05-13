@@ -30,9 +30,9 @@ def get_messaging_preferences(
     """
     row = db_read(
         """
-        SELECT user_id, notify_coworker_pickup_alert, notify_plate_readiness_alert,
+        SELECT user_id, notify_coworker_pickup_alert, notify_vianda_readiness_alert,
                notify_promotions_push, notify_promotions_email,
-               coworkers_can_see_my_orders, can_participate_in_plate_pickups,
+               coworkers_can_see_my_orders, can_participate_in_vianda_pickups,
                created_date, modified_date
         FROM user_messaging_preferences
         WHERE user_id = %s
@@ -49,19 +49,19 @@ def get_messaging_preferences(
             {
                 "user_id": user_id,
                 "notify_coworker_pickup_alert": True,
-                "notify_plate_readiness_alert": True,
+                "notify_vianda_readiness_alert": True,
                 "notify_promotions_push": True,
                 "notify_promotions_email": True,
                 "coworkers_can_see_my_orders": True,
-                "can_participate_in_plate_pickups": True,
+                "can_participate_in_vianda_pickups": True,
             },
             connection=db,
         )
         row = db_read(
             """
-            SELECT user_id, notify_coworker_pickup_alert, notify_plate_readiness_alert,
+            SELECT user_id, notify_coworker_pickup_alert, notify_vianda_readiness_alert,
                    notify_promotions_push, notify_promotions_email,
-                   coworkers_can_see_my_orders, can_participate_in_plate_pickups,
+                   coworkers_can_see_my_orders, can_participate_in_vianda_pickups,
                    created_date, modified_date
             FROM user_messaging_preferences
             WHERE user_id = %s
@@ -83,7 +83,7 @@ def update_messaging_preferences(
 
     Args:
         user_id: User ID
-        update_data: Dict with optional preference booleans (notify_*, coworkers_can_see_my_orders, can_participate_in_plate_pickups)
+        update_data: Dict with optional preference booleans (notify_*, coworkers_can_see_my_orders, can_participate_in_vianda_pickups)
         db: Database connection
 
     Returns:
@@ -95,19 +95,19 @@ def update_messaging_preferences(
     # Filter to only allowed fields and non-None values
     allowed = {
         "notify_coworker_pickup_alert",
-        "notify_plate_readiness_alert",
+        "notify_vianda_readiness_alert",
         "notify_promotions_push",
         "notify_promotions_email",
         "coworkers_can_see_my_orders",
-        "can_participate_in_plate_pickups",
+        "can_participate_in_vianda_pickups",
     }
     to_update = {k: v for k, v in update_data.items() if k in allowed and v is not None}
     if not to_update:
         return get_messaging_preferences(user_id, db)
 
-    # Cascade: when can_participate_in_plate_pickups is set to False, also set coworkers_can_see_my_orders
+    # Cascade: when can_participate_in_vianda_pickups is set to False, also set coworkers_can_see_my_orders
     # and notify_coworker_pickup_alert to False (user won't receive coworker pickup messages if not participating)
-    if to_update.get("can_participate_in_plate_pickups") is False:
+    if to_update.get("can_participate_in_vianda_pickups") is False:
         to_update["coworkers_can_see_my_orders"] = False
         to_update["notify_coworker_pickup_alert"] = False
 

@@ -28,7 +28,7 @@ WINDOW_SECONDS: int = 60
 FREE_TIER_ENDPOINT_OVERRIDES: dict[str, int] = {
     "/addresses/suggest": 30,
     "/restaurants/explorer": 20,
-    "/plate-selections/": 30,
+    "/vianda-selections/": 30,
     "/cuisines/": 60,
 }
 

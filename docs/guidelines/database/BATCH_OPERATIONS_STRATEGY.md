@@ -87,11 +87,11 @@ def _build_insert_sql(table: str, data: dict) -> Tuple[str, tuple, str]:
 **Example**:
 ```python
 data = {
-    "plate_id": "uuid1",
+    "vianda_id": "uuid1",
     "kitchen_day": "Monday",
     "is_archived": False
 }
-inserted_id = db_insert("plate_kitchen_days", data, connection)
+inserted_id = db_insert("vianda_kitchen_days", data, connection)
 ```
 
 **Transaction Behavior**:
@@ -112,7 +112,7 @@ inserted_id = db_insert("plate_kitchen_days", data, connection)
 - Rolls back all operations if any insert fails
 
 **Use Cases**:
-- Creating multiple kitchen days for a plate
+- Creating multiple kitchen days for a vianda
 - Bulk user creation
 - Bulk address creation
 - Bulk product creation
@@ -121,11 +121,11 @@ inserted_id = db_insert("plate_kitchen_days", data, connection)
 **Example**:
 ```python
 data_list = [
-    {"plate_id": "uuid1", "kitchen_day": "Monday"},
-    {"plate_id": "uuid1", "kitchen_day": "Tuesday"},
-    {"plate_id": "uuid1", "kitchen_day": "Wednesday"}
+    {"vianda_id": "uuid1", "kitchen_day": "Monday"},
+    {"vianda_id": "uuid1", "kitchen_day": "Tuesday"},
+    {"vianda_id": "uuid1", "kitchen_day": "Wednesday"}
 ]
-inserted_ids = db_batch_insert("plate_kitchen_days", data_list, connection)
+inserted_ids = db_batch_insert("vianda_kitchen_days", data_list, connection)
 # Returns: [uuid1, uuid2, uuid3]
 ```
 
@@ -488,18 +488,18 @@ See `BATCH_OPERATIONS_ANALYSIS.md` for detailed analysis of potential batch oper
 **Before** (multiple single inserts):
 ```python
 for day in kitchen_days:
-    data = {"plate_id": plate_id, "kitchen_day": day}
-    db_insert("plate_kitchen_days", data, connection)
+    data = {"vianda_id": vianda_id, "kitchen_day": day}
+    db_insert("vianda_kitchen_days", data, connection)
     # Each insert commits separately
 ```
 
 **After** (single batch insert):
 ```python
 data_list = [
-    {"plate_id": plate_id, "kitchen_day": day}
+    {"vianda_id": vianda_id, "kitchen_day": day}
     for day in kitchen_days
 ]
-db_batch_insert("plate_kitchen_days", data_list, connection)
+db_batch_insert("vianda_kitchen_days", data_list, connection)
 # All inserts commit atomically
 ```
 

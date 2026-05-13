@@ -47,9 +47,9 @@ class VersionedSchemaRegistry:
         self.register_schema("ProductUpdate", APIVersion.V1, ProductUpdateSchema)
         self.register_schema("ProductResponse", APIVersion.V1, ProductResponseSchema)
 
-        self.register_schema("PlateCreate", APIVersion.V1, PlateCreateSchema)
-        self.register_schema("PlateUpdate", APIVersion.V1, PlateUpdateSchema)
-        self.register_schema("PlateResponse", APIVersion.V1, PlateResponseSchema)
+        self.register_schema("PlateCreate", APIVersion.V1, ViandaCreateSchema)
+        self.register_schema("PlateUpdate", APIVersion.V1, ViandaUpdateSchema)
+        self.register_schema("ViandaResponse", APIVersion.V1, ViandaResponseSchema)
 
         self.register_schema("QRCodeCreate", APIVersion.V1, QRCodeCreateSchema)
         self.register_schema("QRCodeUpdate", APIVersion.V1, QRCodeUpdateSchema)
@@ -74,10 +74,10 @@ class VersionedSchemaRegistry:
         self.register_schema("EmployerResponse", APIVersion.V1, EmployerResponseSchema)
         self.register_schema("EmployerSearch", APIVersion.V1, EmployerSearchSchema)
 
-        # Plate Selection & Pickup Schemas
-        self.register_schema("PlateSelectionCreate", APIVersion.V1, PlateSelectionCreateSchema)
-        self.register_schema("PlateSelectionUpdate", APIVersion.V1, PlateSelectionUpdateSchema)
-        self.register_schema("PlateSelectionResponse", APIVersion.V1, PlateSelectionResponseSchema)
+        # Vianda Selection & Pickup Schemas
+        self.register_schema("ViandaSelectionCreate", APIVersion.V1, ViandaSelectionCreateSchema)
+        self.register_schema("ViandaSelectionUpdate", APIVersion.V1, ViandaSelectionUpdateSchema)
+        self.register_schema("ViandaSelectionResponse", APIVersion.V1, ViandaSelectionResponseSchema)
 
         # Admin & Discretionary Schemas
         self.register_schema("DiscretionaryCreate", APIVersion.V1, DiscretionaryCreateSchema)

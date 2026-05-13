@@ -20,8 +20,8 @@ new plan tier is introduced or an existing tier is repriced.
 
 ### Why the supplier side is a single stable value
 
-Suppliers price their plates in credits ("this plate costs 4 credits"). If the per-credit
-payout value changes, suppliers either absorb the change or must restate every plate price —
+Suppliers price their viandas in credits ("this vianda costs 4 credits"). If the per-credit
+payout value changes, suppliers either absorb the change or must restate every vianda price —
 both paths produce churn and risk losing supply. So `credit_value_supplier_local` is a
 discretionary, stable, Vianda-owned number set per market and changed rarely.
 
@@ -194,7 +194,7 @@ Aggregates:
 Σ (plan.credit_cost_local_currency − credit_value_supplier_local) × credits_redeemed
 ```
 grouped by plan tier. Only real redemptions (restaurant_transaction rows with a linked
-plate_selection) are counted; discretionary transactions are excluded.
+vianda_selection) are counted; discretionary transactions are excluded.
 
 Response:
 ```json
@@ -244,7 +244,7 @@ isolation and together violating the floor.
 
 `get_margin_report(db, market_id, period_start, period_end) → MarketMarginReport`
 
-Join path: `restaurant_transaction → plate_selection → subscription → plan_info`. Groups by
+Join path: `restaurant_transaction → vianda_selection → subscription → plan_info`. Groups by
 `plan_id` and sums credits redeemed. Returns `MarketMarginReport` with `plan_tiers` and totals.
 
 ---

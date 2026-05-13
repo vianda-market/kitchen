@@ -7,7 +7,7 @@ the restaurant from 'pending' to 'active' automatically (one-way only).
 Readiness chain for a restaurant:
   1. restaurant.status = 'pending'  (precondition; already-active stays active)
   2. restaurant.is_archived = False
-  3. ≥1 plate with plate_kitchen_days configured (non-archived, status='active')
+  3. ≥1 vianda with vianda_kitchen_days configured (non-archived, status='active')
   4. A QR row exists in ops.qr_code for that restaurant (non-archived, status='active')
 
 Rule invariants (do NOT relax):
@@ -36,7 +36,7 @@ def _check_restaurant_prereqs(
       - status: current restaurant status string (or None if not found)
       - name: restaurant name string (or None if not found)
       - is_archived: bool
-      - has_plate_kitchen_days: bool — ≥1 active PKD for the restaurant
+      - has_vianda_kitchen_days: bool — ≥1 active PKD for the restaurant
       - has_qr: bool — ≥1 active non-archived QR row for the restaurant
     """
     row = db_read(
@@ -47,13 +47,13 @@ def _check_restaurant_prereqs(
             r.is_archived,
             EXISTS (
                 SELECT 1
-                FROM ops.plate_info p
-                JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+                FROM ops.vianda_info p
+                JOIN ops.vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id
                 WHERE p.restaurant_id = r.restaurant_id
                   AND p.is_archived = FALSE
                   AND pkd.is_archived = FALSE
                   AND pkd.status = 'active'
-            ) AS has_plate_kitchen_days,
+            ) AS has_vianda_kitchen_days,
             EXISTS (
                 SELECT 1
                 FROM ops.qr_code qc
@@ -69,7 +69,7 @@ def _check_restaurant_prereqs(
         fetch_one=True,
     )
     if not row or not isinstance(row, dict):
-        return {"status": None, "name": None, "is_archived": True, "has_plate_kitchen_days": False, "has_qr": False}
+        return {"status": None, "name": None, "is_archived": True, "has_vianda_kitchen_days": False, "has_qr": False}
     return dict(row)
 
 
@@ -77,14 +77,14 @@ def compute_restaurant_missing(
     *,
     status: str | None,
     is_archived: bool,
-    has_plate_kitchen_days: bool,
+    has_vianda_kitchen_days: bool,
     has_qr: bool,
 ) -> list[str]:
     """
     Pure function: derive the list of unmet prerequisites.
 
     Returns a subset of:
-      ["status_active", "not_archived", "plate_kitchen_days", "qr"]
+      ["status_active", "not_archived", "vianda_kitchen_days", "qr"]
 
     Empty list ⟺ all prerequisites satisfied.
     """
@@ -93,8 +93,8 @@ def compute_restaurant_missing(
         missing.append("status_active")
     if is_archived:
         missing.append("not_archived")
-    if not has_plate_kitchen_days:
-        missing.append("plate_kitchen_days")
+    if not has_vianda_kitchen_days:
+        missing.append("vianda_kitchen_days")
     if not has_qr:
         missing.append("qr")
     return missing
@@ -110,7 +110,7 @@ def maybe_activate_restaurant(
     Preconditions checked atomically:
       1. Restaurant is NOT archived
       2. Restaurant status is 'pending'  (already-active restaurants are skipped — no-op)
-      3. ≥1 active plate_kitchen_days exists for the restaurant
+      3. ≥1 active vianda_kitchen_days exists for the restaurant
       4. ≥1 active non-archived QR code exists for the restaurant
 
     Returns a dict with ``id`` and ``name`` of the promoted restaurant when promotion
@@ -124,7 +124,7 @@ def maybe_activate_restaurant(
         return None
     if prereqs["is_archived"]:
         return None
-    if not prereqs["has_plate_kitchen_days"] or not prereqs["has_qr"]:
+    if not prereqs["has_vianda_kitchen_days"] or not prereqs["has_qr"]:
         # Not all prereqs met yet
         return None
 
@@ -166,7 +166,7 @@ def get_restaurant_readiness(
     missing = compute_restaurant_missing(
         status=prereqs["status"],
         is_archived=prereqs["is_archived"],
-        has_plate_kitchen_days=prereqs["has_plate_kitchen_days"],
+        has_vianda_kitchen_days=prereqs["has_vianda_kitchen_days"],
         has_qr=prereqs["has_qr"],
     )
     return {

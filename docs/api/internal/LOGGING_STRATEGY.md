@@ -27,7 +27,7 @@ The system currently only has `log_info` and `log_warning`. Missing:
 - `app/routes/billing/client_bill.py`
 - `app/routes/payment_methods/client_payment_attempt.py`
 - `app/models/subscription.py` (balance updates)
-- `app/routes/plate_selection.py` (credit deductions)
+- `app/routes/vianda_selection.py` (credit deductions)
 
 #### **B. Authentication & Authorization**
 **Current State**: Basic auth header logging
@@ -103,7 +103,7 @@ def log_security_event(event: str, user_id: str = None, ip: str = None):
 
 #### **✅ Currently Covered by Archival System**
 ```
-orders             → plate_pickup_live
+orders             → vianda_pickup_live
 transactions       → restaurant_transaction  
 payments          → client_payment_attempt
 subscriptions     → subscription_info
@@ -124,7 +124,7 @@ discretionary              → Special handling records
 credential_recovery        → Security records
 payment_method            → Payment methods
 plan_info                 → Service plans
-plate_selection           → Order selections
+vianda_selection           → Order selections
 qr_code_info              → QR codes
 product_info              → Product catalog
 ```
@@ -150,7 +150,7 @@ transaction_type_info     → System configuration
 **Priority**: HIGH - Add immediately
 
 #### **3. Business Logic Gap**
-**Tables**: `discretionary`, `plate_selection`
+**Tables**: `discretionary`, `vianda_selection`
 **Risk**: Operational data loss, customer service issues
 **Priority**: MEDIUM - Add after financial
 
@@ -171,7 +171,7 @@ transaction_type_info     → System configuration
 
 #### **Phase 3: Operational Tables** (Week 2)
 ```python
-"plate_selections": ("app.models.plate_selection", "PlateSelection"),
+"vianda_selections": ("app.models.vianda_selection", "ViandaSelection"),
 "payment_methods": ("app.models.payment_method", "PaymentMethod"),
 "plans": ("app.models.plan", "Plan"),
 ```

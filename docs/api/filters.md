@@ -126,7 +126,7 @@ When a field carries an `"enum": "<ClassName>"` entry, the schema generator:
 
 1. Open `app/config/filter_registry.py`.
 2. Add a new key under the relevant entity dict. Choose `op`, `col`, `alias`, `cast`, and optionally `enum`. Use the shape documented above.
-3. If the column lives on a 1:N joined table (e.g. `plate_kitchen_days`), add the JOIN to the relevant `get_enriched_*` function and pass `distinct=True` to `EnrichedService.get_enriched()` to prevent row inflation (see "distinct=True pattern" below).
+3. If the column lives on a 1:N joined table (e.g. `vianda_kitchen_days`), add the JOIN to the relevant `get_enriched_*` function and pass `distinct=True` to `EnrichedService.get_enriched()` to prevent row inflation (see "distinct=True pattern" below).
 4. Wire the new query param in the route handler: add it as a `Query(None, ...)` parameter and pass it into the `build_filter_conditions` call.
 5. Run `python3 scripts/generate_filter_schema.py` to regenerate `docs/api/filters.json`.
 6. Stage `docs/api/filters.json` alongside the code change.
@@ -162,7 +162,7 @@ The `cuisine` param arrives as `["italian", "japanese"]`, which the builder pass
 Range fields use a naming convention: `<x>_from` for the lower bound (`gte`) and `<x>_to` for the upper bound (`lte`). Frontends pair them by this suffix:
 
 ```
-GET /api/v1/plates/enriched?plate_date_from=2025-01-01&plate_date_to=2025-01-31
+GET /api/v1/viandas/enriched?vianda_date_from=2025-01-01&vianda_date_to=2025-01-31
 GET /api/v1/pickups/enriched?expected_from=2025-01-20T08:00:00Z&expected_to=2025-01-20T12:00:00Z
 ```
 
@@ -280,8 +280,8 @@ The following five enriched (or list) endpoints set `X-Total-Count` when `page` 
 |---|---|
 | `GET /api/v1/plans/enriched` | `plans` |
 | `GET /api/v1/restaurants/enriched` | `restaurants` |
-| `GET /api/v1/plates/enriched` | `plates` |
-| `GET /api/v1/plate-pickup/enriched` | `pickups` |
+| `GET /api/v1/viandas/enriched` | `viandas` |
+| `GET /api/v1/vianda-pickup/enriched` | `pickups` |
 | `GET /api/v1/national-holidays` | `national_holidays` |
 
 When `page` and `page_size` are **not** provided (no-pagination mode), the header is **not** set. Frontends that need a count without pagination can pass `page=1&page_size=<large_number>` and read `X-Total-Count`.
@@ -310,7 +310,7 @@ The builder validates `eq` and `in` fields that carry an `"enum"` declaration. A
 
 ### `distinct=True` for filter-only 1:N joins
 
-When a filter targets a column on a table joined 1:N to the main entity (for example, `plate_kitchen_days` joined to `restaurant_info` so you can filter by kitchen day), the JOIN will inflate row count — one restaurant row per matching kitchen day. Eliminate this by passing `distinct=True` to `EnrichedService.get_enriched()`. The registry entry itself is a plain scalar op (`eq`); the `distinct=True` is set at the call site in the service function. Use this pattern whenever a filter-only JOIN is added that is not already DISTINCT-guarded.
+When a filter targets a column on a table joined 1:N to the main entity (for example, `vianda_kitchen_days` joined to `restaurant_info` so you can filter by kitchen day), the JOIN will inflate row count — one restaurant row per matching kitchen day. Eliminate this by passing `distinct=True` to `EnrichedService.get_enriched()`. The registry entry itself is a plain scalar op (`eq`); the `distinct=True` is set at the call site in the service function. Use this pattern whenever a filter-only JOIN is added that is not already DISTINCT-guarded.
 
 ---
 
@@ -351,12 +351,12 @@ git add docs/api/filters.json
 
 ### Pickups — `expected_from` / `expected_to`
 
-These two `range-bound (timestamptz)` params filter `plate_pickup_live.expected_completion_time` on the `ppl` alias:
+These two `range-bound (timestamptz)` params filter `vianda_pickup_live.expected_completion_time` on the `ppl` alias:
 
 - `expected_from` — lower bound (`>=`): returns pickups whose `expected_completion_time` is on or after the given timestamp.
 - `expected_to` — upper bound (`<=`): returns pickups whose `expected_completion_time` is on or before the given timestamp.
 
-**Column binding:** `expected_completion_time` is the only time-related column currently on `plate_pickup_live` that projects a future window. There are no `window_start` / `window_end` columns on that table. If operators need a true pickup-window filter (separate start and end columns populated from a scheduling model), that requires schema work — deferred. See GitHub issue #58 and its follow-up for context.
+**Column binding:** `expected_completion_time` is the only time-related column currently on `vianda_pickup_live` that projects a future window. There are no `window_start` / `window_end` columns on that table. If operators need a true pickup-window filter (separate start and end columns populated from a scheduling model), that requires schema work — deferred. See GitHub issue #58 and its follow-up for context.
 
 **Renamed in #58:** these params were previously called `window_from` / `window_to`. The old names implied a pickup-window semantics that the underlying column does not support. The rename aligns the param names with the actual column. Any caller that was passing `window_from` / `window_to` must update to `expected_from` / `expected_to`.
 
@@ -364,21 +364,21 @@ These two `range-bound (timestamptz)` params filter `plate_pickup_live.expected_
 
 ## Disposition history
 
-### Fix: plates.plate_date_from/to rebound to plate_selection_info.pickup_date — 2026-04-26
+### Fix: viandas.vianda_date_from/to rebound to vianda_selection_info.pickup_date — 2026-04-26
 
-`plates.plate_date_from` and `plates.plate_date_to` previously filtered by `p.created_date`
-(the plate record's creation timestamp) as a proxy, which is silently wrong — operators filtering
-"plates for week X" were receiving plates created in that calendar window, not plates scheduled for
+`viandas.vianda_date_from` and `viandas.vianda_date_to` previously filtered by `p.created_date`
+(the vianda record's creation timestamp) as a proxy, which is silently wrong — operators filtering
+"viandas for week X" were receiving viandas created in that calendar window, not viandas scheduled for
 service on those dates.
 
-**Resolution (path B):** `get_enriched_plates` in `app/services/entity_service.py` now adds a
-filter-only LEFT JOIN to `customer.plate_selection_info` (alias `psi`) on `psi.plate_id = p.plate_id
+**Resolution (path B):** `get_enriched_viandas` in `app/services/entity_service.py` now adds a
+filter-only LEFT JOIN to `customer.vianda_selection_info` (alias `psi`) on `psi.vianda_id = p.vianda_id
 AND psi.is_archived = FALSE`. The filters are rebound to `psi.pickup_date` (a `DATE` column). Because
-`plate_info → plate_selection_info` is 1:N, `distinct=True` is passed to `EnrichedService.get_enriched()`
+`vianda_info → vianda_selection_info` is 1:N, `distinct=True` is passed to `EnrichedService.get_enriched()`
 to prevent row inflation. This matches the established `restaurants.kitchen_day` filter-only-join pattern.
 
-**Behavior change:** callers using `plate_date_from`/`plate_date_to` now receive plates filtered by
-service date (`pickup_date`), not creation date. Plates with no reservations in the requested window
+**Behavior change:** callers using `vianda_date_from`/`vianda_date_to` now receive viandas filtered by
+service date (`pickup_date`), not creation date. Viandas with no reservations in the requested window
 are excluded. This is a bug fix, not a semantic extension — the old behavior was never correct.
 
 **Consumer impact:** any frontend or integration test that relied on the old creation-date semantics
@@ -402,19 +402,19 @@ will see different results. The filter semantics are now aligned with operator i
 | `pickups` | `arrival_time_from`, `arrival_time_to` | date-range-bound (timestamptz) | `ppl` |
 | `pickups` | `completion_time_from`, `completion_time_to` | date-range-bound (timestamptz) | `ppl` |
 | `pickups` | `was_collected` | toggle | bool on `ppl` |
-| `pickups` | `credit_from`, `credit_to` | range-bound (int) | `plate_info` alias `p` |
+| `pickups` | `credit_from`, `credit_to` | range-bound (int) | `vianda_info` alias `p` |
 | `pickups` | `restaurant_id` | multi-select (uuid) | `ppl` |
-| `pickups` | `plate_id` | multi-select (uuid) | `ppl` |
+| `pickups` | `vianda_id` | multi-select (uuid) | `ppl` |
 | `plans` | `price_from`, `price_to` | range-bound (float) | DB type is float, not int |
 | `plans` | `credit_from`, `credit_to` | range-bound (int) | `pl` |
 | `plans` | `country_code` | multi-select (upper) | via `market_info` alias `m` |
 | `plans` | `rollover` | toggle | bool on `pl` |
-| `plates` | `cuisine_id` | multi-select (uuid) | cuisine table alias `cu` |
-| `plates` | `dietary` | multi-select (text, DietaryFlag enum) | `TEXT[]` on `pr`; manual SQL (array overlap `&&`) used in route until filter_builder gains `any_in` op — tracked kitchen#87 |
-| `plates` | `price_from`, `price_to` | range-bound (int) | `p` |
-| `plates` | `credit_from`, `credit_to` | range-bound (int) | `p` |
-| `plates` | `has_image` | toggle | CASE expression on `pr.image_storage_path`; schema-published only, SQL wiring deferred kitchen#87 |
-| `plates` | `portion_size` | multi-select (text, PortionSizeDisplay enum) | Python-computed bucket; schema-published only, SQL wiring deferred kitchen#87 |
+| `viandas` | `cuisine_id` | multi-select (uuid) | cuisine table alias `cu` |
+| `viandas` | `dietary` | multi-select (text, DietaryFlag enum) | `TEXT[]` on `pr`; manual SQL (array overlap `&&`) used in route until filter_builder gains `any_in` op — tracked kitchen#87 |
+| `viandas` | `price_from`, `price_to` | range-bound (int) | `p` |
+| `viandas` | `credit_from`, `credit_to` | range-bound (int) | `p` |
+| `viandas` | `has_image` | toggle | CASE expression on `pr.image_storage_path`; schema-published only, SQL wiring deferred kitchen#87 |
+| `viandas` | `portion_size` | multi-select (text, PortionSizeDisplay enum) | Python-computed bucket; schema-published only, SQL wiring deferred kitchen#87 |
 | `restaurants` | `status` | multi-select | Status enum on `r` |
 | `restaurants` | `country_code` | multi-select (upper) | address alias `a` |
 | `restaurants` | `institution_id` | multi-select (uuid) | `r`; query param named `institution_id_in` to avoid conflict with scoping param |
@@ -427,7 +427,7 @@ will see different results. The filter semantics are now aligned with operator i
 | `national_holidays` | `created_date`, `modified_by`, `modified_date` (from schema only; DTO layer retains them for DB hydration) |
 | `pickups` | `created_date`, `modified_date`, `modified_by`, `product_id` |
 | `plans` | `created_date`, `modified_date` |
-| `plates` | `created_date`, `modified_date`, `product_image_storage_path` (storage path retained in SELECT to feed `resolve_product_image_urls` transform; excluded from schema) |
+| `viandas` | `created_date`, `modified_date`, `product_image_storage_path` (storage path retained in SELECT to feed `resolve_product_image_urls` transform; excluded from schema) |
 | `restaurants` | `created_date`, `modified_date` |
 
 **Exempt:** 101 fields annotated with `# filter-registry:exempt reason="..."`. See `docs/api/filters_inventory.md` for the full table.
@@ -442,7 +442,7 @@ will see different results. The filter semantics are now aligned with operator i
 
 ### How it works
 
-1. Walks the Pydantic response models for the 5 enriched endpoints (`plans`, `restaurants`, `plates`, `pickups`, `national_holidays`).
+1. Walks the Pydantic response models for the 5 enriched endpoints (`plans`, `restaurants`, `viandas`, `pickups`, `national_holidays`).
 2. For each field, checks whether it appears in `FILTER_REGISTRY[entity]` (filterable) or carries a `# filter-registry:exempt reason="..."` comment in the model source.
 3. Writes `docs/api/filters_inventory.{json,md}` with one row per field, status `filterable` / `exempt` / `unfiltered`.
 4. Exits 0 if `unfiltered` count is 0; exits 1 otherwise.

@@ -1,5 +1,5 @@
 """
-Unit tests for restaurant explorer service (B2C by-city: plates with image_url/savings, restaurants with address).
+Unit tests for restaurant explorer service (B2C by-city: viandas with image_url/savings, restaurants with address).
 """
 
 from datetime import date
@@ -13,22 +13,22 @@ from app.services.restaurant_explorer_service import (
     get_allowed_kitchen_days_sorted_by_date,
     get_coworker_pickup_windows,
     get_pickup_windows_for_kitchen_day,
-    get_plates_for_restaurants,
     get_restaurants_by_city,
+    get_viandas_for_restaurants,
 )
 
 
 class TestGetPlatesForRestaurants:
-    """get_plates_for_restaurants returns plate_id, product_name, price, credit, kitchen_day, image_url; savings set to 0 (computed in get_restaurants_by_city from credit_cost_local_currency)."""
+    """get_viandas_for_restaurants returns vianda_id, product_name, price, credit, kitchen_day, image_url; savings set to 0 (computed in get_restaurants_by_city from credit_cost_local_currency)."""
 
     @patch("app.services.restaurant_explorer_service.db_read")
-    def test_returns_image_url_and_savings_placeholder_from_product_and_plate(self, mock_db_read):
+    def test_returns_image_url_and_savings_placeholder_from_product_and_vianda(self, mock_db_read):
         rid = uuid4()
         pid = uuid4()
         mock_db_read.return_value = [
             {
                 "restaurant_id": rid,
-                "plate_id": pid,
+                "vianda_id": pid,
                 "product_name": "Grilled Chicken",
                 "price": 12.5,
                 "credit": 2,
@@ -38,18 +38,18 @@ class TestGetPlatesForRestaurants:
         ]
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "wednesday", mock_db)
+        result = get_viandas_for_restaurants([rid], "wednesday", mock_db)
 
         assert rid in result
-        plates = result[rid]
-        assert len(plates) == 1
-        assert plates[0]["plate_id"] == pid
-        assert plates[0]["product_name"] == "Grilled Chicken"
-        assert plates[0]["price"] == 12.5
-        assert plates[0]["credit"] == 2
-        assert plates[0]["kitchen_day"] == "wednesday"
-        assert plates[0]["image_url"] == "http://localhost:8000/static/products/abc.jpg"
-        assert plates[0]["savings"] == 0  # Computed in get_restaurants_by_city from credit_cost_local_currency
+        viandas = result[rid]
+        assert len(viandas) == 1
+        assert viandas[0]["vianda_id"] == pid
+        assert viandas[0]["product_name"] == "Grilled Chicken"
+        assert viandas[0]["price"] == 12.5
+        assert viandas[0]["credit"] == 2
+        assert viandas[0]["kitchen_day"] == "wednesday"
+        assert viandas[0]["image_url"] == "http://localhost:8000/static/products/abc.jpg"
+        assert viandas[0]["savings"] == 0  # Computed in get_restaurants_by_city from credit_cost_local_currency
 
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_savings_zero_when_no_credit_cost_local_currency(self, mock_db_read):
@@ -57,7 +57,7 @@ class TestGetPlatesForRestaurants:
         mock_db_read.return_value = [
             {
                 "restaurant_id": rid,
-                "plate_id": uuid4(),
+                "vianda_id": uuid4(),
                 "product_name": "Pasta",
                 "price": 10.0,
                 "credit": 1,
@@ -67,7 +67,7 @@ class TestGetPlatesForRestaurants:
         ]
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "monday", mock_db)
+        result = get_viandas_for_restaurants([rid], "monday", mock_db)
 
         assert result[rid][0]["savings"] == 0
         assert result[rid][0]["image_url"] is None
@@ -78,7 +78,7 @@ class TestGetPlatesForRestaurants:
         mock_db_read.return_value = [
             {
                 "restaurant_id": rid,
-                "plate_id": uuid4(),
+                "vianda_id": uuid4(),
                 "product_name": "Salad",
                 "price": 8.0,
                 "credit": 1,
@@ -88,21 +88,21 @@ class TestGetPlatesForRestaurants:
         ]
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "friday", mock_db)
+        result = get_viandas_for_restaurants([rid], "friday", mock_db)
 
         assert result[rid][0]["image_url"] is None
         assert result[rid][0]["savings"] == 0
 
     def test_returns_empty_dict_for_invalid_kitchen_day(self):
         mock_db = MagicMock()
-        assert get_plates_for_restaurants([uuid4()], "sunday", mock_db) == {}
-        assert get_plates_for_restaurants([uuid4()], "Invalid", mock_db) == {}
+        assert get_viandas_for_restaurants([uuid4()], "sunday", mock_db) == {}
+        assert get_viandas_for_restaurants([uuid4()], "Invalid", mock_db) == {}
 
     def test_returns_empty_dict_for_empty_restaurant_ids(self):
         mock_db = MagicMock()
-        assert get_plates_for_restaurants([], "monday", mock_db) == {}
+        assert get_viandas_for_restaurants([], "monday", mock_db) == {}
 
-    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.get_vianda_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_portion_size_insufficient_reviews_when_review_count_below_5(self, mock_db_read, mock_get_aggregates):
         """When review_count < 5, portion_size is insufficient_reviews and averages are null."""
@@ -111,8 +111,8 @@ class TestGetPlatesForRestaurants:
         mock_db_read.return_value = [
             {
                 "restaurant_id": rid,
-                "plate_id": pid,
-                "product_name": "New Plate",
+                "vianda_id": pid,
+                "product_name": "New Vianda",
                 "price": 10.0,
                 "credit": 1,
                 "kitchen_day": "wednesday",
@@ -128,7 +128,7 @@ class TestGetPlatesForRestaurants:
         }
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "wednesday", mock_db)
+        result = get_viandas_for_restaurants([rid], "wednesday", mock_db)
 
         p = result[rid][0]
         assert p["portion_size"] == "insufficient_reviews"
@@ -136,7 +136,7 @@ class TestGetPlatesForRestaurants:
         assert p["average_portion_size"] is None
         assert p["review_count"] == 3
 
-    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.get_vianda_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_portion_size_bucketed_when_review_count_ge_5(self, mock_db_read, mock_get_aggregates):
         """When review_count >= 5, portion_size is bucketed from average_portion_size."""
@@ -145,7 +145,7 @@ class TestGetPlatesForRestaurants:
         mock_db_read.return_value = [
             {
                 "restaurant_id": rid,
-                "plate_id": pid,
+                "vianda_id": pid,
                 "product_name": "Grilled Chicken",
                 "price": 12.0,
                 "credit": 2,
@@ -162,7 +162,7 @@ class TestGetPlatesForRestaurants:
         }
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "wednesday", mock_db)
+        result = get_viandas_for_restaurants([rid], "wednesday", mock_db)
 
         p = result[rid][0]
         assert p["portion_size"] == "standard"  # 2.1 -> standard
@@ -170,7 +170,7 @@ class TestGetPlatesForRestaurants:
         assert p["average_portion_size"] == 2.1
         assert p["review_count"] == 15
 
-    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.get_vianda_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_portion_size_light_and_large_buckets(self, mock_db_read, mock_get_aggregates):
         """portion_size light (avg<1.5) and large (avg>=2.5) buckets."""
@@ -180,7 +180,7 @@ class TestGetPlatesForRestaurants:
         mock_db_read.return_value = [
             {
                 "restaurant_id": rid,
-                "plate_id": pid_light,
+                "vianda_id": pid_light,
                 "product_name": "Small",
                 "price": 8.0,
                 "credit": 1,
@@ -189,7 +189,7 @@ class TestGetPlatesForRestaurants:
             },
             {
                 "restaurant_id": rid,
-                "plate_id": pid_large,
+                "vianda_id": pid_large,
                 "product_name": "Big",
                 "price": 15.0,
                 "credit": 2,
@@ -203,22 +203,22 @@ class TestGetPlatesForRestaurants:
         }
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "monday", mock_db)
+        result = get_viandas_for_restaurants([rid], "monday", mock_db)
 
-        plates_by_pid = {str(p["plate_id"]): p for p in result[rid]}
-        assert plates_by_pid[str(pid_light)]["portion_size"] == "light"
-        assert plates_by_pid[str(pid_large)]["portion_size"] == "large"
+        viandas_by_pid = {str(p["vianda_id"]): p for p in result[rid]}
+        assert viandas_by_pid[str(pid_light)]["portion_size"] == "light"
+        assert viandas_by_pid[str(pid_large)]["portion_size"] == "large"
 
-    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.get_vianda_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_portion_size_insufficient_reviews_when_no_aggregates(self, mock_db_read, mock_get_aggregates):
-        """When plate has no aggregates, portion_size stays insufficient_reviews."""
+        """When vianda has no aggregates, portion_size stays insufficient_reviews."""
         rid = uuid4()
         pid = uuid4()
         mock_db_read.return_value = [
             {
                 "restaurant_id": rid,
-                "plate_id": pid,
+                "vianda_id": pid,
                 "product_name": "New",
                 "price": 10.0,
                 "credit": 1,
@@ -229,7 +229,7 @@ class TestGetPlatesForRestaurants:
         mock_get_aggregates.return_value = {}
         mock_db = MagicMock()
 
-        result = get_plates_for_restaurants([rid], "tuesday", mock_db)
+        result = get_viandas_for_restaurants([rid], "tuesday", mock_db)
 
         p = result[rid][0]
         assert p["portion_size"] == "insufficient_reviews"
@@ -309,11 +309,11 @@ class TestGetRestaurantsByCity:
         assert r["building_number"] is None
         assert result["city"] == "Córdoba"
 
-    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.get_vianda_review_aggregates")
     @patch("app.services.favorite_service.get_favorite_ids")
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_is_recommended_and_sort_order_when_user_id_present(
-        self, mock_db_read, mock_get_favorite_ids, mock_get_plate_review_aggregates
+        self, mock_db_read, mock_get_favorite_ids, mock_get_vianda_review_aggregates
     ):
         """When user_id present, is_recommended set from favorites; recommended items sorted first."""
         rid_a = uuid4()
@@ -323,9 +323,9 @@ class TestGetRestaurantsByCity:
         pid3 = uuid4()
         user_id = uuid4()
 
-        mock_get_plate_review_aggregates.return_value = {}
+        mock_get_vianda_review_aggregates.return_value = {}
         mock_get_favorite_ids.return_value = {
-            "plate_ids": [pid1],
+            "vianda_ids": [pid1],
             "restaurant_ids": [rid_b],
         }
         mock_db_read.side_effect = [
@@ -359,7 +359,7 @@ class TestGetRestaurantsByCity:
             [
                 {
                     "restaurant_id": rid_a,
-                    "plate_id": pid1,
+                    "vianda_id": pid1,
                     "product_name": "Pasta",
                     "price": 10.0,
                     "credit": 1,
@@ -368,7 +368,7 @@ class TestGetRestaurantsByCity:
                 },
                 {
                     "restaurant_id": rid_a,
-                    "plate_id": pid2,
+                    "vianda_id": pid2,
                     "product_name": "Salad",
                     "price": 8.0,
                     "credit": 1,
@@ -377,7 +377,7 @@ class TestGetRestaurantsByCity:
                 },
                 {
                     "restaurant_id": rid_b,
-                    "plate_id": pid3,
+                    "vianda_id": pid3,
                     "product_name": "Soup",
                     "price": 6.0,
                     "credit": 1,
@@ -386,7 +386,7 @@ class TestGetRestaurantsByCity:
                 },
             ],
             [],  # vol_query (has_volunteer)
-            [],  # reserved_query (user has no reserved plates)
+            [],  # reserved_query (user has no reserved viandas)
             {"lat": -34.6, "lng": -58.4},
         ]
         mock_db = MagicMock()
@@ -402,35 +402,35 @@ class TestGetRestaurantsByCity:
         restaurants = result["restaurants"]
         assert len(restaurants) == 2
 
-        # Both restaurants recommended: A has favorited plate, B is favorited
+        # Both restaurants recommended: A has favorited vianda, B is favorited
         for r in restaurants:
             assert "is_recommended" in r
             assert "is_favorite" in r
 
         # Beta Bistro (favorited restaurant) should be first (recommended, score 5)
-        # Alpha Restaurant (has favorited plate) also recommended (score 5)
+        # Alpha Restaurant (has favorited vianda) also recommended (score 5)
         # Tie-break by name: Alpha before Beta
         assert restaurants[0]["name"] == "Alpha Restaurant"
         assert restaurants[1]["name"] == "Beta Bistro"
 
-        # Alpha: plate pid1 favorited -> recommended; pid2 not
+        # Alpha: vianda pid1 favorited -> recommended; pid2 not
         alpha = next(r for r in restaurants if r["restaurant_id"] == rid_a)
-        plates_a = alpha["plates"]
-        assert len(plates_a) == 2
-        pasta = next(p for p in plates_a if p["plate_id"] == pid1)
-        salad = next(p for p in plates_a if p["plate_id"] == pid2)
+        viandas_a = alpha["viandas"]
+        assert len(viandas_a) == 2
+        pasta = next(p for p in viandas_a if p["vianda_id"] == pid1)
+        salad = next(p for p in viandas_a if p["vianda_id"] == pid2)
         assert pasta["is_recommended"] is True
         assert pasta["is_favorite"] is True
         assert salad["is_recommended"] is False
         assert salad["is_favorite"] is False
-        # Recommended plate first
-        assert plates_a[0]["plate_id"] == pid1
+        # Recommended vianda first
+        assert viandas_a[0]["vianda_id"] == pid1
 
-        # Beta: restaurant favorited -> all plates recommended
+        # Beta: restaurant favorited -> all viandas recommended
         beta = next(r for r in restaurants if r["restaurant_id"] == rid_b)
         assert beta["is_recommended"] is True
         assert beta["is_favorite"] is True
-        assert beta["plates"][0]["is_recommended"] is True
+        assert beta["viandas"][0]["is_recommended"] is True
 
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_is_recommended_false_when_no_user_id(self, mock_db_read):
@@ -464,7 +464,7 @@ class TestGetRestaurantsByCity:
 
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_is_already_reserved_false_when_no_user_id(self, mock_db_read):
-        """When user_id is None, all plates have is_already_reserved=False and existing_plate_selection_id=None."""
+        """When user_id is None, all viandas have is_already_reserved=False and existing_vianda_selection_id=None."""
         rid = uuid4()
         pid1 = uuid4()
         pid2 = uuid4()
@@ -487,7 +487,7 @@ class TestGetRestaurantsByCity:
             [
                 {
                     "restaurant_id": rid,
-                    "plate_id": pid1,
+                    "vianda_id": pid1,
                     "product_name": "Pasta",
                     "price": 10.0,
                     "credit": 1,
@@ -496,7 +496,7 @@ class TestGetRestaurantsByCity:
                 },
                 {
                     "restaurant_id": rid,
-                    "plate_id": pid2,
+                    "vianda_id": pid2,
                     "product_name": "Salad",
                     "price": 8.0,
                     "credit": 1,
@@ -516,23 +516,23 @@ class TestGetRestaurantsByCity:
             kitchen_day="monday",
         )
 
-        plates = result["restaurants"][0]["plates"]
-        assert len(plates) == 2
-        for p in plates:
+        viandas = result["restaurants"][0]["viandas"]
+        assert len(viandas) == 2
+        for p in viandas:
             assert p["is_already_reserved"] is False
-            assert p["existing_plate_selection_id"] is None
+            assert p["existing_vianda_selection_id"] is None
 
     @patch("app.services.favorite_service.get_favorite_ids")
     @patch("app.services.restaurant_explorer_service.db_read")
-    def test_is_already_reserved_true_for_reserved_plate(self, mock_db_read, mock_get_favorite_ids):
-        """When user has plate_selection for plate X and kitchen_day Monday, plate X has is_already_reserved=True and existing_plate_selection_id set; other plates have False."""
+    def test_is_already_reserved_true_for_reserved_vianda(self, mock_db_read, mock_get_favorite_ids):
+        """When user has vianda_selection for vianda X and kitchen_day Monday, vianda X has is_already_reserved=True and existing_vianda_selection_id set; other viandas have False."""
         rid = uuid4()
         pid_reserved = uuid4()
         pid_other = uuid4()
         user_id = uuid4()
-        plate_selection_id = uuid4()
+        vianda_selection_id = uuid4()
 
-        mock_get_favorite_ids.return_value = {"plate_ids": [], "restaurant_ids": []}
+        mock_get_favorite_ids.return_value = {"vianda_ids": [], "restaurant_ids": []}
         mock_db_read.side_effect = [
             [{"city": "Buenos Aires"}],
             [
@@ -552,7 +552,7 @@ class TestGetRestaurantsByCity:
             [
                 {
                     "restaurant_id": rid,
-                    "plate_id": pid_reserved,
+                    "vianda_id": pid_reserved,
                     "product_name": "Pasta",
                     "price": 10.0,
                     "credit": 1,
@@ -561,7 +561,7 @@ class TestGetRestaurantsByCity:
                 },
                 {
                     "restaurant_id": rid,
-                    "plate_id": pid_other,
+                    "vianda_id": pid_other,
                     "product_name": "Salad",
                     "price": 8.0,
                     "credit": 1,
@@ -570,7 +570,7 @@ class TestGetRestaurantsByCity:
                 },
             ],
             [],
-            [{"plate_id": pid_reserved, "plate_selection_id": plate_selection_id}],
+            [{"vianda_id": pid_reserved, "vianda_selection_id": vianda_selection_id}],
             {"lat": -34.6, "lng": -58.4},
         ]
         mock_db = MagicMock()
@@ -584,17 +584,17 @@ class TestGetRestaurantsByCity:
                 user_id=user_id,
             )
 
-        plates = result["restaurants"][0]["plates"]
-        pasta = next(p for p in plates if p["plate_id"] == pid_reserved)
-        salad = next(p for p in plates if p["plate_id"] == pid_other)
+        viandas = result["restaurants"][0]["viandas"]
+        pasta = next(p for p in viandas if p["vianda_id"] == pid_reserved)
+        salad = next(p for p in viandas if p["vianda_id"] == pid_other)
         assert pasta["is_already_reserved"] is True
-        assert pasta["existing_plate_selection_id"] == str(plate_selection_id)
+        assert pasta["existing_vianda_selection_id"] == str(vianda_selection_id)
         assert salad["is_already_reserved"] is False
-        assert salad["existing_plate_selection_id"] is None
+        assert salad["existing_vianda_selection_id"] is None
 
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_has_volunteer_false_when_all_volunteers_opted_out(self, mock_db_read):
-        """has_volunteer is False when vol_query returns empty (all volunteers have coworkers_can_see_my_orders or can_participate_in_plate_pickups=false)."""
+        """has_volunteer is False when vol_query returns empty (all volunteers have coworkers_can_see_my_orders or can_participate_in_vianda_pickups=false)."""
         rid = uuid4()
         mock_db_read.side_effect = [
             [{"city": "Buenos Aires"}],
@@ -615,7 +615,7 @@ class TestGetRestaurantsByCity:
             [
                 {
                     "restaurant_id": rid,
-                    "plate_id": uuid4(),
+                    "vianda_id": uuid4(),
                     "product_name": "Pasta",
                     "price": 10.0,
                     "credit": 1,
@@ -655,7 +655,7 @@ class TestGetRestaurantsByCity:
             [
                 {
                     "restaurant_id": rid,
-                    "plate_id": uuid4(),
+                    "vianda_id": uuid4(),
                     "product_name": "Pasta",
                     "price": 10.0,
                     "credit": 1,
@@ -683,7 +683,7 @@ class TestGetRestaurantsByCity:
         user_id = uuid4()
         employer_entity_id = uuid4()
         employer_address_id = uuid4()
-        mock_get_favorite_ids.return_value = {"plate_ids": [], "restaurant_ids": []}
+        mock_get_favorite_ids.return_value = {"vianda_ids": [], "restaurant_ids": []}
         mock_db_read.side_effect = [
             [{"city": "Buenos Aires"}],
             [
@@ -703,7 +703,7 @@ class TestGetRestaurantsByCity:
             [
                 {
                     "restaurant_id": rid,
-                    "plate_id": uuid4(),
+                    "vianda_id": uuid4(),
                     "product_name": "Pasta",
                     "price": 10.0,
                     "credit": 1,
@@ -743,7 +743,7 @@ class TestGetRestaurantsByCity:
         user_id = uuid4()
         employer_entity_id = uuid4()
         employer_address_id = uuid4()
-        mock_get_favorite_ids.return_value = {"plate_ids": [], "restaurant_ids": []}
+        mock_get_favorite_ids.return_value = {"vianda_ids": [], "restaurant_ids": []}
         mock_db_read.side_effect = [
             [{"city": "Buenos Aires"}],
             [
@@ -763,7 +763,7 @@ class TestGetRestaurantsByCity:
             [
                 {
                     "restaurant_id": rid,
-                    "plate_id": uuid4(),
+                    "vianda_id": uuid4(),
                     "product_name": "Pasta",
                     "price": 10.0,
                     "credit": 1,
@@ -1055,16 +1055,16 @@ class TestCuisineFilter:
 
 
 # ---------------------------------------------------------------------------
-# K3: max_credits filter (drop-on-empty-plates)
+# K3: max_credits filter (drop-on-empty-viandas)
 # ---------------------------------------------------------------------------
 
 
 class TestMaxCreditsFilter:
-    """K3 — max_credits plate-level filter; restaurants with empty plate list are dropped."""
+    """K3 — max_credits vianda-level filter; restaurants with empty vianda list are dropped."""
 
-    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.get_vianda_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
-    def test_restaurants_with_no_surviving_plates_dropped(self, mock_db_read, mock_aggregates):
+    def test_restaurants_with_no_surviving_viandas_dropped(self, mock_db_read, mock_aggregates):
         """When max_credits=3, restaurant A (credit=3) survives; restaurant B (credit=7) is dropped."""
         rid_a, rid_b = uuid4(), uuid4()
         pid_a = uuid4()
@@ -1103,12 +1103,12 @@ class TestMaxCreditsFilter:
                     "pickup_instructions": None,
                 },
             ],
-            # get_plates_for_restaurants — only A's plate survives max_credits filter (handled in SQL)
+            # get_viandas_for_restaurants — only A's vianda survives max_credits filter (handled in SQL)
             [
                 {
                     "restaurant_id": rid_a,
-                    "plate_id": pid_a,
-                    "product_name": "Cheap Plate",
+                    "vianda_id": pid_a,
+                    "product_name": "Cheap Vianda",
                     "price": 5.0,
                     "credit": 3,
                     "kitchen_day": "monday",
@@ -1132,9 +1132,9 @@ class TestMaxCreditsFilter:
 
         rids = [r["restaurant_id"] for r in result["restaurants"]]
         assert rid_a in rids
-        assert rid_b not in rids, "Restaurant B should be dropped: no plates survive max_credits=3"
+        assert rid_b not in rids, "Restaurant B should be dropped: no viandas survive max_credits=3"
 
-    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.get_vianda_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
     def test_no_max_credits_returns_both_restaurants(self, mock_db_read, mock_aggregates):
         """When max_credits is absent, all restaurants are returned (backward compatible)."""
@@ -1175,7 +1175,7 @@ class TestMaxCreditsFilter:
             [
                 {
                     "restaurant_id": rid_a,
-                    "plate_id": uuid4(),
+                    "vianda_id": uuid4(),
                     "product_name": "P1",
                     "price": 8.0,
                     "credit": 7,
@@ -1184,7 +1184,7 @@ class TestMaxCreditsFilter:
                 },
                 {
                     "restaurant_id": rid_b,
-                    "plate_id": uuid4(),
+                    "vianda_id": uuid4(),
                     "product_name": "P2",
                     "price": 5.0,
                     "credit": 3,
@@ -1203,21 +1203,21 @@ class TestMaxCreditsFilter:
 
 
 # ---------------------------------------------------------------------------
-# K4: dietary filter (array overlap, drop-on-empty-plates)
+# K4: dietary filter (array overlap, drop-on-empty-viandas)
 # ---------------------------------------------------------------------------
 
 
 class TestDietaryFilter:
     """K4 — dietary filter uses PostgreSQL array overlap (&&); uses direct SQL, not filter_builder."""
 
-    @patch("app.services.restaurant_explorer_service.get_plate_review_aggregates")
+    @patch("app.services.restaurant_explorer_service.get_vianda_review_aggregates")
     @patch("app.services.restaurant_explorer_service.db_read")
-    def test_dietary_filter_drops_restaurant_with_no_matching_plates(self, mock_db_read, mock_aggregates):
-        """Restaurant with no plates surviving dietary filter is dropped (drop-on-empty-plates)."""
+    def test_dietary_filter_drops_restaurant_with_no_matching_viandas(self, mock_db_read, mock_aggregates):
+        """Restaurant with no viandas surviving dietary filter is dropped (drop-on-empty-viandas)."""
         rid_a, rid_b = uuid4(), uuid4()
         pid_a = uuid4()
         mock_aggregates.return_value = {}
-        # Simulate SQL already applied the && filter: only A's vegan plate comes back
+        # Simulate SQL already applied the && filter: only A's vegan vianda comes back
         mock_db_read.side_effect = [
             [{"city": "Buenos Aires"}],
             [
@@ -1250,11 +1250,11 @@ class TestDietaryFilter:
                     "pickup_instructions": None,
                 },
             ],
-            # plate query with && dietary filter: only A's vegan plate
+            # vianda query with && dietary filter: only A's vegan vianda
             [
                 {
                     "restaurant_id": rid_a,
-                    "plate_id": pid_a,
+                    "vianda_id": pid_a,
                     "product_name": "VeganPlate",
                     "price": 8.0,
                     "credit": 2,
@@ -1277,17 +1277,17 @@ class TestDietaryFilter:
 
         rids = [r["restaurant_id"] for r in result["restaurants"]]
         assert rid_a in rids
-        assert rid_b not in rids, "Restaurant B has no surviving plates after dietary filter — should be dropped"
+        assert rid_b not in rids, "Restaurant B has no surviving viandas after dietary filter — should be dropped"
 
-    def test_get_plates_for_restaurants_passes_dietary_filter_param(self):
-        """get_plates_for_restaurants accepts dietary_filter without raising errors."""
+    def test_get_viandas_for_restaurants_passes_dietary_filter_param(self):
+        """get_viandas_for_restaurants accepts dietary_filter without raising errors."""
         mock_db = MagicMock()
         mock_db.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
         with patch("app.services.restaurant_explorer_service.db_read") as mock_db_read:
-            with patch("app.services.restaurant_explorer_service.get_plate_review_aggregates") as mock_agg:
+            with patch("app.services.restaurant_explorer_service.get_vianda_review_aggregates") as mock_agg:
                 mock_db_read.return_value = []
                 mock_agg.return_value = {}
-                result = get_plates_for_restaurants([uuid4()], "monday", mock_db, dietary_filter=["vegan"])
+                result = get_viandas_for_restaurants([uuid4()], "monday", mock_db, dietary_filter=["vegan"])
                 assert result == {}
 
 

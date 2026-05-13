@@ -418,7 +418,7 @@ For benefit employees, renewal control is critical because of the monthly cap:
 - [x] History trigger updated to include new column
 - [x] SubscriptionDTO, SubscriptionResponseSchema, SubscriptionEnrichedResponseSchema updated
 - [x] Enriched SQL queries updated with new column
-- [x] `app/services/plate_selection_service.py` uses per-subscription threshold (NULL = skip early renewal)
+- [x] `app/services/vianda_selection_service.py` uses per-subscription threshold (NULL = skip early renewal)
 - [x] `PATCH /api/v1/subscriptions/me/renewal-preferences` — Customer endpoint to update threshold
 - [x] `RenewalPreferencesSchema` in `app/schemas/subscription.py`
 - [ ] `allow_early_renewal BOOLEAN DEFAULT FALSE` on `employer_benefits_program` (Phase 1 of benefits program)
@@ -481,7 +481,7 @@ The employee is informed upfront: "Your employer benefit for this month has been
 **Subscription renewal control (platform-wide, prerequisite) — ✅ DONE:**
 - [x] Add `early_renewal_threshold INTEGER DEFAULT 10` to `subscription_info` and `audit.subscription_history`
 - [x] Add column to history trigger
-- [x] Update plate selection (`app/services/plate_selection_service.py`): use per-subscription threshold; skip early renewal when NULL
+- [x] Update vianda selection (`app/services/vianda_selection_service.py`): use per-subscription threshold; skip early renewal when NULL
 - [x] Add `PATCH /api/v1/subscriptions/me/renewal-preferences` — user updates `early_renewal_threshold`
 - [x] Include `early_renewal_threshold` in subscription response schemas
 - Note: Cron job unchanged — always renews at 30-day mark. No `auto_renew` column; cancel/hold cover "don't renew".

@@ -52,12 +52,12 @@ def _get_recipient_locale(user_id: UUID, db: psycopg2.extensions.connection) -> 
 
 def send_handed_out_push(
     user_id: UUID,
-    plate_pickup_id: UUID,
+    vianda_pickup_id: UUID,
     restaurant_name: str,
     db: psycopg2.extensions.connection,
 ) -> None:
     """
-    Send push notification when a plate pickup transitions to Handed Out.
+    Send push notification when a vianda pickup transitions to Handed Out.
 
     Checks user's messaging preferences before sending. Handles stale tokens.
     Fails silently — push is best-effort, never blocks the handoff flow.
@@ -65,13 +65,13 @@ def send_handed_out_push(
     try:
         # 1. Check messaging preferences
         prefs = db_read(
-            "SELECT notify_plate_readiness_alert FROM user_messaging_preferences WHERE user_id = %s",
+            "SELECT notify_vianda_readiness_alert FROM user_messaging_preferences WHERE user_id = %s",
             (str(user_id),),
             connection=db,
             fetch_one=True,
         )
-        if prefs and not prefs.get("notify_plate_readiness_alert", True):
-            log_info(f"Push skipped for user {user_id}: plate_readiness_alert disabled")
+        if prefs and not prefs.get("notify_vianda_readiness_alert", True):
+            log_info(f"Push skipped for user {user_id}: vianda_readiness_alert disabled")
             return
 
         # 2. Get user's FCM tokens
@@ -84,7 +84,7 @@ def send_handed_out_push(
         if not _ensure_firebase():
             log_warning(
                 f"Firebase not configured — would send 'Handed Out' push to user {user_id} "
-                f"for pickup {plate_pickup_id} at {restaurant_name}"
+                f"for pickup {vianda_pickup_id} at {restaurant_name}"
             )
             return
 
@@ -100,7 +100,7 @@ def send_handed_out_push(
         )
         data = {
             "type": "pickup_handed_out",
-            "plate_pickup_id": str(plate_pickup_id),
+            "vianda_pickup_id": str(vianda_pickup_id),
             "restaurant_name": restaurant_name,
         }
 

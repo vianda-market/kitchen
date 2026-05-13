@@ -25,7 +25,7 @@ The API uses a two-tier role system: `role_type` and `role_name`. Together, thes
 #### Supplier Roles
 - **Admin**: Full institution-scoped access (CRUD + kiosk + billing + user management + code verification toggle)
 - **Manager**: Same as Admin minus institution entity config and code verification toggle
-- **Operator**: Kiosk-only — daily orders, verify code, hand out, mark complete, view customer feedback, self-profile. Blocked from all CRUD management routes (products, plans, plates, restaurants, users, addresses). See `docs/api/b2b_client/KIOSK_MODE_API.md` for access matrix.
+- **Operator**: Kiosk-only — daily orders, verify code, hand out, mark complete, view customer feedback, self-profile. Blocked from all CRUD management routes (products, plans, viandas, restaurants, users, addresses). See `docs/api/b2b_client/KIOSK_MODE_API.md` for access matrix.
 
 #### Customer Roles
 - **Comensal**: Self-only access (can only manage their own profile)

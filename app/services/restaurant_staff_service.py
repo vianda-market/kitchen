@@ -68,7 +68,7 @@ def get_daily_orders(
     # 2. Query all orders for the institution_entity (optionally filtered by restaurant)
     query = """
         SELECT
-            ppl.plate_pickup_id,
+            ppl.vianda_pickup_id,
             ppl.confirmation_code,
             ppl.status,
             ppl.arrival_time,
@@ -82,18 +82,18 @@ def get_daily_orders(
             ps.kitchen_day,
             UPPER(SUBSTRING(u.first_name, 1, 1)) AS first_initial,
             UPPER(SUBSTRING(u.last_name, 1, 1)) AS last_initial,
-            prod.name AS plate_name,
+            prod.name AS vianda_name,
             r.restaurant_id,
             r.name AS restaurant_name,
             r.require_kiosk_code_verification,
             pp.pickup_type
-        FROM plate_pickup_live ppl
-        INNER JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id AND ps.is_archived = FALSE
+        FROM vianda_pickup_live ppl
+        INNER JOIN vianda_selection_info ps ON ppl.vianda_selection_id = ps.vianda_selection_id AND ps.is_archived = FALSE
         INNER JOIN user_info u ON ppl.user_id = u.user_id
-        INNER JOIN plate_info pl ON ppl.plate_id = pl.plate_id
+        INNER JOIN vianda_info pl ON ppl.vianda_id = pl.vianda_id
         INNER JOIN product_info prod ON pl.product_id = prod.product_id
         INNER JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
-        LEFT JOIN pickup_preferences pp ON ppl.plate_selection_id = pp.plate_selection_id
+        LEFT JOIN pickup_preferences pp ON ppl.vianda_selection_id = pp.vianda_selection_id
         WHERE r.institution_entity_id = %s
           AND ps.kitchen_day = %s
           AND ppl.is_archived = FALSE
@@ -118,7 +118,7 @@ def get_daily_orders(
     # 4. Group orders by restaurant and calculate summary statistics
     restaurants_data = _group_orders_by_restaurant(rows)
 
-    # 5. Add reservations_by_plate and live_locked_count per restaurant
+    # 5. Add reservations_by_vianda and live_locked_count per restaurant
     _add_reservations_and_live_metrics(
         restaurants_data, user_institution_entity_id, order_date, kitchen_day, restaurant_id, db
     )
@@ -217,9 +217,9 @@ def _build_order_row(row: dict[str, Any], is_no_show: bool, countdown_seconds: i
     """
     customer_name = f"{row['first_initial']}.{row['last_initial']}."
     return {
-        "plate_pickup_id": row["plate_pickup_id"],
+        "vianda_pickup_id": row["vianda_pickup_id"],
         "customer_name": customer_name,
-        "plate_name": row["plate_name"],
+        "vianda_name": row["vianda_name"],
         "confirmation_code": row["confirmation_code"],
         "status": row["status"],
         "arrival_time": row["arrival_time"],
@@ -315,34 +315,34 @@ def _add_reservations_and_live_metrics(
     restaurant_id: UUID | None,
     db: psycopg2.extensions.connection,
 ) -> None:
-    """Add reservations_by_plate and live_locked_count to each restaurant."""
+    """Add reservations_by_vianda and live_locked_count to each restaurant."""
     if not restaurants_data:
         return
 
     for rest in restaurants_data:
         rid = rest["restaurant_id"]
-        # reservations_by_plate: count from plate_selection_info for this restaurant, kitchen_day, pickup_date
+        # reservations_by_vianda: count from vianda_selection_info for this restaurant, kitchen_day, pickup_date
         res_query = """
-            SELECT pl.plate_id, prod.name AS plate_name, COUNT(*) AS count
-            FROM plate_selection_info ps
-            JOIN plate_info pl ON ps.plate_id = pl.plate_id
+            SELECT pl.vianda_id, prod.name AS vianda_name, COUNT(*) AS count
+            FROM vianda_selection_info ps
+            JOIN vianda_info pl ON ps.vianda_id = pl.vianda_id
             JOIN product_info prod ON pl.product_id = prod.product_id
             WHERE ps.restaurant_id = %s
               AND ps.kitchen_day = %s
               AND ps.pickup_date = %s
               AND ps.is_archived = FALSE
-            GROUP BY pl.plate_id, prod.name
+            GROUP BY pl.vianda_id, prod.name
         """
         res_rows = db_read(res_query, (str(rid), kitchen_day, order_date.isoformat()), connection=db)
-        rest["reservations_by_plate"] = [
-            {"plate_id": str(r["plate_id"]), "plate_name": r["plate_name"], "count": r["count"]}
+        rest["reservations_by_vianda"] = [
+            {"vianda_id": str(r["vianda_id"]), "vianda_name": r["vianda_name"], "count": r["count"]}
             for r in (res_rows or [])
         ]
-        # live_locked_count: count of plate_pickup_live for this restaurant (today's promoted orders)
+        # live_locked_count: count of vianda_pickup_live for this restaurant (today's promoted orders)
         live_query = """
             SELECT COUNT(*) AS count
-            FROM plate_pickup_live ppl
-            JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id AND ps.is_archived = FALSE
+            FROM vianda_pickup_live ppl
+            JOIN vianda_selection_info ps ON ppl.vianda_selection_id = ps.vianda_selection_id AND ps.is_archived = FALSE
             WHERE ppl.restaurant_id = %s
               AND ps.kitchen_day = %s
               AND ps.pickup_date = %s
@@ -373,15 +373,15 @@ def verify_and_handoff(
 
     rows = db_read(
         """
-        SELECT ppl.plate_pickup_id, ppl.user_id, ppl.arrival_time, ppl.expected_completion_time,
+        SELECT ppl.vianda_pickup_id, ppl.user_id, ppl.arrival_time, ppl.expected_completion_time,
                ppl.extensions_used,
                UPPER(SUBSTRING(u.first_name, 1, 1)) AS first_initial,
                UPPER(SUBSTRING(u.last_name, 1, 1)) AS last_initial,
-               prod.name AS plate_name, r.name AS restaurant_name
-        FROM plate_pickup_live ppl
-        INNER JOIN plate_selection_info ps ON ppl.plate_selection_id = ps.plate_selection_id AND ps.is_archived = FALSE
+               prod.name AS vianda_name, r.name AS restaurant_name
+        FROM vianda_pickup_live ppl
+        INNER JOIN vianda_selection_info ps ON ppl.vianda_selection_id = ps.vianda_selection_id AND ps.is_archived = FALSE
         INNER JOIN user_info u ON ppl.user_id = u.user_id
-        INNER JOIN plate_info pl ON ppl.plate_id = pl.plate_id
+        INNER JOIN vianda_info pl ON ppl.vianda_id = pl.vianda_id
         INNER JOIN product_info prod ON pl.product_id = prod.product_id
         INNER JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
         WHERE ppl.confirmation_code = %s
@@ -399,15 +399,15 @@ def verify_and_handoff(
 
     # Transition all matching pickups to Handed Out
     now = datetime.now()
-    pickup_ids = [row["plate_pickup_id"] for row in rows]
+    pickup_ids = [row["vianda_pickup_id"] for row in rows]
     for pid in pickup_ids:
         db_write(
             """
-            UPDATE plate_pickup_live
+            UPDATE vianda_pickup_live
             SET status = 'handed_out', handed_out_time = %s,
                 code_verified = TRUE, code_verified_time = %s,
                 modified_by = %s, modified_date = CURRENT_TIMESTAMP
-            WHERE plate_pickup_id = %s
+            WHERE vianda_pickup_id = %s
             """,
             (now, now, str(current_user_id), str(pid)),
             connection=db,
@@ -418,12 +418,12 @@ def verify_and_handoff(
     first_row = rows[0]
     customer_initials = f"{first_row['first_initial']}.{first_row['last_initial']}."
 
-    # Aggregate plates by name
-    plate_counts: dict[str, int] = defaultdict(int)
+    # Aggregate viandas by name
+    vianda_counts: dict[str, int] = defaultdict(int)
     for row in rows:
-        plate_counts[row["plate_name"]] += 1
+        vianda_counts[row["vianda_name"]] += 1
 
-    plates = [{"plate_name": name, "quantity": count} for name, count in plate_counts.items()]
+    viandas = [{"vianda_name": name, "quantity": count} for name, count in vianda_counts.items()]
 
     log_info(f"Verify-and-handoff: code={confirmation_code}, restaurant={restaurant_id}, pickups={len(pickup_ids)}")
 
@@ -440,8 +440,8 @@ def verify_and_handoff(
     return {
         "match": True,
         "customer_initials": customer_initials,
-        "plate_pickup_ids": pickup_ids,
-        "plates": plates,
+        "vianda_pickup_ids": pickup_ids,
+        "viandas": viandas,
         "status": "handed_out",
         "arrival_time": first_row["arrival_time"],
         "expected_completion_time": first_row["expected_completion_time"],
@@ -453,7 +453,7 @@ def verify_and_handoff(
 
 
 def hand_out_pickup(
-    plate_pickup_id: UUID,
+    vianda_pickup_id: UUID,
     current_user_id: UUID,
     db: psycopg2.extensions.connection,
     locale: str = "en",
@@ -468,11 +468,11 @@ def hand_out_pickup(
 
     # Verify the pickup exists and is in Arrived status
     row = db_read(
-        """SELECT ppl.plate_pickup_id, ppl.status, ppl.user_id, ppl.restaurant_id, r.name AS restaurant_name
-           FROM plate_pickup_live ppl
+        """SELECT ppl.vianda_pickup_id, ppl.status, ppl.user_id, ppl.restaurant_id, r.name AS restaurant_name
+           FROM vianda_pickup_live ppl
            JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
-           WHERE ppl.plate_pickup_id = %s AND ppl.is_archived = FALSE""",
-        (str(plate_pickup_id),),
+           WHERE ppl.vianda_pickup_id = %s AND ppl.is_archived = FALSE""",
+        (str(vianda_pickup_id),),
         connection=db,
         fetch_one=True,
     )
@@ -480,18 +480,18 @@ def hand_out_pickup(
         raise envelope_exception(ErrorCode.ENTITY_NOT_FOUND, status=404, locale=locale, entity="Pickup")
     if row["status"] != "arrived":
         raise envelope_exception(
-            ErrorCode.PLATE_PICKUP_INVALID_STATUS, status=400, locale=locale, pickup_status=row["status"]
+            ErrorCode.VIANDA_PICKUP_INVALID_STATUS, status=400, locale=locale, pickup_status=row["status"]
         )
 
     now = datetime.now()
     db_write(
         """
-        UPDATE plate_pickup_live
+        UPDATE vianda_pickup_live
         SET status = 'handed_out', handed_out_time = %s,
             modified_by = %s, modified_date = CURRENT_TIMESTAMP
-        WHERE plate_pickup_id = %s
+        WHERE vianda_pickup_id = %s
         """,
-        (now, str(current_user_id), str(plate_pickup_id)),
+        (now, str(current_user_id), str(vianda_pickup_id)),
         connection=db,
     )
     db.commit()
@@ -500,11 +500,11 @@ def hand_out_pickup(
     try:
         from app.services.push_notification_service import send_handed_out_push
 
-        send_handed_out_push(UUID(str(row["user_id"])), plate_pickup_id, row["restaurant_name"], db)
+        send_handed_out_push(UUID(str(row["user_id"])), vianda_pickup_id, row["restaurant_name"], db)
     except Exception as push_err:
-        log_warning(f"Push notification failed for hand-out {plate_pickup_id}: {push_err}")
+        log_warning(f"Push notification failed for hand-out {vianda_pickup_id}: {push_err}")
 
-    log_info(f"Hand-out: pickup={plate_pickup_id}, handed_out_time={now}")
+    log_info(f"Hand-out: pickup={vianda_pickup_id}, handed_out_time={now}")
     return {"status": "handed_out", "handed_out_time": now}
 
 

@@ -51,10 +51,10 @@ class ErrorCode(StrEnum):
     VALIDATION_ADDRESS_FIELD_REQUIRED = "validation.address.field_required"
     VALIDATION_ADDRESS_CITY_METADATA_ID_REQUIRED = "validation.address.city_metadata_id_required"
 
-    # ── validation.plate.* ─────────────────────────────────────────────────
-    # Custom field-validator errors from PlateKitchenDayCreateSchema
-    VALIDATION_PLATE_KITCHEN_DAYS_EMPTY = "validation.plate.kitchen_days_empty"
-    VALIDATION_PLATE_KITCHEN_DAYS_DUPLICATE = "validation.plate.kitchen_days_duplicate"
+    # ── validation.vianda.* ─────────────────────────────────────────────────
+    # Custom field-validator errors from ViandaKitchenDayCreateSchema
+    VALIDATION_VIANDA_KITCHEN_DAYS_EMPTY = "validation.vianda.kitchen_days_empty"
+    VALIDATION_VIANDA_KITCHEN_DAYS_DUPLICATE = "validation.vianda.kitchen_days_duplicate"
 
     # ── validation.discretionary.* ─────────────────────────────────────────
     # Custom model-validator errors from DiscretionaryCreateSchema
@@ -220,34 +220,34 @@ class ErrorCode(StrEnum):
     SUBSCRIPTION_PAYMENT_PROVIDER_UNAVAILABLE = "subscription.payment_provider_unavailable"
     SUBSCRIPTION_ACCESS_DENIED = "subscription.access_denied"
 
-    # ── plate_selection.* ─────────────────────────────────────────────────
-    # Plate selection lifecycle errors. Wired in K10.
-    PLATE_SELECTION_NOT_FOUND = "plate_selection.not_found"
-    PLATE_SELECTION_IMMUTABLE_FIELDS = "plate_selection.immutable_fields"
-    PLATE_SELECTION_ACCESS_DENIED = "plate_selection.access_denied"
-    PLATE_SELECTION_NOT_EDITABLE = "plate_selection.not_editable"
-    PLATE_SELECTION_NOT_CANCELLABLE = "plate_selection.not_cancellable"
-    PLATE_SELECTION_DUPLICATE_KITCHEN_DAY = "plate_selection.duplicate_kitchen_day"
+    # ── vianda_selection.* ─────────────────────────────────────────────────
+    # Vianda selection lifecycle errors. Wired in K10.
+    VIANDA_SELECTION_NOT_FOUND = "vianda_selection.not_found"
+    VIANDA_SELECTION_IMMUTABLE_FIELDS = "vianda_selection.immutable_fields"
+    VIANDA_SELECTION_ACCESS_DENIED = "vianda_selection.access_denied"
+    VIANDA_SELECTION_NOT_EDITABLE = "vianda_selection.not_editable"
+    VIANDA_SELECTION_NOT_CANCELLABLE = "vianda_selection.not_cancellable"
+    VIANDA_SELECTION_DUPLICATE_KITCHEN_DAY = "vianda_selection.duplicate_kitchen_day"
 
-    # ── plate_pickup.* ────────────────────────────────────────────────────
-    # Plate pickup errors. Wired in K10.
-    PLATE_PICKUP_ACCESS_DENIED = "plate_pickup.access_denied"
-    PLATE_PICKUP_INVALID_QR_CODE = "plate_pickup.invalid_qr_code"
-    PLATE_PICKUP_WRONG_RESTAURANT = "plate_pickup.wrong_restaurant"
-    PLATE_PICKUP_NO_ACTIVE_RESERVATION = "plate_pickup.no_active_reservation"
-    PLATE_PICKUP_INVALID_STATUS = "plate_pickup.invalid_status"
-    PLATE_PICKUP_INVALID_SIGNATURE = "plate_pickup.invalid_signature"
-    PLATE_PICKUP_CANNOT_DELETE = "plate_pickup.cannot_delete"
+    # ── vianda_pickup.* ────────────────────────────────────────────────────
+    # Vianda pickup errors. Wired in K10.
+    VIANDA_PICKUP_ACCESS_DENIED = "vianda_pickup.access_denied"
+    VIANDA_PICKUP_INVALID_QR_CODE = "vianda_pickup.invalid_qr_code"
+    VIANDA_PICKUP_WRONG_RESTAURANT = "vianda_pickup.wrong_restaurant"
+    VIANDA_PICKUP_NO_ACTIVE_RESERVATION = "vianda_pickup.no_active_reservation"
+    VIANDA_PICKUP_INVALID_STATUS = "vianda_pickup.invalid_status"
+    VIANDA_PICKUP_INVALID_SIGNATURE = "vianda_pickup.invalid_signature"
+    VIANDA_PICKUP_CANNOT_DELETE = "vianda_pickup.cannot_delete"
 
-    # ── plate_review.* ────────────────────────────────────────────────────
-    # Plate review errors. Wired in K10.
-    PLATE_REVIEW_NOT_FOUND = "plate_review.not_found"
-    PLATE_REVIEW_ACCESS_DENIED = "plate_review.access_denied"
-    PLATE_REVIEW_NOT_ELIGIBLE = "plate_review.not_eligible"
-    PLATE_REVIEW_PICKUP_ARCHIVED = "plate_review.pickup_archived"
-    PLATE_REVIEW_ALREADY_EXISTS = "plate_review.already_exists"
-    PLATE_REVIEW_INVALID_PORTION_RATING = "plate_review.invalid_portion_rating"
-    PLATE_REVIEW_COMPLAINT_EXISTS = "plate_review.complaint_exists"
+    # ── vianda_review.* ────────────────────────────────────────────────────
+    # Vianda review errors. Wired in K10.
+    VIANDA_REVIEW_NOT_FOUND = "vianda_review.not_found"
+    VIANDA_REVIEW_ACCESS_DENIED = "vianda_review.access_denied"
+    VIANDA_REVIEW_NOT_ELIGIBLE = "vianda_review.not_eligible"
+    VIANDA_REVIEW_PICKUP_ARCHIVED = "vianda_review.pickup_archived"
+    VIANDA_REVIEW_ALREADY_EXISTS = "vianda_review.already_exists"
+    VIANDA_REVIEW_INVALID_PORTION_RATING = "vianda_review.invalid_portion_rating"
+    VIANDA_REVIEW_COMPLAINT_EXISTS = "vianda_review.complaint_exists"
 
     # ── payment_provider.* ────────────────────────────────────────────────
     # Payment provider (Stripe Connect) errors. Wired in K10.
@@ -285,7 +285,7 @@ class ErrorCode(StrEnum):
     RESTAURANT_MARKET_REQUIRED = "restaurant.market_required"
     RESTAURANT_MARKET_ACCESS_DENIED = "restaurant.market_access_denied"
     RESTAURANT_ACTIVE_REQUIRES_SETUP = "restaurant.active_requires_setup"
-    RESTAURANT_ACTIVE_REQUIRES_PLATE_DAYS = "restaurant.active_requires_plate_days"
+    RESTAURANT_ACTIVE_REQUIRES_VIANDA_DAYS = "restaurant.active_requires_vianda_days"
     RESTAURANT_ACTIVE_REQUIRES_QR = "restaurant.active_requires_qr"
     RESTAURANT_ACTIVE_REQUIRES_ENTITY_PAYOUTS = "restaurant.active_requires_entity_payouts"
 
@@ -355,7 +355,7 @@ class ErrorCode(StrEnum):
     DISCRETIONARY_CATEGORY_REQUIRES_RESTAURANT = "discretionary.category_requires_restaurant"
 
     # ── user.market.* ─────────────────────────────────────────────────────
-    # User market assignment errors. Wired in K14 (plate-ops + entity sweep).
+    # User market assignment errors. Wired in K14 (vianda-ops + entity sweep).
     USER_MARKET_IDS_EMPTY = "user.market_ids_empty"
     USER_MARKET_IDS_INVALID = "user.market_ids_invalid"
     USER_MARKET_NOT_IN_INSTITUTION = "user.market_not_in_institution"
@@ -381,53 +381,53 @@ class ErrorCode(StrEnum):
     ENTITY_ARCHIVE_ACTIVE_RESTAURANTS = "entity.archive_active_restaurants"
     RESTAURANT_ARCHIVE_ACTIVE_PICKUPS = "restaurant.archive_active_pickups"
 
-    # ── plate_kitchen_day.* ───────────────────────────────────────────────
-    # Plate kitchen day management errors. Wired in K14.
-    PLATE_KITCHEN_DAY_NOT_FOUND = "plate_kitchen_day.not_found"
-    PLATE_KITCHEN_DAY_DUPLICATE = "plate_kitchen_day.duplicate"
-    PLATE_KITCHEN_DAY_PLATE_ID_IMMUTABLE = "plate_kitchen_day.plate_id_immutable"
-    PLATE_KITCHEN_DAY_ARCHIVE_FAILED = "plate_kitchen_day.archive_failed"
-    PLATE_KITCHEN_DAY_UPDATE_FAILED = "plate_kitchen_day.update_failed"
-    PLATE_KITCHEN_DAY_DELETE_FAILED = "plate_kitchen_day.delete_failed"
+    # ── vianda_kitchen_day.* ───────────────────────────────────────────────
+    # Vianda kitchen day management errors. Wired in K14.
+    VIANDA_KITCHEN_DAY_NOT_FOUND = "vianda_kitchen_day.not_found"
+    VIANDA_KITCHEN_DAY_DUPLICATE = "vianda_kitchen_day.duplicate"
+    VIANDA_KITCHEN_DAY_VIANDA_ID_IMMUTABLE = "vianda_kitchen_day.vianda_id_immutable"
+    VIANDA_KITCHEN_DAY_ARCHIVE_FAILED = "vianda_kitchen_day.archive_failed"
+    VIANDA_KITCHEN_DAY_UPDATE_FAILED = "vianda_kitchen_day.update_failed"
+    VIANDA_KITCHEN_DAY_DELETE_FAILED = "vianda_kitchen_day.delete_failed"
 
     # ── restaurant.status.* ───────────────────────────────────────────────
-    # Restaurant availability errors for plate selection. Wired in K14.
+    # Restaurant availability errors for vianda selection. Wired in K14.
     RESTAURANT_ARCHIVED = "restaurant.archived"
     RESTAURANT_ENTITY_ARCHIVED = "restaurant.entity_archived"
     RESTAURANT_UNAVAILABLE = "restaurant.unavailable"
     RESTAURANT_NATIONAL_HOLIDAY = "restaurant.national_holiday"
     RESTAURANT_HOLIDAY = "restaurant.restaurant_holiday"
 
-    # ── plate_selection.window.* ──────────────────────────────────────────
-    # Plate selection kitchen-day and pickup-window validation errors. Wired in K14.
-    PLATE_SELECTION_PICKUP_TIME_REQUIRED = "plate_selection.pickup_time_required"
-    PLATE_SELECTION_NO_PICKUP_WINDOWS = "plate_selection.no_pickup_windows"
-    PLATE_SELECTION_INVALID_PICKUP_WINDOW = "plate_selection.invalid_pickup_window"
-    PLATE_SELECTION_KITCHEN_DAY_INVALID = "plate_selection.kitchen_day_invalid"
-    PLATE_SELECTION_KITCHEN_DAY_NOT_AVAILABLE = "plate_selection.kitchen_day_not_available"
-    PLATE_SELECTION_KITCHEN_DAY_TOO_FAR = "plate_selection.kitchen_day_too_far"
-    PLATE_SELECTION_NO_KITCHEN_DAYS = "plate_selection.no_kitchen_days"
+    # ── vianda_selection.window.* ──────────────────────────────────────────
+    # Vianda selection kitchen-day and pickup-window validation errors. Wired in K14.
+    VIANDA_SELECTION_PICKUP_TIME_REQUIRED = "vianda_selection.pickup_time_required"
+    VIANDA_SELECTION_NO_PICKUP_WINDOWS = "vianda_selection.no_pickup_windows"
+    VIANDA_SELECTION_INVALID_PICKUP_WINDOW = "vianda_selection.invalid_pickup_window"
+    VIANDA_SELECTION_KITCHEN_DAY_INVALID = "vianda_selection.kitchen_day_invalid"
+    VIANDA_SELECTION_KITCHEN_DAY_NOT_AVAILABLE = "vianda_selection.kitchen_day_not_available"
+    VIANDA_SELECTION_KITCHEN_DAY_TOO_FAR = "vianda_selection.kitchen_day_too_far"
+    VIANDA_SELECTION_NO_KITCHEN_DAYS = "vianda_selection.no_kitchen_days"
 
-    # ── plate_selection.create.* ──────────────────────────────────────────
-    # Plate selection create-route validation errors. Wired in K14.
-    PLATE_SELECTION_PLATE_ID_REQUIRED = "plate_selection.plate_id_required"
-    PLATE_SELECTION_PLATE_ID_INVALID = "plate_selection.plate_id_invalid"
+    # ── vianda_selection.create.* ──────────────────────────────────────────
+    # Vianda selection create-route validation errors. Wired in K14.
+    VIANDA_SELECTION_VIANDA_ID_REQUIRED = "vianda_selection.vianda_id_required"
+    VIANDA_SELECTION_VIANDA_ID_INVALID = "vianda_selection.vianda_id_invalid"
 
-    # ── plate_review.access.* ─────────────────────────────────────────────
-    # Plate review access errors not covered by K10. Wired in K14.
-    PLATE_REVIEW_CUSTOMER_ONLY = "plate_review.customer_only"
-    PLATE_REVIEW_NO_INSTITUTION = "plate_review.no_institution"
-    PLATE_REVIEW_BY_PICKUP_NOT_FOUND = "plate_review.by_pickup_not_found"
+    # ── vianda_review.access.* ─────────────────────────────────────────────
+    # Vianda review access errors not covered by K10. Wired in K14.
+    VIANDA_REVIEW_CUSTOMER_ONLY = "vianda_review.customer_only"
+    VIANDA_REVIEW_NO_INSTITUTION = "vianda_review.no_institution"
+    VIANDA_REVIEW_BY_PICKUP_NOT_FOUND = "vianda_review.by_pickup_not_found"
 
     # ── ingredient.* ──────────────────────────────────────────────────────
     # Ingredient service errors. Wired in K14.
     INGREDIENT_NOT_FOUND = "ingredient.not_found"
 
-    # ── plate_pickup.staff.* ──────────────────────────────────────────────
-    # Plate pickup staff-only access error. Wired in K14.
-    PLATE_PICKUP_STAFF_ONLY = "plate_pickup.staff_only"
-    PLATE_PICKUP_INVALID_USER_ID = "plate_pickup.invalid_user_id"
-    PLATE_PICKUP_INVALID_FILTER = "plate_pickup.invalid_filter"
+    # ── vianda_pickup.staff.* ──────────────────────────────────────────────
+    # Vianda pickup staff-only access error. Wired in K14.
+    VIANDA_PICKUP_STAFF_ONLY = "vianda_pickup.staff_only"
+    VIANDA_PICKUP_INVALID_USER_ID = "vianda_pickup.invalid_user_id"
+    VIANDA_PICKUP_INVALID_FILTER = "vianda_pickup.invalid_filter"
 
     # ── locale.* ──────────────────────────────────────────────────────────────
     # Locale/language validation errors. Wired in K15 (misc remainder sweep).
@@ -546,9 +546,9 @@ class ErrorCode(StrEnum):
     RESTAURANT_HOLIDAY_UPDATE_FAILED = "restaurant_holiday.update_failed"
     RESTAURANT_HOLIDAY_DELETE_FAILED = "restaurant_holiday.delete_failed"
 
-    # ── plate_selection.* ─────────────────────────────────────────────────────
-    # Plate selection operation errors. Wired in K15.
-    PLATE_SELECTION_CREATION_FAILED = "plate_selection.creation_failed"
+    # ── vianda_selection.* ─────────────────────────────────────────────────────
+    # Vianda selection operation errors. Wired in K15.
+    VIANDA_SELECTION_CREATION_FAILED = "vianda_selection.creation_failed"
 
     # ── product_image.* ──────────────────────────────────────────────────────
     # Product image upload errors. Wired in K15.
@@ -614,16 +614,16 @@ class ErrorCode(StrEnum):
     SUBSCRIPTION_CREATION_FAILED = "subscription.creation_failed"
     SUBSCRIPTION_PAYMENT_RECORD_FAILED = "subscription.payment_record_failed"
 
-    # ── plate_review.operation.* ──────────────────────────────────────────────
-    # Plate review operation failures. Wired in K15.
-    PLATE_REVIEW_CREATION_FAILED = "plate_review.creation_failed"
-    PLATE_REVIEW_COMPLAINT_FAILED = "plate_review.complaint_failed"
+    # ── vianda_review.operation.* ──────────────────────────────────────────────
+    # Vianda review operation failures. Wired in K15.
+    VIANDA_REVIEW_CREATION_FAILED = "vianda_review.creation_failed"
+    VIANDA_REVIEW_COMPLAINT_FAILED = "vianda_review.complaint_failed"
 
-    # ── plate_kitchen_days.* ─────────────────────────────────────────────────
-    # Plate kitchen days operation errors. Wired in K15.
-    PLATE_KITCHEN_DAYS_LIST_FAILED = "plate_kitchen_days.list_failed"
-    PLATE_KITCHEN_DAYS_ENRICHED_LIST_FAILED = "plate_kitchen_days.enriched_list_failed"
-    PLATE_KITCHEN_DAYS_ENRICHED_GET_FAILED = "plate_kitchen_days.enriched_get_failed"
+    # ── vianda_kitchen_days.* ─────────────────────────────────────────────────
+    # Vianda kitchen days operation errors. Wired in K15.
+    VIANDA_KITCHEN_DAYS_LIST_FAILED = "vianda_kitchen_days.list_failed"
+    VIANDA_KITCHEN_DAYS_ENRICHED_LIST_FAILED = "vianda_kitchen_days.enriched_list_failed"
+    VIANDA_KITCHEN_DAYS_ENRICHED_GET_FAILED = "vianda_kitchen_days.enriched_get_failed"
 
     # ── national_holiday.* ───────────────────────────────────────────────────
     # National holiday operation failures. Wired in K15.
@@ -644,9 +644,9 @@ class ErrorCode(StrEnum):
     # Billing payout (mock + live) errors. Wired in K15.
     BILLING_PAYOUT_BILL_NOT_PENDING = "billing.payout_bill_not_pending"
 
-    # ── plate_selection.* extended ───────────────────────────────────────────
-    # Plate selection validation errors. Wired in K15.
-    PLATE_SELECTION_PICKUP_INTENT_INVALID = "plate_selection.pickup_intent_invalid"
+    # ── vianda_selection.* extended ───────────────────────────────────────────
+    # Vianda selection validation errors. Wired in K15.
+    VIANDA_SELECTION_PICKUP_INTENT_INVALID = "vianda_selection.pickup_intent_invalid"
 
     # ── institution.* ────────────────────────────────────────────────────────
     # Institution constraint errors. Wired in K15.
@@ -743,7 +743,7 @@ class ErrorCode(StrEnum):
     # Product entity-service operation errors. Wired in K16.
     SERVICE_PRODUCT_LIST_FAILED = "service.product_list_failed"
     SERVICE_PRODUCT_SEARCH_FAILED = "service.product_search_failed"
-    SERVICE_PLATE_LIST_FAILED = "service.plate_list_failed"
+    SERVICE_VIANDA_LIST_FAILED = "service.vianda_list_failed"
     SERVICE_BILL_LIST_FAILED = "service.bill_list_failed"
     SERVICE_GEOLOCATION_GET_FAILED = "service.geolocation_get_failed"
 

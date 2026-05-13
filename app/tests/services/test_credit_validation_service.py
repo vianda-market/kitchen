@@ -236,7 +236,7 @@ class TestCreditValidationService:
 
         # Assert
         assert result.error_type == "insufficient_credits"
-        assert "You have 2.0 credits, but this plate costs 5.0 credits" in result.message
+        assert "You have 2.0 credits, but this vianda costs 5.0 credits" in result.message
         assert result.current_balance == 2.0
         assert result.required_credits == 5.0
         assert result.shortfall == 3.0

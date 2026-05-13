@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "filter-registry-entities-2026-v1",
     "name": "017 FILTER_REGISTRY_ENTITIES",
-    "description": "017 – Filter Registry Entities. Covers restaurants, plates, and pickups filter params registered in §3.2. Flow: (1) Login as admin, (2) Restaurants – eq (city, kitchen_day), in (cuisine), ilike search, (3) Plates – eq status, eq restaurant_id, eq market_id, date range, (4) Pickups – eq status, eq market_id, timestamptz window range. Run after DB has seeded test data. Uses {{baseUrl}} and {{adminAuthToken}}.",
+    "description": "017 – Filter Registry Entities. Covers restaurants, viandas, and pickups filter params registered in §3.2. Flow: (1) Login as admin, (2) Restaurants – eq (city, kitchen_day), in (cuisine), ilike search, (3) Viandas – eq status, eq restaurant_id, eq market_id, date range, (4) Pickups – eq status, eq market_id, timestamptz window range. Run after DB has seeded test data. Uses {{baseUrl}} and {{adminAuthToken}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
   },
   "item": [
@@ -423,10 +423,10 @@
       ]
     },
     {
-      "name": "Plates",
+      "name": "Viandas",
       "item": [
         {
-          "name": "GET /plates/enriched – no filter (baseline, stores count for row-inflation guard)",
+          "name": "GET /viandas/enriched – no filter (baseline, stores count for row-inflation guard)",
           "event": [
             {
               "listen": "test",
@@ -454,21 +454,21 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates/enriched",
+              "raw": "{{baseUrl}}/api/v1/viandas/enriched",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates",
+                "viandas",
                 "enriched"
               ]
             }
           }
         },
         {
-          "name": "GET /plates/enriched – filter by status (eq)",
+          "name": "GET /viandas/enriched – filter by status (eq)",
           "event": [
             {
               "listen": "test",
@@ -477,9 +477,9 @@
                   "pm.test('Status code is 200', function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "const plates = pm.response.json();",
-                  "plates.forEach(function(p) {",
-                  "    pm.test('Plate status matches filter', function () {",
+                  "const viandas = pm.response.json();",
+                  "viandas.forEach(function(p) {",
+                  "    pm.test('Vianda status matches filter', function () {",
                   "        pm.expect(p.status).to.equal('active');",
                   "    });",
                   "});"
@@ -497,14 +497,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates/enriched?status=active",
+              "raw": "{{baseUrl}}/api/v1/viandas/enriched?status=active",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates",
+                "viandas",
                 "enriched"
               ],
               "query": [
@@ -517,7 +517,7 @@
           }
         },
         {
-          "name": "GET /plates/enriched – filter by restaurant_id (eq/uuid)",
+          "name": "GET /viandas/enriched – filter by restaurant_id (eq/uuid)",
           "event": [
             {
               "listen": "test",
@@ -530,9 +530,9 @@
                   "    pm.expect(pm.response.json()).to.be.an('array');",
                   "});",
                   "const restaurantId = pm.collectionVariables.get('sampleRestaurantId');",
-                  "const plates = pm.response.json();",
-                  "plates.forEach(function(p) {",
-                  "    pm.test('Plate restaurant_id matches filter', function () {",
+                  "const viandas = pm.response.json();",
+                  "viandas.forEach(function(p) {",
+                  "    pm.test('Vianda restaurant_id matches filter', function () {",
                   "        pm.expect(p.restaurant_id).to.equal(restaurantId);",
                   "    });",
                   "});"
@@ -550,14 +550,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates/enriched?restaurant_id={{sampleRestaurantId}}",
+              "raw": "{{baseUrl}}/api/v1/viandas/enriched?restaurant_id={{sampleRestaurantId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates",
+                "viandas",
                 "enriched"
               ],
               "query": [
@@ -570,7 +570,7 @@
           }
         },
         {
-          "name": "GET /plates/enriched – filter by service date range (pickup_date gte/lte via psi join)",
+          "name": "GET /viandas/enriched – filter by service date range (pickup_date gte/lte via psi join)",
           "event": [
             {
               "listen": "test",
@@ -586,7 +586,7 @@
                   "    // A date filter can only reduce (or equal) the unfiltered count — it cannot",
                   "    // inflate it. If distinct=True is working correctly, the filtered result is a",
                   "    // subset of the unfiltered result. This guards against the 1:N join inflating",
-                  "    // plate rows when plate_selection_info has multiple reservations per plate.",
+                  "    // vianda rows when vianda_selection_info has multiple reservations per vianda.",
                   "    var baseline = pm.collectionVariables.get('platesBaselineCount');",
                   "    pm.expect(pm.response.json().length).to.be.at.most(parseInt(baseline));",
                   "});"
@@ -604,23 +604,23 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates/enriched?plate_date_from=2024-01-01&plate_date_to=2026-12-31",
+              "raw": "{{baseUrl}}/api/v1/viandas/enriched?vianda_date_from=2024-01-01&vianda_date_to=2026-12-31",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates",
+                "viandas",
                 "enriched"
               ],
               "query": [
                 {
-                  "key": "plate_date_from",
+                  "key": "vianda_date_from",
                   "value": "2024-01-01"
                 },
                 {
-                  "key": "plate_date_to",
+                  "key": "vianda_date_to",
                   "value": "2026-12-31"
                 }
               ]
@@ -628,7 +628,7 @@
           }
         },
         {
-          "name": "GET /plates/enriched – multi-value dietary (in/repeated-param wire format)",
+          "name": "GET /viandas/enriched – multi-value dietary (in/repeated-param wire format)",
           "event": [
             {
               "listen": "test",
@@ -642,7 +642,7 @@
                   "});",
                   "// Verifies repeated-param wire format: ?dietary=vegan&dietary=vegetarian.",
                   "// Result count must be >= either single-value query (union semantics via ANY(%s)).",
-                  "// An empty result is acceptable when no seeded plates carry those dietary flags.",
+                  "// An empty result is acceptable when no seeded viandas carry those dietary flags.",
                   "pm.test('Result count is non-negative', function () {",
                   "    pm.expect(pm.response.json().length).to.be.at.least(0);",
                   "});"
@@ -660,14 +660,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates/enriched?dietary=vegan&dietary=vegetarian",
+              "raw": "{{baseUrl}}/api/v1/viandas/enriched?dietary=vegan&dietary=vegetarian",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates",
+                "viandas",
                 "enriched"
               ],
               "query": [
@@ -689,7 +689,7 @@
       "name": "Pickups",
       "item": [
         {
-          "name": "GET /plate-pickup/enriched – no filter (baseline)",
+          "name": "GET /vianda-pickup/enriched – no filter (baseline)",
           "event": [
             {
               "listen": "test",
@@ -715,21 +715,21 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched",
+              "raw": "{{baseUrl}}/api/v1/vianda-pickup/enriched",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plate-pickup",
+                "vianda-pickup",
                 "enriched"
               ]
             }
           }
         },
         {
-          "name": "GET /plate-pickup/enriched – filter by status (eq)",
+          "name": "GET /vianda-pickup/enriched – filter by status (eq)",
           "event": [
             {
               "listen": "test",
@@ -758,14 +758,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?status=pending",
+              "raw": "{{baseUrl}}/api/v1/vianda-pickup/enriched?status=pending",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plate-pickup",
+                "vianda-pickup",
                 "enriched"
               ],
               "query": [
@@ -778,7 +778,7 @@
           }
         },
         {
-          "name": "GET /plate-pickup/enriched – filter by market_id (eq/uuid)",
+          "name": "GET /vianda-pickup/enriched – filter by market_id (eq/uuid)",
           "event": [
             {
               "listen": "test",
@@ -804,14 +804,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?market_id={{sampleMarketId}}",
+              "raw": "{{baseUrl}}/api/v1/vianda-pickup/enriched?market_id={{sampleMarketId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plate-pickup",
+                "vianda-pickup",
                 "enriched"
               ],
               "query": [
@@ -824,7 +824,7 @@
           }
         },
         {
-          "name": "GET /plate-pickup/enriched – filter by expected range (gte/lte timestamptz)",
+          "name": "GET /vianda-pickup/enriched – filter by expected range (gte/lte timestamptz)",
           "event": [
             {
               "listen": "test",
@@ -850,14 +850,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?expected_from=2024-01-01T00:00:00Z&expected_to=2026-12-31T23:59:59Z",
+              "raw": "{{baseUrl}}/api/v1/vianda-pickup/enriched?expected_from=2024-01-01T00:00:00Z&expected_to=2026-12-31T23:59:59Z",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plate-pickup",
+                "vianda-pickup",
                 "enriched"
               ],
               "query": [
@@ -874,7 +874,7 @@
           }
         },
         {
-          "name": "GET /plate-pickup/enriched – multi-value restaurant_id (in/repeated-param wire format)",
+          "name": "GET /vianda-pickup/enriched – multi-value restaurant_id (in/repeated-param wire format)",
           "event": [
             {
               "listen": "test",
@@ -907,14 +907,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?restaurant_id=00000000-0000-0000-0000-000000000001&restaurant_id=00000000-0000-0000-0000-000000000002",
+              "raw": "{{baseUrl}}/api/v1/vianda-pickup/enriched?restaurant_id=00000000-0000-0000-0000-000000000001&restaurant_id=00000000-0000-0000-0000-000000000002",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plate-pickup",
+                "vianda-pickup",
                 "enriched"
               ],
               "query": [
@@ -1330,7 +1330,7 @@
           ]
         },
         {
-          "name": "GET /plate-pickup/enriched – filter by was_collected toggle (bool)",
+          "name": "GET /vianda-pickup/enriched – filter by was_collected toggle (bool)",
           "request": {
             "method": "GET",
             "header": [
@@ -1340,14 +1340,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plate-pickup/enriched?was_collected=true",
+              "raw": "{{baseUrl}}/api/v1/vianda-pickup/enriched?was_collected=true",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plate-pickup",
+                "vianda-pickup",
                 "enriched"
               ],
               "query": [
@@ -1472,7 +1472,7 @@
           }
         },
         {
-          "name": "GET /plates/enriched – filter by cuisine_id (in/multi-select, uuid)",
+          "name": "GET /viandas/enriched – filter by cuisine_id (in/multi-select, uuid)",
           "request": {
             "method": "GET",
             "header": [
@@ -1482,14 +1482,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates/enriched?cuisine_id={{cuisine_id}}",
+              "raw": "{{baseUrl}}/api/v1/viandas/enriched?cuisine_id={{cuisine_id}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates",
+                "viandas",
                 "enriched"
               ],
               "query": [
@@ -1510,11 +1510,11 @@
                   "const body = pm.response.json();",
                   "pm.test(\"Returns array\", () => pm.expect(Array.isArray(body)).to.be.true);",
                   "// cuisine_id is captured from GET /cuisines in the prior request.",
-                  "// Plates may or may not be linked to this cuisine, so an empty result",
-                  "// is acceptable. When results exist, every plate must match the cuisine.",
+                  "// Viandas may or may not be linked to this cuisine, so an empty result",
+                  "// is acceptable. When results exist, every vianda must match the cuisine.",
                   "const cuisineId = pm.collectionVariables.get('cuisine_id');",
                   "body.forEach(function(p) {",
-                  "    pm.test('Plate cuisine_id matches filter', function () {",
+                  "    pm.test('Vianda cuisine_id matches filter', function () {",
                   "        pm.expect(p.cuisine_id).to.equal(cuisineId);",
                   "    });",
                   "});"
@@ -1572,17 +1572,17 @@
       ]
     },
     {
-      "name": "Status Context Guards (plate + plan)",
-      "description": "Verifies that plate and plan status filters are scoped to their context. Out-of-context values (e.g. processed, which is billing-only) must return 400. In-context values (active) must return 200.",
+      "name": "Status Context Guards (vianda + plan)",
+      "description": "Verifies that vianda and plan status filters are scoped to their context. Out-of-context values (e.g. processed, which is billing-only) must return 400. In-context values (active) must return 200.",
       "item": [
         {
-          "name": "GET /plates/enriched – status=processed (out-of-context) → 400",
+          "name": "GET /viandas/enriched – status=processed (out-of-context) → 400",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status code is 400 for out-of-context plate status', function () {",
+                  "pm.test('Status code is 400 for out-of-context vianda status', function () {",
                   "    pm.response.to.have.status(400);",
                   "});"
                 ],
@@ -1599,14 +1599,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates/enriched?status=processed",
+              "raw": "{{baseUrl}}/api/v1/viandas/enriched?status=processed",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates",
+                "viandas",
                 "enriched"
               ],
               "query": [
@@ -1619,13 +1619,13 @@
           }
         },
         {
-          "name": "GET /plates/enriched – status=active (in-context) → 200",
+          "name": "GET /viandas/enriched – status=active (in-context) → 200",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status code is 200 for in-context plate status', function () {",
+                  "pm.test('Status code is 200 for in-context vianda status', function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
                   "pm.test('Response is array', function () {",
@@ -1645,14 +1645,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/plates/enriched?status=active",
+              "raw": "{{baseUrl}}/api/v1/viandas/enriched?status=active",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "plates",
+                "viandas",
                 "enriched"
               ],
               "query": [

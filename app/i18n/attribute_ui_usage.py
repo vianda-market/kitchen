@@ -324,9 +324,9 @@ INVENTORY: dict[str, InventoryEntry] = {
     # vianda-app: api/types.ts (UserMessagingPreferences) — rendered in preferences settings.
     "core.user_messaging_preferences.notify_coworker_pickup_alert": {"surfaces": ["app"]},
     #
-    # .notify_plate_readiness_alert surfaces in /users/me/messaging-preferences.
-    # vianda-app: api/types.ts — plate readiness push notification toggle.
-    "core.user_messaging_preferences.notify_plate_readiness_alert": {"surfaces": ["app"]},
+    # .notify_vianda_readiness_alert surfaces in /users/me/messaging-preferences.
+    # vianda-app: api/types.ts — vianda readiness push notification toggle.
+    "core.user_messaging_preferences.notify_vianda_readiness_alert": {"surfaces": ["app"]},
     #
     # .notify_promotions_push surfaces in /users/me/messaging-preferences.
     # vianda-app: api/types.ts — promotional push notification toggle.
@@ -340,9 +340,9 @@ INVENTORY: dict[str, InventoryEntry] = {
     # vianda-app: api/types.ts — coworker visibility toggle.
     "core.user_messaging_preferences.coworkers_can_see_my_orders": {"surfaces": ["app"]},
     #
-    # .can_participate_in_plate_pickups surfaces in /users/me/messaging-preferences.
+    # .can_participate_in_vianda_pickups surfaces in /users/me/messaging-preferences.
     # vianda-app: api/types.ts — pickup participation toggle.
-    "core.user_messaging_preferences.can_participate_in_plate_pickups": {"surfaces": ["app"]},
+    "core.user_messaging_preferences.can_participate_in_vianda_pickups": {"surfaces": ["app"]},
     # --- core.workplace_group ---
     #
     # .name surfaces as "workplace_group_name" in /users/me enriched response.
@@ -417,7 +417,7 @@ INVENTORY: dict[str, InventoryEntry] = {
     # customer schema
     # ==========================================================================
     #
-    # B2C domain: plate selections, pickups, reviews, plans, referrals,
+    # B2C domain: vianda selections, pickups, reviews, plans, referrals,
     # subscriptions, payment methods, and notification banners.
     #
     # Tables excluded from inventory (not in any API response):
@@ -436,37 +436,37 @@ INVENTORY: dict[str, InventoryEntry] = {
     #   "created_date", "modified_date", "modified_by" — admin/audit metadata,
     #     defer to Phase 2 lint.
     #
-    # --- customer.plate_selection_info ---
+    # --- customer.vianda_selection_info ---
     #
-    # .kitchen_day surfaces in PlateSelectionResponseSchema and DailyOrderItemSchema.
+    # .kitchen_day surfaces in ViandaSelectionResponseSchema and DailyOrderItemSchema.
     # vianda-platform: types/api.ts (DailyOrder.kitchen_day).
-    # vianda-app: api/types.ts (PlateSelection.kitchen_day).
-    "customer.plate_selection_info.kitchen_day": {"surfaces": ["platform", "app"]},
+    # vianda-app: api/types.ts (ViandaSelection.kitchen_day).
+    "customer.vianda_selection_info.kitchen_day": {"surfaces": ["platform", "app"]},
     #
-    # .pickup_date surfaces in PlateSelectionResponseSchema.
-    # vianda-app: api/types.ts (PlateSelection.pickup_date).
-    "customer.plate_selection_info.pickup_date": {"surfaces": ["app"]},
+    # .pickup_date surfaces in ViandaSelectionResponseSchema.
+    # vianda-app: api/types.ts (ViandaSelection.pickup_date).
+    "customer.vianda_selection_info.pickup_date": {"surfaces": ["app"]},
     #
-    # .pickup_time_range surfaces in PlateSelectionResponseSchema and DailyOrderItemSchema.
+    # .pickup_time_range surfaces in ViandaSelectionResponseSchema and DailyOrderItemSchema.
     # vianda-platform: types/api.ts (DailyOrder.pickup_time_range).
-    # vianda-app: api/types.ts (PlateSelection.pickup_time_range).
-    "customer.plate_selection_info.pickup_time_range": {"surfaces": ["platform", "app"]},
+    # vianda-app: api/types.ts (ViandaSelection.pickup_time_range).
+    "customer.vianda_selection_info.pickup_time_range": {"surfaces": ["platform", "app"]},
     #
-    # .pickup_intent surfaces in PlateSelectionResponseSchema.
-    # vianda-app: api/types.ts (PlateSelection.pickup_intent).
-    "customer.plate_selection_info.pickup_intent": {"surfaces": ["app"]},
+    # .pickup_intent surfaces in ViandaSelectionResponseSchema.
+    # vianda-app: api/types.ts (ViandaSelection.pickup_intent).
+    "customer.vianda_selection_info.pickup_intent": {"surfaces": ["app"]},
     #
-    # .flexible_on_time surfaces in PlateSelectionResponseSchema.
-    # vianda-app: api/types.ts (PlateSelection.flexible_on_time).
-    "customer.plate_selection_info.flexible_on_time": {"surfaces": ["app"]},
+    # .flexible_on_time surfaces in ViandaSelectionResponseSchema.
+    # vianda-app: api/types.ts (ViandaSelection.flexible_on_time).
+    "customer.vianda_selection_info.flexible_on_time": {"surfaces": ["app"]},
     #
-    # .credit surfaces in PlateSelectionResponseSchema (credit cost of this selection).
-    # vianda-app: api/types.ts (PlateSelection.credit).
-    "customer.plate_selection_info.credit": {"surfaces": ["app"]},
+    # .credit surfaces in ViandaSelectionResponseSchema (credit cost of this selection).
+    # vianda-app: api/types.ts (ViandaSelection.credit).
+    "customer.vianda_selection_info.credit": {"surfaces": ["app"]},
     #
-    # .status surfaces in PlateSelectionResponseSchema.
-    # vianda-app: api/types.ts (PlateSelection.status).
-    "customer.plate_selection_info.status": {"surfaces": ["app"]},
+    # .status surfaces in ViandaSelectionResponseSchema.
+    # vianda-app: api/types.ts (ViandaSelection.status).
+    "customer.vianda_selection_info.status": {"surfaces": ["app"]},
     # --- customer.notification_banner ---
     #
     # .notification_type surfaces as "type" in AppNotification (renamed at the API layer).
@@ -488,69 +488,69 @@ INVENTORY: dict[str, InventoryEntry] = {
     # .action_label surfaces as "action.label" in AppNotification (nested action object).
     # vianda-app: api/endpoints/notifications.ts (AppNotification.action.label).
     "customer.notification_banner.action_label": {"surfaces": ["app"]},
-    # --- customer.plate_pickup_live ---
+    # --- customer.vianda_pickup_live ---
     #
-    # .was_collected surfaces in PlatePickupEnrichedResponseSchema and DailyOrderItemSchema.
-    # vianda-platform: types/api.ts (PlatePickupEnriched.was_collected, DailyOrder.was_collected).
-    # vianda-app: api/types.ts (PlatePickup.was_collected).
-    "customer.plate_pickup_live.was_collected": {"surfaces": ["platform", "app"]},
+    # .was_collected surfaces in ViandaPickupEnrichedResponseSchema and DailyOrderItemSchema.
+    # vianda-platform: types/api.ts (ViandaPickupEnriched.was_collected, DailyOrder.was_collected).
+    # vianda-app: api/types.ts (ViandaPickup.was_collected).
+    "customer.vianda_pickup_live.was_collected": {"surfaces": ["platform", "app"]},
     #
-    # .arrival_time surfaces in PlatePickupEnrichedResponseSchema and DailyOrderItemSchema.
-    # vianda-platform: types/api.ts (PlatePickupEnriched.arrival_time, DailyOrder.arrival_time).
-    # vianda-app: api/types.ts (PlatePickup.arrival_time).
-    "customer.plate_pickup_live.arrival_time": {"surfaces": ["platform", "app"]},
+    # .arrival_time surfaces in ViandaPickupEnrichedResponseSchema and DailyOrderItemSchema.
+    # vianda-platform: types/api.ts (ViandaPickupEnriched.arrival_time, DailyOrder.arrival_time).
+    # vianda-app: api/types.ts (ViandaPickup.arrival_time).
+    "customer.vianda_pickup_live.arrival_time": {"surfaces": ["platform", "app"]},
     #
-    # .completion_time surfaces in PlatePickupEnrichedResponseSchema and DailyOrderItemSchema.
-    # vianda-platform: types/api.ts (PlatePickupEnriched.completion_time, DailyOrder.completion_time).
-    "customer.plate_pickup_live.completion_time": {"surfaces": ["platform"]},
+    # .completion_time surfaces in ViandaPickupEnrichedResponseSchema and DailyOrderItemSchema.
+    # vianda-platform: types/api.ts (ViandaPickupEnriched.completion_time, DailyOrder.completion_time).
+    "customer.vianda_pickup_live.completion_time": {"surfaces": ["platform"]},
     #
-    # .expected_completion_time surfaces in PlatePickupEnrichedResponseSchema and DailyOrderItemSchema.
+    # .expected_completion_time surfaces in ViandaPickupEnrichedResponseSchema and DailyOrderItemSchema.
     # vianda-platform: types/api.ts (DailyOrder.expected_completion_time).
-    # vianda-app: api/types.ts (PlatePickup.expected_completion_time).
-    "customer.plate_pickup_live.expected_completion_time": {"surfaces": ["platform", "app"]},
+    # vianda-app: api/types.ts (ViandaPickup.expected_completion_time).
+    "customer.vianda_pickup_live.expected_completion_time": {"surfaces": ["platform", "app"]},
     #
-    # .confirmation_code surfaces in PlatePickupEnrichedResponseSchema and DailyOrderItemSchema.
-    # vianda-platform: types/api.ts (DailyOrder.confirmation_code, PlatePickupEnriched.confirmation_code).
-    # vianda-app: api/types.ts (PlatePickup.confirmation_code).
-    "customer.plate_pickup_live.confirmation_code": {"surfaces": ["platform", "app"]},
+    # .confirmation_code surfaces in ViandaPickupEnrichedResponseSchema and DailyOrderItemSchema.
+    # vianda-platform: types/api.ts (DailyOrder.confirmation_code, ViandaPickupEnriched.confirmation_code).
+    # vianda-app: api/types.ts (ViandaPickup.confirmation_code).
+    "customer.vianda_pickup_live.confirmation_code": {"surfaces": ["platform", "app"]},
     #
     # .extensions_used surfaces in DailyOrderItemSchema.
     # vianda-platform: types/api.ts (DailyOrder.extensions_used).
-    "customer.plate_pickup_live.extensions_used": {"surfaces": ["platform"]},
+    "customer.vianda_pickup_live.extensions_used": {"surfaces": ["platform"]},
     #
     # .completion_type surfaces in DailyOrderItemSchema.
     # vianda-platform: types/api.ts (DailyOrder.completion_type).
-    "customer.plate_pickup_live.completion_type": {"surfaces": ["platform"]},
+    "customer.vianda_pickup_live.completion_type": {"surfaces": ["platform"]},
     #
-    # .qr_code_payload surfaces in PlatePickupEnrichedResponseSchema.
-    # vianda-platform: types/api.ts (PlatePickupEnriched.qr_code_payload).
+    # .qr_code_payload surfaces in ViandaPickupEnrichedResponseSchema.
+    # vianda-platform: types/api.ts (ViandaPickupEnriched.qr_code_payload).
     # vianda-app: api/types.ts — QR code string rendered at the pickup screen.
-    "customer.plate_pickup_live.qr_code_payload": {"surfaces": ["platform", "app"]},
+    "customer.vianda_pickup_live.qr_code_payload": {"surfaces": ["platform", "app"]},
     #
-    # .handed_out_time surfaces in HandOutResponse (POST /plate-pickups/{id}/hand-out).
+    # .handed_out_time surfaces in HandOutResponse (POST /vianda-pickups/{id}/hand-out).
     # vianda-platform: types/api.ts (HandOutResponse.handed_out_time).
-    "customer.plate_pickup_live.handed_out_time": {"surfaces": ["platform"]},
-    # --- customer.plate_review_info ---
+    "customer.vianda_pickup_live.handed_out_time": {"surfaces": ["platform"]},
+    # --- customer.vianda_review_info ---
     #
-    # .stars_rating surfaces in PlateReviewResponseSchema and PlateReviewEnriched.
-    # vianda-platform: types/api.ts (PlateReviewEnriched.stars_rating).
-    # vianda-app: api/types.ts (PlateReviewResponse.stars_rating).
-    "customer.plate_review_info.stars_rating": {"surfaces": ["platform", "app"]},
+    # .stars_rating surfaces in ViandaReviewResponseSchema and ViandaReviewEnriched.
+    # vianda-platform: types/api.ts (ViandaReviewEnriched.stars_rating).
+    # vianda-app: api/types.ts (ViandaReviewResponse.stars_rating).
+    "customer.vianda_review_info.stars_rating": {"surfaces": ["platform", "app"]},
     #
-    # .portion_size_rating surfaces in PlateReviewResponseSchema and PlateReviewEnriched.
-    # vianda-platform: types/api.ts (PlateReviewEnriched.portion_size_rating).
-    # vianda-app: api/types.ts (PlateReviewResponse.portion_size_rating).
-    "customer.plate_review_info.portion_size_rating": {"surfaces": ["platform", "app"]},
+    # .portion_size_rating surfaces in ViandaReviewResponseSchema and ViandaReviewEnriched.
+    # vianda-platform: types/api.ts (ViandaReviewEnriched.portion_size_rating).
+    # vianda-app: api/types.ts (ViandaReviewResponse.portion_size_rating).
+    "customer.vianda_review_info.portion_size_rating": {"surfaces": ["platform", "app"]},
     #
-    # .would_order_again surfaces in PlateReviewResponseSchema and PlateReviewEnriched.
-    # vianda-platform: types/api.ts (PlateReviewEnriched.would_order_again).
-    # vianda-app: api/types.ts (PlateReviewResponse.would_order_again).
-    "customer.plate_review_info.would_order_again": {"surfaces": ["platform", "app"]},
+    # .would_order_again surfaces in ViandaReviewResponseSchema and ViandaReviewEnriched.
+    # vianda-platform: types/api.ts (ViandaReviewEnriched.would_order_again).
+    # vianda-app: api/types.ts (ViandaReviewResponse.would_order_again).
+    "customer.vianda_review_info.would_order_again": {"surfaces": ["platform", "app"]},
     #
-    # .comment surfaces in PlateReviewResponseSchema and PlateReviewEnriched.
-    # vianda-platform: types/api.ts (PlateReviewEnriched.comment).
-    # vianda-app: api/types.ts (PlateReviewResponse.comment).
-    "customer.plate_review_info.comment": {"surfaces": ["platform", "app"]},
+    # .comment surfaces in ViandaReviewResponseSchema and ViandaReviewEnriched.
+    # vianda-platform: types/api.ts (ViandaReviewEnriched.comment).
+    # vianda-app: api/types.ts (ViandaReviewResponse.comment).
+    "customer.vianda_review_info.comment": {"surfaces": ["platform", "app"]},
     # --- customer.plan_info ---
     #
     # .name surfaces in PlanResponseSchema and PlanEnrichedResponseSchema.
@@ -1289,7 +1289,7 @@ INVENTORY: dict[str, InventoryEntry] = {
     "ops.qr_code.status": {"surfaces": ["platform", "app"]},
     # --- ops.product_info ---
     #
-    # .product_id surfaces in ProductResponseSchema and enriched plate responses.
+    # .product_id surfaces in ProductResponseSchema and enriched vianda responses.
     # vianda-platform: types/api.ts — product_id in admin product management (4 hits).
     # vianda-app: api/types.ts (1 hit).
     "ops.product_info.product_id": {"surfaces": ["platform", "app"]},
@@ -1299,24 +1299,24 @@ INVENTORY: dict[str, InventoryEntry] = {
     # vianda-app: api/types.ts (2 hits).
     "ops.product_info.institution_id": {"surfaces": ["platform", "app"]},
     #
-    # .name surfaces in ProductResponseSchema and plate enriched responses.
+    # .name surfaces in ProductResponseSchema and vianda enriched responses.
     # vianda-platform: types/api.ts — product name in admin management.
-    # vianda-app: api/types.ts — plate/product name displayed to consumers.
+    # vianda-app: api/types.ts — vianda/product name displayed to consumers.
     "ops.product_info.name": {"surfaces": ["platform", "app"]},
     #
     # .ingredients surfaces in ProductResponseSchema.
     # vianda-platform: types/api.ts — ingredient list in product detail (7 hits).
-    # vianda-app: api/types.ts — ingredient text on plate detail screen (3 hits).
+    # vianda-app: api/types.ts — ingredient text on vianda detail screen (3 hits).
     "ops.product_info.ingredients": {"surfaces": ["platform", "app"]},
     #
     # .description surfaces in ProductResponseSchema.
     # vianda-platform: types/api.ts — product description in admin management.
-    # vianda-app: api/types.ts — plate description on explore and detail screens.
+    # vianda-app: api/types.ts — vianda description on explore and detail screens.
     "ops.product_info.description": {"surfaces": ["platform", "app"]},
     #
     # .dietary surfaces in ProductResponseSchema.
     # vianda-platform: types/api.ts — dietary filter chips in admin product list (5 hits).
-    # vianda-app: api/types.ts — dietary badges on plate cards (1 hit).
+    # vianda-app: api/types.ts — dietary badges on vianda cards (1 hit).
     "ops.product_info.dietary": {"surfaces": ["platform", "app"]},
     #
     # NOTE: image_url and image_thumbnail_url were removed from ops.product_info
@@ -1325,49 +1325,49 @@ INVENTORY: dict[str, InventoryEntry] = {
     #
     # .status surfaces in ProductResponseSchema.
     # vianda-platform: types/api.ts — status column in product management.
-    # vianda-app: api/types.ts — product/plate visibility.
+    # vianda-app: api/types.ts — product/vianda visibility.
     "ops.product_info.status": {"surfaces": ["platform", "app"]},
-    # --- ops.plate_info ---
+    # --- ops.vianda_info ---
     #
-    # .plate_id surfaces in PlateResponseSchema and PlateSelectionResponseSchema.
-    # vianda-platform: types/api.ts — plate_id in admin plate management and daily orders (7 hits).
-    # vianda-app: api/types.ts — plate_id in selection and pickup flows (13 hits).
-    "ops.plate_info.plate_id": {"surfaces": ["platform", "app"]},
+    # .vianda_id surfaces in ViandaResponseSchema and ViandaSelectionResponseSchema.
+    # vianda-platform: types/api.ts — vianda_id in admin vianda management and daily orders (7 hits).
+    # vianda-app: api/types.ts — vianda_id in selection and pickup flows (13 hits).
+    "ops.vianda_info.vianda_id": {"surfaces": ["platform", "app"]},
     #
-    # .product_id surfaces in PlateResponseSchema.
-    # vianda-platform: types/api.ts — product_id for linking plate to product (4 hits).
+    # .product_id surfaces in ViandaResponseSchema.
+    # vianda-platform: types/api.ts — product_id for linking vianda to product (4 hits).
     # vianda-app: api/types.ts (1 hit).
-    "ops.plate_info.product_id": {"surfaces": ["platform", "app"]},
+    "ops.vianda_info.product_id": {"surfaces": ["platform", "app"]},
     #
-    # .restaurant_id surfaces in PlateResponseSchema.
-    # vianda-platform: types/api.ts — restaurant context for plate in admin.
-    # vianda-app: api/types.ts — restaurant context in plate selection.
-    "ops.plate_info.restaurant_id": {"surfaces": ["platform", "app"]},
+    # .restaurant_id surfaces in ViandaResponseSchema.
+    # vianda-platform: types/api.ts — restaurant context for vianda in admin.
+    # vianda-app: api/types.ts — restaurant context in vianda selection.
+    "ops.vianda_info.restaurant_id": {"surfaces": ["platform", "app"]},
     #
-    # .price surfaces in PlateResponseSchema and enriched plate responses.
-    # vianda-platform: types/api.ts — plate price in admin and billing.
-    # vianda-app: api/types.ts — plate price displayed in selection flow.
-    "ops.plate_info.price": {"surfaces": ["platform", "app"]},
+    # .price surfaces in ViandaResponseSchema and enriched vianda responses.
+    # vianda-platform: types/api.ts — vianda price in admin and billing.
+    # vianda-app: api/types.ts — vianda price displayed in selection flow.
+    "ops.vianda_info.price": {"surfaces": ["platform", "app"]},
     #
-    # .credit surfaces in PlateResponseSchema and PlateSelectionResponseSchema.
-    # vianda-platform: types/api.ts — credit cost in admin plate management.
+    # .credit surfaces in ViandaResponseSchema and ViandaSelectionResponseSchema.
+    # vianda-platform: types/api.ts — credit cost in admin vianda management.
     # vianda-app: api/types.ts — credit cost shown in selection and balance flows.
-    "ops.plate_info.credit": {"surfaces": ["platform", "app"]},
+    "ops.vianda_info.credit": {"surfaces": ["platform", "app"]},
     #
-    # .expected_payout_local_currency surfaces in PlateResponseSchema.
+    # .expected_payout_local_currency surfaces in ViandaResponseSchema.
     # vianda-platform: types/api.ts — payout amount in admin financial reporting (2 hits).
     # vianda-app: api/types.ts (2 hits).
-    "ops.plate_info.expected_payout_local_currency": {"surfaces": ["platform", "app"]},
+    "ops.vianda_info.expected_payout_local_currency": {"surfaces": ["platform", "app"]},
     #
-    # .delivery_time_minutes surfaces in PlateResponseSchema.
-    # vianda-platform: types/api.ts — estimated prep time in admin plate management (2 hits).
+    # .delivery_time_minutes surfaces in ViandaResponseSchema.
+    # vianda-platform: types/api.ts — estimated prep time in admin vianda management (2 hits).
     # vianda-app: api/types.ts — ETA shown in selection flow (1 hit).
-    "ops.plate_info.delivery_time_minutes": {"surfaces": ["platform", "app"]},
+    "ops.vianda_info.delivery_time_minutes": {"surfaces": ["platform", "app"]},
     #
-    # .status surfaces in PlateResponseSchema and PlateSelectionResponseSchema.
-    # vianda-platform: types/api.ts — status in plate management.
-    # vianda-app: api/types.ts — plate visibility in explore.
-    "ops.plate_info.status": {"surfaces": ["platform", "app"]},
+    # .status surfaces in ViandaResponseSchema and ViandaSelectionResponseSchema.
+    # vianda-platform: types/api.ts — status in vianda management.
+    # vianda-app: api/types.ts — vianda visibility in explore.
+    "ops.vianda_info.status": {"surfaces": ["platform", "app"]},
     # --- ops.restaurant_holidays ---
     #
     # .holiday_id surfaces in RestaurantHolidayResponseSchema.
@@ -1408,26 +1408,26 @@ INVENTORY: dict[str, InventoryEntry] = {
     # vianda-platform: types/api.ts — status column in holiday management.
     # vianda-app: api/types.ts.
     "ops.restaurant_holidays.status": {"surfaces": ["platform", "app"]},
-    # --- ops.plate_kitchen_days ---
+    # --- ops.vianda_kitchen_days ---
     #
-    # .plate_kitchen_day_id surfaces in PlateKitchenDayResponseSchema.
-    # vianda-platform: types/api.ts — scheduling row ID in plate scheduling admin (2 hits).
-    "ops.plate_kitchen_days.plate_kitchen_day_id": {"surfaces": ["platform"]},
+    # .vianda_kitchen_day_id surfaces in ViandaKitchenDayResponseSchema.
+    # vianda-platform: types/api.ts — scheduling row ID in vianda scheduling admin (2 hits).
+    "ops.vianda_kitchen_days.vianda_kitchen_day_id": {"surfaces": ["platform"]},
     #
-    # .plate_id surfaces in PlateKitchenDayResponseSchema.
-    # vianda-platform: types/api.ts — plate reference in scheduling management (7 hits).
-    # vianda-app: api/types.ts — plate scheduling in selection flow (13 hits).
-    "ops.plate_kitchen_days.plate_id": {"surfaces": ["platform", "app"]},
+    # .vianda_id surfaces in ViandaKitchenDayResponseSchema.
+    # vianda-platform: types/api.ts — vianda reference in scheduling management (7 hits).
+    # vianda-app: api/types.ts — vianda scheduling in selection flow (13 hits).
+    "ops.vianda_kitchen_days.vianda_id": {"surfaces": ["platform", "app"]},
     #
-    # .kitchen_day surfaces in PlateKitchenDayResponseSchema and plate enriched responses.
+    # .kitchen_day surfaces in ViandaKitchenDayResponseSchema and vianda enriched responses.
     # vianda-platform: types/api.ts — kitchen day displayed in scheduling admin (5 hits).
-    # vianda-app: api/types.ts — available day shown in plate selection flow (14 hits).
-    "ops.plate_kitchen_days.kitchen_day": {"surfaces": ["platform", "app"]},
+    # vianda-app: api/types.ts — available day shown in vianda selection flow (14 hits).
+    "ops.vianda_kitchen_days.kitchen_day": {"surfaces": ["platform", "app"]},
     #
-    # .status surfaces in PlateKitchenDayResponseSchema.
+    # .status surfaces in ViandaKitchenDayResponseSchema.
     # vianda-platform: types/api.ts — scheduling status in admin.
     # vianda-app: api/types.ts.
-    "ops.plate_kitchen_days.status": {"surfaces": ["platform", "app"]},
+    "ops.vianda_kitchen_days.status": {"surfaces": ["platform", "app"]},
     # --- ops.ingredient_catalog ---
     #
     # .ingredient_id surfaces in IngredientCatalogResponseSchema.
@@ -1436,7 +1436,7 @@ INVENTORY: dict[str, InventoryEntry] = {
     #
     # .name surfaces in IngredientCatalogResponseSchema.
     # vianda-platform: types/api.ts — canonical ingredient name in catalog management.
-    # vianda-app: api/types.ts — ingredient name on plate detail screens.
+    # vianda-app: api/types.ts — ingredient name on vianda detail screens.
     "ops.ingredient_catalog.name": {"surfaces": ["platform", "app"]},
     #
     # .name_display surfaces in IngredientCatalogResponseSchema.
@@ -1453,7 +1453,7 @@ INVENTORY: dict[str, InventoryEntry] = {
     #
     # .image_url surfaces in IngredientCatalogResponseSchema.
     # vianda-platform: types/api.ts — ingredient image in catalog admin (3 hits).
-    # vianda-app: api/types.ts — ingredient image on plate detail screen (7 hits).
+    # vianda-app: api/types.ts — ingredient image on vianda detail screen (7 hits).
     "ops.ingredient_catalog.image_url": {"surfaces": ["platform", "app"]},
     #
     # .image_enriched surfaces in IngredientCatalogResponseSchema.

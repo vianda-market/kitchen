@@ -82,7 +82,7 @@ app/
 │   ├── onboarding.py        # GET /institutions/{id}/onboarding-status, GET /institutions/onboarding-summary
 │   ├── locales.py           # GET /locales — public, cacheable supported-locales discovery
 │   ├── uploads.py           # POST/GET/DELETE /uploads — image-asset signed-URL upload pipeline
-│   └── *.py                 # Domain routes (plate_selection, restaurant, address, etc.)
+│   └── *.py                 # Domain routes (vianda_selection, restaurant, address, etc.)
 ├── schemas/                 # Pydantic API contracts (request/response)
 │   ├── consolidated_schemas.py
 │   ├── billing/             # client_bill, institution_bill, supplier_invoice
@@ -263,10 +263,10 @@ Both endpoints require `get_current_user` (Bearer JWT). No role restriction — 
 1. **`application.py`** creates the app and registers all routers.
 2. **Versioned wrappers:** Every business route uses `create_versioned_router("api", ["Tag"], APIVersion.V1)` → prefix `/api/v1`.
 3. **Two CRUD routers:**
-   - **`crud_routes.py`** → Admin/System CRUD (no user context): Product, Plan, Restaurant, CreditCurrency, Institution, Plate, Geolocation, InstitutionEntity.
+   - **`crud_routes.py`** → Admin/System CRUD (no user context): Product, Plan, Restaurant, CreditCurrency, Institution, Vianda, Geolocation, InstitutionEntity.
    - **`crud_routes_user.py`** → User CRUD (user_id from `current_user`): Subscription, PaymentMethod; includes subscription_payment (with-payment, confirm-payment) before generic CRUD.
 4. **Route factory** (`app/services/route_factory.py`) generates standard CRUD routes via `create_plan_routes()`, `create_product_routes()`, etc.
-5. **Custom/manual routes** (not in CRUD routers): plate_selection, plate_pickup, plate_review, favorite, address, qr_code, restaurant, restaurant_balance, restaurant_transaction, restaurant_staff, plate_kitchen_days, national_holidays, restaurant_holidays, client_bill, institution_bill, supplier_invoice, ingredients, markets, countries, currencies, cities, provinces, cuisines, leads, locales, webhooks, customer payment_methods, enums, admin discretionary, super_admin discretionary, archival, archival_config, admin leads, admin city_centroid (POST /admin/city-centroid/recompute — manual trigger for weekly centroid cron job). (**employer routes removed** — employer identity is `institution_info` + `institution_entity_info`.)
+5. **Custom/manual routes** (not in CRUD routers): vianda_selection, vianda_pickup, vianda_review, favorite, address, qr_code, restaurant, restaurant_balance, restaurant_transaction, restaurant_staff, vianda_kitchen_days, national_holidays, restaurant_holidays, client_bill, institution_bill, supplier_invoice, ingredients, markets, countries, currencies, cities, provinces, cuisines, leads, locales, webhooks, customer payment_methods, enums, admin discretionary, super_admin discretionary, archival, archival_config, admin leads, admin city_centroid (POST /admin/city-centroid/recompute — manual trigger for weekly centroid cron job). (**employer routes removed** — employer identity is `institution_info` + `institution_entity_info`.)
 6. **Registration order:** Institution entities router registered before CRUD so `/enriched` matches before `/{entity_id}`. Manual/custom routes must be registered before auto-generated if they share paths (FastAPI matches first).
 7. **Composite-create pattern:** When an entity spans multiple tables by lifecycle, `POST` accepts optional embedded sub-resource blocks in a single transaction (`commit=False` chaining). Updates stay granular per sub-resource. Applied to: institutions (+ supplier_terms + institution_market), products (+ ingredient_ids), markets (+ billing_config). See `docs/api/internal/COMPOSITE_CREATE_PATTERN.md`.
 
@@ -349,7 +349,7 @@ Request
 User-configurable early renewal threshold on `customer.subscription_info`.
 
 - **Column:** `early_renewal_threshold INTEGER DEFAULT 10` — NULL = period-end only (renew only at 30-day mark); integer = renew early when balance drops below this value at order time.
-- **Two renewal triggers:** Time-based cron (`app/services/cron/subscription_renewal.py`) always renews at 30-day mark regardless of threshold. Low-balance early renewal (`app/services/plate_selection_service.py`) checks `subscription.early_renewal_threshold` — skips if NULL.
+- **Two renewal triggers:** Time-based cron (`app/services/cron/subscription_renewal.py`) always renews at 30-day mark regardless of threshold. Low-balance early renewal (`app/services/vianda_selection_service.py`) checks `subscription.early_renewal_threshold` — skips if NULL.
 - **User endpoint:** `PATCH /api/v1/subscriptions/me/renewal-preferences` — Customer updates their threshold. Defined in `app/services/route_factory.py` inside `create_subscription_routes()`.
 - **Schema:** `RenewalPreferencesSchema` in `app/schemas/subscription.py`.
 - **Roadmap:** `docs/plans/vianda_employer_benefits_program.md` (Section 7 — prerequisite for employer benefits monthly cap).
@@ -402,7 +402,7 @@ Tracks supplier tax invoices (AFIP Factura Electronica for Argentina) and W-9 co
 - **Data model:** `billing.supplier_invoice` (core, market-agnostic) + per-country extension tables: `billing.supplier_invoice_ar` (CAE, CUIT), `billing.supplier_invoice_pe` (serie, correlativo, CDR, RUC), `billing.supplier_invoice_us` (tax_year). Junction: `billing.bill_invoice_match`. Audit: `audit.supplier_invoice_history` (core only). US W-9: `billing.supplier_w9` (one per entity)
 - **Payout gate config:** `billing.market_payout_aggregator` (`require_invoice`, `max_unmatched_bill_days`, `kitchen_open_time`, `kitchen_close_time`) — market-level defaults for supplier terms. Auto-created during `POST /markets` (composite create). Managed via `GET/PUT /markets/{id}/billing-config`. Propagation preview: `GET /markets/{id}/billing-config/propagation-preview`.
 - **Supplier terms:** `billing.supplier_terms` with three-tier cascade: `institution_entity_id IS NULL` = institution-level defaults; `institution_entity_id IS NOT NULL` = entity-level override. Unique constraint: `(institution_id, institution_entity_id)`. Fields: `no_show_discount`, `payment_frequency`, `kitchen_open_time`, `kitchen_close_time`, `require_invoice`, `invoice_hold_days`. NULL = inherit from next tier. Audit: `audit.supplier_terms_history`. Routes: `app/routes/supplier_terms.py` (GET/PUT). Resolution: `app/services/billing/supplier_terms_resolution.py`.
-  - `no_show_discount` → plate enriched queries + promotion service transaction creation
+  - `no_show_discount` → vianda enriched queries + promotion service transaction creation
   - `payment_frequency` → gates bill creation in `institution_billing.py:run_phase2_bills_and_payout()` via `_is_supplier_payout_due()`
   - `kitchen_open_time` → gates pickup availability / QR code scanning via `kitchen_day_service.is_pickup_available()`
   - `kitchen_close_time` → kitchen day cutoff (reservation lockdown, transaction finalization) via `kitchen_day_service._get_kitchen_close_time()`
@@ -420,7 +420,7 @@ Tracks supplier tax invoices (AFIP Factura Electronica for Argentina) and W-9 co
 
 ## Supplier Onboarding Status
 
-Backend-computed onboarding checklist for Supplier/Employer institutions. Tracks 7-item setup progress (address → entity → restaurant → product → plate → kitchen_day → qr_code).
+Backend-computed onboarding checklist for Supplier/Employer institutions. Tracks 7-item setup progress (address → entity → restaurant → product → vianda → kitchen_day → qr_code).
 
 - **Service:** `app/services/onboarding_service.py` — `get_onboarding_status()` (single institution), `get_onboarding_status_claim()` (JWT-safe), `get_onboarding_summary()` (admin funnel)
 - **Routes:** `app/routes/onboarding.py` — `GET /institutions/{id}/onboarding-status` (scoped), `GET /institutions/onboarding-summary` (Super Admin)
@@ -460,35 +460,35 @@ supplier credit value. Finance's primary lever for gross margin per redemption.
 
 ---
 
-## Plate Pickup Flow (B2C)
+## Vianda Pickup Flow (B2C)
 
 QR-code-based pickup confirmation flow for the B2C mobile app.
 
 - **Signed QR codes:** `https://vianda.app/qr?id={qr_code_id}&sig={hmac_hex16}`. HMAC-SHA256 over `qr_code_id` using `QR_HMAC_SECRET`, truncated to 16 hex chars.
 - **QR generation:** `app/services/qr_code_service.py` — `create_qr_code_atomic()` inserts QR record, computes signed URL, generates PNG image. QR image encodes the signed URL.
 - **HMAC utility:** `app/utils/qr_hmac.py` — `sign_qr_code_id()`, `verify_qr_signature()`, `build_signed_qr_url()`
-- **Scan endpoint:** `POST /api/v1/plate-pickup/scan-qr` — accepts `{ qr_code_id, sig }`, verifies HMAC, returns pickup confirmation with `plate_pickup_ids`, `restaurant_name`, `plates[]`, `countdown_seconds`, `max_extensions`, `confirmation_code`.
-- **Completion tracking:** `POST /api/v1/plate-pickup/{id}/complete` — accepts optional `{ completion_type }` (`user_confirmed` | `timer_expired`). Stored on `plate_pickup_live.completion_type` for analytics.
+- **Scan endpoint:** `POST /api/v1/vianda-pickup/scan-qr` — accepts `{ qr_code_id, sig }`, verifies HMAC, returns pickup confirmation with `vianda_pickup_ids`, `restaurant_name`, `viandas[]`, `countdown_seconds`, `max_extensions`, `confirmation_code`.
+- **Completion tracking:** `POST /api/v1/vianda-pickup/{id}/complete` — accepts optional `{ completion_type }` (`user_confirmed` | `timer_expired`). Stored on `vianda_pickup_live.completion_type` for analytics.
 - **Timer config:** Global via `PICKUP_COUNTDOWN_SECONDS` (default 300) and `PICKUP_MAX_EXTENSIONS` (default 3) in `app/config/settings.py`.
-- **Plate reviews:** `POST /api/v1/plate-reviews` — extended with `would_order_again` (bool) and `comment` (varchar 500). Comments surface to restaurants in B2B only, not in B2C app.
+- **Vianda reviews:** `POST /api/v1/vianda-reviews` — extended with `would_order_again` (bool) and `comment` (varchar 500). Comments surface to restaurants in B2B only, not in B2C app.
 - **Error codes:** `invalid_signature` (400), `wrong_restaurant` (400), `outside_pickup_hours` (400), `no_active_reservation` (404).
-- **Service:** `app/services/plate_pickup_service.py` — `scan_qr_code_by_id()` (new, signed), `scan_qr_code_simplified()` (deprecated, payload-based).
-- **Supplier review endpoint:** `GET /api/v1/plate-reviews/by-institution/enriched` — institution-scoped, returns plate name + restaurant name + ratings + comment. No customer PII. Optional `?plate_id` and `?restaurant_id` filters. Service: `get_enriched_reviews_by_institution()` in `app/services/plate_review_service.py`.
-- **Portion complaints:** `POST /api/v1/plate-reviews/{id}/portion-complaint` — customer files complaint after rating portion size as 1. Accepts photo (multipart) + text. Table: `customer.portion_complaint`. Photos in GCS customer bucket.
+- **Service:** `app/services/vianda_pickup_service.py` — `scan_qr_code_by_id()` (new, signed), `scan_qr_code_simplified()` (deprecated, payload-based).
+- **Supplier review endpoint:** `GET /api/v1/vianda-reviews/by-institution/enriched` — institution-scoped, returns vianda name + restaurant name + ratings + comment. No customer PII. Optional `?vianda_id` and `?restaurant_id` filters. Service: `get_enriched_reviews_by_institution()` in `app/services/vianda_review_service.py`.
+- **Portion complaints:** `POST /api/v1/vianda-reviews/{id}/portion-complaint` — customer files complaint after rating portion size as 1. Accepts photo (multipart) + text. Table: `customer.portion_complaint`. Photos in GCS customer bucket.
 
 ### Kiosk Mode (B2B)
 
 Tablet/phone-optimized views for restaurant operators handling pickups during service hours.
 
-- **Handed Out status:** New `status_enum` value. Lifecycle: `pending → arrived → handed_out → completed`. Separates "customer is here" from "plate was given" from "customer confirms."
-- **Numeric confirmation codes:** 6-digit numeric (not alphanumeric) for fast kiosk entry. Generated in `_generate_confirmation_code()` in `plate_pickup_service.py`.
-- **Enhanced daily-orders:** `GET /api/v1/restaurant-staff/daily-orders` now includes per-order: `plate_pickup_id`, `expected_completion_time`, `completion_time`, `countdown_seconds`, `extensions_used`, `was_collected`, `confirmation_code`, `pickup_type`. Per-restaurant: `pickup_window_start/end`, `require_kiosk_code_verification`. Response: `server_time` for timer sync. Privacy: initials only (M.G.).
+- **Handed Out status:** New `status_enum` value. Lifecycle: `pending → arrived → handed_out → completed`. Separates "customer is here" from "vianda was given" from "customer confirms."
+- **Numeric confirmation codes:** 6-digit numeric (not alphanumeric) for fast kiosk entry. Generated in `_generate_confirmation_code()` in `vianda_pickup_service.py`.
+- **Enhanced daily-orders:** `GET /api/v1/restaurant-staff/daily-orders` now includes per-order: `vianda_pickup_id`, `expected_completion_time`, `completion_time`, `countdown_seconds`, `extensions_used`, `was_collected`, `confirmation_code`, `pickup_type`. Per-restaurant: `pickup_window_start/end`, `require_kiosk_code_verification`. Response: `server_time` for timer sync. Privacy: initials only (M.G.).
 - **Verify-and-handoff:** `POST /api/v1/restaurant-staff/verify-and-handoff` — Layer 2 code verification. Clerk enters numeric code, system verifies and transitions to Handed Out. Consumes the code.
-- **Hand-out:** `POST /api/v1/plate-pickup/{id}/hand-out` — Layer 1 one-tap handoff. Transitions Arrived → Handed Out without code entry.
+- **Hand-out:** `POST /api/v1/vianda-pickup/{id}/hand-out` — Layer 1 one-tap handoff. Transitions Arrived → Handed Out without code entry.
 - **Per-restaurant toggle:** `require_kiosk_code_verification` boolean on `restaurant_info`. Supplier Admin only.
 - **Supplier Operator restrictions:** Operators are blocked from all CRUD management routes (via `ensure_supplier_admin_or_manager()` in route factory). Operators can access: daily orders, verify code, hand out, mark complete, view feedback, self-profile.
 - **Trust model:** See `docs/plans/PICKUP_HANDOFF_TRUST_MODEL.md` for the layered trust strategy.
-- **Push notifications (FCM):** `core.user_fcm_token` stores device tokens. `POST/DELETE /users/me/fcm-token` for registration/logout. `app/services/push_notification_service.py` sends FCM push on Handed Out transition (checks `notify_plate_readiness_alert` preference). `app/services/fcm_token_service.py` manages token lifecycle. Config: `FIREBASE_CREDENTIALS_PATH` (empty = push disabled, logs instead).
+- **Push notifications (FCM):** `core.user_fcm_token` stores device tokens. `POST/DELETE /users/me/fcm-token` for registration/logout. `app/services/push_notification_service.py` sends FCM push on Handed Out transition (checks `notify_vianda_readiness_alert` preference). `app/services/fcm_token_service.py` manages token lifecycle. Config: `FIREBASE_CREDENTIALS_PATH` (empty = push disabled, logs instead).
 
 ---
 
@@ -500,7 +500,7 @@ Cross-platform in-app notification banner system. Frontends poll for active bann
 - **Enums:** `notification_banner_type_enum` (`survey_available`, `peer_pickup_volunteer`, `reservation_reminder`), `notification_banner_priority_enum` (`normal`, `high`), `notification_banner_action_status_enum` (`active`, `dismissed`, `opened`, `completed`, `expired`).
 - **Service:** `app/services/notification_banner_service.py` — `create_notification()` (raw SQL with ON CONFLICT dedup), `get_active_notifications()` (max 5, high priority first, 2h grace for surveys), `acknowledge_notification()` (idempotent), `expire_stale_notifications()` (bulk cleanup).
 - **Routes:** `app/routes/notification_banner.py` — `GET /notifications/active` (Customer, polled every 60s), `POST /notifications/{id}/acknowledge` (Customer), `POST /notifications/expire` (Internal, cron trigger), `POST /notifications/generate-reminders` (Internal, cron trigger).
-- **Survey trigger:** Wired into `PlatePickupService.complete_order()` in `plate_pickup_service.py` — creates `survey_available` banner after successful pickup completion (best-effort, fail-silent).
+- **Survey trigger:** Wired into `ViandaPickupService.complete_order()` in `vianda_pickup_service.py` — creates `survey_available` banner after successful pickup completion (best-effort, fail-silent).
 - **Reservation reminder cron:** `app/services/cron/notification_banner_cron.py` — `run_notification_banner_cron()` generates `reservation_reminder` notifications for pickups starting within 1h (market-local time) and expires stale notifications. Intended to run every 15 minutes.
 - **Relationship to push:** Complementary — push (FCM) delivers when app is backgrounded, banners deliver when foregrounded. Same event may trigger both; frontend deduplicates by `notification_id`.
 - **Plan doc:** `docs/plans/NOTIFICATION_BANNERS_PLAN.md`
@@ -643,7 +643,7 @@ Institutions can operate across multiple countries. One institution = one set of
 - **Three-tier cascade:** Both `supplier_terms` and `employer_benefits_program` support entity-level overrides via nullable `institution_entity_id`. Resolution: entity → institution → market/hardcoded defaults. Single-market institutions use institution-level defaults with no entity overrides.
 - **Employer normalization:** `employer_info` and `employer_domain` tables removed. Employer identity = `institution_info` (type=employer) + `institution_entity_info`. `user_info.employer_entity_id` replaces `employer_id`. `email_domain` column on entity replaces `employer_domain` table.
 - **Address types:** B2C customer addresses are user-selected (Home/Work/Other). `customer_employer` ("Work") is no longer auto-derived.
-- **JWT `market_id`:** B2C-only (plate/restaurant scoping). Orthogonal to institution structure. B2B users use primary market for language default.
+- **JWT `market_id`:** B2C-only (vianda/restaurant scoping). Orthogonal to institution structure. B2B users use primary market for language default.
 - **Validation:** Entity creation validates address country against `institution_market`. User market assignments validate against `institution_market` (Internal bypasses).
 - **Full design:** `docs/plans/MULTINATIONAL_INSTITUTIONS.md`
 
@@ -651,7 +651,7 @@ Institutions can operate across multiple countries. One institution = one set of
 
 Declarative query-param filtering for list and enriched endpoints. Three components:
 
-- **Registry** (`app/config/filter_registry.py`) — `FILTER_REGISTRY` dict mapping entity keys (`plans`, `restaurants`, `plates`, `pickups`) to per-field dicts with `op`, `col`/`cols`, `alias`, `cast`, and optional `enum`.
+- **Registry** (`app/config/filter_registry.py`) — `FILTER_REGISTRY` dict mapping entity keys (`plans`, `restaurants`, `viandas`, `pickups`) to per-field dicts with `op`, `col`/`cols`, `alias`, `cast`, and optional `enum`.
 - **Builder** (`app/utils/filter_builder.py`) — `build_filter_conditions(entity_key, filters)` dispatches on `op` (`eq`, `in`, `gte`, `lte`, `ilike`, `bool`) and emits `list[(condition_str, params)]` for `EnrichedService.get_enriched()`.
 - **Schema** (`docs/api/filters.json`) — machine-generated frontend contract. Regenerated by `scripts/generate_filter_schema.py`. Synced by `scripts/check_filter_schema.sh` in CI. Consumed by `vianda-hooks`, `vianda-platform`, and `vianda-app`.
 
@@ -824,12 +824,12 @@ Prerequisites: `RUN_MODE=image_event` Cloud Run job deployed to `vianda-dev`, GC
 Three-layer dataset (PE + AR + US) that populates a narrative demo for stakeholder presentations against the dev environment. Never loaded in staging or production. Requires `PAYMENT_PROVIDER=mock` so subscriptions and orders flow through the API rather than SQL. Every demo address is created via the production Mapbox `suggest → create` flow; the geocode cache (`seeds/mapbox_geocode_cache.json`) replays these calls in `replay_only` mode so no live Mapbox calls are made on subsequent loads.
 
 - **Layer A — `app/db/seed/demo_baseline.sql`:** SQL-only entities that must pre-exist before the API starts: the primary demo supplier institution (PE/AR/US markets, shared), three secondary supplier institutions (one per market), and the demo super-admin user (`demo-admin@vianda.market`). All rows use the `dddddddd-dec0-` UUID prefix and are idempotent (`ON CONFLICT ... DO UPDATE`). Does NOT create addresses, institution entities, or restaurants — those live in Layer B so they pass through Mapbox geocoding.
-- **Layer B — `docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json`:** Newman collection (~900+ requests, PE + AR + US) running the full mock-Stripe happy path across all three markets. Per-market flow: Mapbox suggest→create for supplier office address → Mapbox suggest→create for each restaurant address → upsert institution entities by `canonical_key` → upsert restaurants → products/plates/PKDs → plan → 7 customer signups (email-verified, neighborhood addresses via Mapbox) → 5–7 subscriptions → order loops → reviews. Additionally seeds employer institutions (3 markets), employer entities/offices (Mapbox addresses), employee signups, enrolments, and secondary supplier institutions (canonical_key entity upsert). Settlement pipeline runs in folder 45 for primary suppliers.
+- **Layer B — `docs/postman/collections/900_DEMO_DAY_SEED.postman_collection.json`:** Newman collection (~900+ requests, PE + AR + US) running the full mock-Stripe happy path across all three markets. Per-market flow: Mapbox suggest→create for supplier office address → Mapbox suggest→create for each restaurant address → upsert institution entities by `canonical_key` → upsert restaurants → products/viandas/PKDs → plan → 7 customer signups (email-verified, neighborhood addresses via Mapbox) → 5–7 subscriptions → order loops → reviews. Additionally seeds employer institutions (3 markets), employer entities/offices (Mapbox addresses), employee signups, enrolments, and secondary supplier institutions (canonical_key entity upsert). Settlement pipeline runs in folder 45 for primary suppliers.
 - **Layer C — `app/db/seed/demo_billing_backfill.sql`:** SQL run after Newman. Inserts 2 billing rows per secondary supplier (1 pending + 1 paid) to populate vianda-platform Billing/Invoices/Payouts pages. Secondary supplier entity UUIDs are DB-assigned at Newman runtime; Layer C resolves them by `canonical_key` (`DEMO_INSTITUTION_ENTITY_PE2/AR2/US2`). Will raise an error if Layer B has not run.
 - **Dev wrapper — `app/db/build_dev_db.sh`:** One-command dev-rebuild driver above the demo loader. Calls `build_kitchen_db.sh` (schema + reference + dev fixtures) then `load_demo_data.sh` (demo_baseline.sql + 900 Newman seed). Pass `--target=local|gcp-dev` (forwarded to the loader). Used by the `db-reset-dev.yml` GH Actions workflow (`--target=gcp-dev`) and by devs locally (default `--target=local`). `build_kitchen_db.sh` itself stays the primitive — staging/prod composition (when those envs exist) will compose from it without the demo layer.
 - **Loader — `scripts/load_demo_data.sh`:** Runs Layer A [1/5], generates and hashes a random demo-admin password [2/5], probes the API health endpoint [3/5], runs Newman [4/5], and runs Layer C billing backfill [5/5]. Prints credentials to stdout and `.demo_credentials.local` (gitignored). Two targets: `--target=local` (default; requires `PAYMENT_PROVIDER=mock`, runs against laptop API on `:8000`) and `--target=gcp-dev` (drives the deployed dev API, confirms PaymentIntents directly against Stripe sandbox using `STRIPE_SECRET_KEY` test key). Always refuses on non-`dev` ENV or staging/prod-smelling hosts.
 - **GCP wrapper — `scripts/load_demo_data_gcp.sh`:** Convenience wrapper for the `gcp-dev` target. Discovers project/region/Cloud Run URL/Cloud SQL instance from gcloud; starts `cloud-sql-proxy` in the background (trap-cleaned on exit); pulls `STRIPE_SECRET_KEY` and the dev DB password from Secret Manager; execs the underlying loader. Accepts `--purge` and `--purge-only` for one-command resets. Refuses any stack other than `dev`.
-- **Purge — `scripts/purge_demo_data.sh`:** Deletes all demo rows in child-first dependency order, wrapped in a single transaction. Matches: UUID prefix `dddddddd-dec0-` (institutions, admin user, dec0-prefixed entities), canonical key `DEMO_*` (restaurants, plates, plans, employer entities, Newman-created supplier entities), username patterns (`demo.cliente.%@vianda.demo` etc.), and `dddddddd-dec0-0050%` bill IDs (Layer C billing rows whose entity FKs are dynamic). Transactional descendants (subscriptions, orders, reviews, pipeline billing rows) carry system-generated UUIDs and are matched via FK chains.
+- **Purge — `scripts/purge_demo_data.sh`:** Deletes all demo rows in child-first dependency order, wrapped in a single transaction. Matches: UUID prefix `dddddddd-dec0-` (institutions, admin user, dec0-prefixed entities), canonical key `DEMO_*` (restaurants, viandas, plans, employer entities, Newman-created supplier entities), username patterns (`demo.cliente.%@vianda.demo` etc.), and `dddddddd-dec0-0050%` bill IDs (Layer C billing rows whose entity FKs are dynamic). Transactional descendants (subscriptions, orders, reviews, pipeline billing rows) carry system-generated UUIDs and are matched via FK chains.
 - **Geocode cache — `seeds/mapbox_geocode_cache.json`:** Committed replay cache for all 48 demo addresses (21 customer + 18 restaurant + 3 supplier offices + 3 secondary supplier offices + 3 employer offices). Cache is in `replay_only` mode by default; set `MAPBOX_CACHE_MODE=record` to re-record live Mapbox responses. Cache key format: `{op}|{normalized_q}|{country}|{language}|permanent={true|false}`.
 - **Environment — `docs/postman/environments/dev.postman_environment.json`:** Dev-local Postman environment; adds `demoAdminUsername`, `demoAdminPassword`, `mediaBaseUrl`, `customerSharedPassword` on top of the standard CI vars.
 - **Re-run posture:** Customer signups and transactional events are NOT idempotent. Reset pattern: `bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh`.

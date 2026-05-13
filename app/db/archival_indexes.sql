@@ -1,13 +1,13 @@
 -- Archival Performance Indexes
 -- These indexes optimize queries for the archival system
 
--- Orders (customer.plate_pickup_live) archival indexes
-CREATE INDEX IF NOT EXISTS idx_plate_pickup_archival 
-ON customer.plate_pickup_live(status, completion_time, is_archived) 
+-- Orders (customer.vianda_pickup_live) archival indexes
+CREATE INDEX IF NOT EXISTS idx_vianda_pickup_archival 
+ON customer.vianda_pickup_live(status, completion_time, is_archived) 
 WHERE completion_time IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_plate_pickup_archival_eligible 
-ON customer.plate_pickup_live(is_archived, status, completion_time) 
+CREATE INDEX IF NOT EXISTS idx_vianda_pickup_archival_eligible 
+ON customer.vianda_pickup_live(is_archived, status, completion_time) 
 WHERE is_archived = FALSE AND status = 'completed';
 
 -- Transactions (billing.restaurant_transaction) archival indexes  
@@ -52,8 +52,8 @@ ON ops.restaurant_info(is_archived, status, modified_date)
 WHERE is_archived = FALSE;
 
 -- Composite indexes for archival statistics queries
-CREATE INDEX IF NOT EXISTS idx_plate_pickup_stats
-ON customer.plate_pickup_live(is_archived, created_date);
+CREATE INDEX IF NOT EXISTS idx_vianda_pickup_stats
+ON customer.vianda_pickup_live(is_archived, created_date);
 
 CREATE INDEX IF NOT EXISTS idx_restaurant_transaction_stats  
 ON billing.restaurant_transaction(is_archived, created_date);

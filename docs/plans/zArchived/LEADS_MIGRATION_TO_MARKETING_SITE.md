@@ -61,7 +61,7 @@ The B2C app retains the **minimum leads API surface needed for registration**:
 
 - **No login / authentication.** The marketing site has no concept of a logged-in user. Every visitor sees the same experience. There is no session, no JWT, no user context.
 - **No paid API calls.** The marketing site must never trigger Mapbox, Stripe, or any metered external API. All data comes from the kitchen's own database.
-- **No restaurant exploration.** The marketing site shows coverage (how many restaurants in your city) and marketing content (featured restaurants, plans). It does not show menus, plates, kitchen days, or pickup windows. That is the app's job.
+- **No restaurant exploration.** The marketing site shows coverage (how many restaurants in your city) and marketing content (featured restaurants, plans). It does not show menus, viandas, kitchen days, or pickup windows. That is the app's job.
 - **No signup.** Registration happens in the app. The marketing site provides the link/QR to download the app.
 
 ---

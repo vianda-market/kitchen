@@ -3,7 +3,7 @@ Restaurant explorer service for B2C explore-by-city flow.
 
 - Cities for dropdown: use get_cities_with_coverage from city_metrics_service (city_metadata + has restaurant).
 - get_restaurants_by_city(city, country_code, db, ...): list of restaurants in that city
-  with name, cuisine, lat/lng for list and map; optional market filter and plates for a kitchen day.
+  with name, cuisine, lat/lng for list and map; optional market filter and viandas for a kitchen day.
 - resolve_kitchen_day_for_explore(country_code, timezone_str, db): next available kitchen day (or today if still open).
 """
 
@@ -20,8 +20,8 @@ from app.services.kitchen_day_service import (
     get_effective_current_day,
     is_today_kitchen_closed,
 )
-from app.services.plate_review_service import get_plate_review_aggregates
-from app.services.plate_selection_validation import _find_next_available_kitchen_day_in_week
+from app.services.vianda_review_service import get_vianda_review_aggregates
+from app.services.vianda_selection_validation import _find_next_available_kitchen_day_in_week
 from app.utils.address_formatting import format_street_display
 from app.utils.cursor_pagination import slice_restaurants_by_cursor
 from app.utils.db import db_read
@@ -64,7 +64,7 @@ def get_coworker_pickup_windows(
 ) -> list[dict]:
     """
     Return pickup windows from coworkers (same employer) with offer/request for this restaurant+kitchen_day.
-    Excludes users who opted out (coworkers_can_see_my_orders=false or can_participate_in_plate_pickups=false).
+    Excludes users who opted out (coworkers_can_see_my_orders=false or can_participate_in_vianda_pickups=false).
     When pickup_intent=request and flexible_on_time=true: expands ±30 min; marks original with flexible_on_time.
     Returns empty list when user has no employer.
     """
@@ -108,39 +108,39 @@ def get_coworker_pickup_windows(
         # workplace_group_id takes precedence — match all users in the same group
         sel_query = """
             SELECT ps.pickup_time_range, ps.pickup_intent, ps.flexible_on_time
-            FROM plate_selection_info ps
+            FROM vianda_selection_info ps
             INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
             INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
             WHERE ps.restaurant_id = %s AND ps.kitchen_day = %s
               AND ps.pickup_intent IN ('offer', 'request') AND ps.is_archived = FALSE
               AND ump.coworkers_can_see_my_orders = TRUE
-              AND ump.can_participate_in_plate_pickups = TRUE
+              AND ump.can_participate_in_vianda_pickups = TRUE
               AND u_ps.workplace_group_id = %s
         """
         params = (str(restaurant_id), kitchen_day, str(workplace_group_id))
     elif employer_address_id is not None:
         sel_query = """
             SELECT ps.pickup_time_range, ps.pickup_intent, ps.flexible_on_time
-            FROM plate_selection_info ps
+            FROM vianda_selection_info ps
             INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
             INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
             WHERE ps.restaurant_id = %s AND ps.kitchen_day = %s
               AND ps.pickup_intent IN ('offer', 'request') AND ps.is_archived = FALSE
               AND ump.coworkers_can_see_my_orders = TRUE
-              AND ump.can_participate_in_plate_pickups = TRUE
+              AND ump.can_participate_in_vianda_pickups = TRUE
               AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id = %s
         """
         params = (str(restaurant_id), kitchen_day, str(employer_entity_id), str(employer_address_id))
     else:
         sel_query = """
             SELECT ps.pickup_time_range, ps.pickup_intent, ps.flexible_on_time
-            FROM plate_selection_info ps
+            FROM vianda_selection_info ps
             INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
             INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
             WHERE ps.restaurant_id = %s AND ps.kitchen_day = %s
               AND ps.pickup_intent IN ('offer', 'request') AND ps.is_archived = FALSE
               AND ump.coworkers_can_see_my_orders = TRUE
-              AND ump.can_participate_in_plate_pickups = TRUE
+              AND ump.can_participate_in_vianda_pickups = TRUE
               AND u_ps.employer_entity_id = %s AND u_ps.employer_address_id IS NULL
         """
         params = (str(restaurant_id), kitchen_day, str(employer_entity_id))
@@ -181,14 +181,14 @@ def get_coworker_pickup_windows(
     return result
 
 
-def _compute_savings_pct(plate_price: float, plate_credit: int, credit_cost_local_currency: float) -> int:
+def _compute_savings_pct(vianda_price: float, vianda_credit: int, credit_cost_local_currency: float) -> int:
     """
-    Compute savings percentage: (plate_price - plate_credit * credit_cost_local_currency) / plate_price * 100.
-    Clamped to [0, 100]. Returns 0 if plate_price <= 0.
+    Compute savings percentage: (vianda_price - vianda_credit * credit_cost_local_currency) / vianda_price * 100.
+    Clamped to [0, 100]. Returns 0 if vianda_price <= 0.
     """
-    if plate_price <= 0:
+    if vianda_price <= 0:
         return 0
-    raw = (plate_price - plate_credit * credit_cost_local_currency) / plate_price * 100
+    raw = (vianda_price - vianda_credit * credit_cost_local_currency) / vianda_price * 100
     return int(round(max(0.0, min(100.0, raw))))
 
 
@@ -212,7 +212,7 @@ def resolve_weekday_to_next_occurrence(weekday_name: str, timezone_str: str) -> 
     """Return the next occurrence of the given weekday (Monday–Friday) from today in the given TZ.
 
     In DEV_MODE, when today is a weekend and the target day was mapped to friday,
-    return TODAY instead of next Friday — so plate pickups, QR scans, and billing
+    return TODAY instead of next Friday — so vianda pickups, QR scans, and billing
     all operate on the same date and the E2E flow works any day of the week.
     """
     from app.config.settings import settings as _settings
@@ -227,7 +227,7 @@ def resolve_weekday_to_next_occurrence(weekday_name: str, timezone_str: str) -> 
         raise ValueError(f"Invalid kitchen_day: {weekday_name!r}")
     days_ahead = (target - today.weekday() + 7) % 7
     # DEV_MODE: if today is a weekend, return today so the full E2E pipeline
-    # (plate selection → QR scan → complete → billing) all operates on the same date.
+    # (vianda selection → QR scan → complete → billing) all operates on the same date.
     # The DB CHECK constraint on pickup_date DOW was removed — business logic owns the guard.
     if _settings.DEV_MODE and today.weekday() >= 5 and days_ahead > 0:
         return today
@@ -366,40 +366,40 @@ def resolve_kitchen_day_for_explore(
     return next_day or "monday"
 
 
-def _build_lean_plate_dict(plate: dict) -> dict:
-    """Build lean plate payload for by-city cards (modal fetches via enriched)."""
+def _build_lean_vianda_dict(vianda: dict) -> dict:
+    """Build lean vianda payload for by-city cards (modal fetches via enriched)."""
     return {
-        "plate_id": plate["plate_id"],
-        "product_name": plate.get("product_name") or "",
-        "image_url": plate.get("image_url"),
-        "credit": plate["credit"],
-        "savings": plate.get("savings", 0),
-        "is_recommended": plate.get("is_recommended", False),
-        "is_favorite": plate.get("is_favorite", False),
-        "is_already_reserved": plate.get("is_already_reserved", False),
-        "existing_plate_selection_id": plate.get("existing_plate_selection_id"),
+        "vianda_id": vianda["vianda_id"],
+        "product_name": vianda.get("product_name") or "",
+        "image_url": vianda.get("image_url"),
+        "credit": vianda["credit"],
+        "savings": vianda.get("savings", 0),
+        "is_recommended": vianda.get("is_recommended", False),
+        "is_favorite": vianda.get("is_favorite", False),
+        "is_already_reserved": vianda.get("is_already_reserved", False),
+        "existing_vianda_selection_id": vianda.get("existing_vianda_selection_id"),
     }
 
 
-def get_plates_for_restaurants(
+def get_viandas_for_restaurants(
     restaurant_ids: list[Any],
     kitchen_day: str,
     db: psycopg2.extensions.connection,
     *,
-    favorite_plate_ids: list[UUID] | None = None,
+    favorite_vianda_ids: list[UUID] | None = None,
     max_credits: int | None = None,
     dietary_filter: list[str] | None = None,
 ) -> dict:
     """
-    Return map restaurant_id -> list of plates (plate_id, product_name, price, credit, kitchen_day,
+    Return map restaurant_id -> list of viandas (vianda_id, product_name, price, credit, kitchen_day,
     image_url — always None post image-pipeline-atomic; pipeline populates via image_asset).
     Savings are NOT read from DB; caller should compute from
     price, credit, and user's credit_cost_local_currency (see get_restaurants_by_city).
-    Only non-archived plates with a matching plate_kitchen_day.
+    Only non-archived viandas with a matching vianda_kitchen_day.
 
-    max_credits: when set, only plates with credit <= max_credits are returned.
-    dietary_filter: when set, only plates whose dietary TEXT[] column overlaps the requested flags
-    are returned (PostgreSQL && array overlap operator — a plate matches if it has AT LEAST ONE of
+    max_credits: when set, only viandas with credit <= max_credits are returned.
+    dietary_filter: when set, only viandas whose dietary TEXT[] column overlaps the requested flags
+    are returned (PostgreSQL && array overlap operator — a vianda matches if it has AT LEAST ONE of
     the requested flags). Direct SQL, NOT routed through filter_builder (avoids the kitchen#87
     IN/ANY mismatch bug for TEXT[] columns).
     """
@@ -414,7 +414,7 @@ def get_plates_for_restaurants(
         params.append(max_credits)
 
     if dietary_filter:
-        # Use PostgreSQL array overlap (&&) to match plates containing ANY of the requested flags.
+        # Use PostgreSQL array overlap (&&) to match viandas containing ANY of the requested flags.
         # Do NOT use IN / = ANY(...) — those apply scalar equality against an array column and
         # produce wrong results (kitchen#87). The && operator correctly checks array intersection.
         extra_where += "\n          AND pr.dietary && %s::text[]"
@@ -424,7 +424,7 @@ def get_plates_for_restaurants(
         """
         SELECT
             p.restaurant_id,
-            p.plate_id,
+            p.vianda_id,
             COALESCE(pr.name, '') AS product_name,
             p.price,
             p.credit,
@@ -432,8 +432,8 @@ def get_plates_for_restaurants(
             NULL::text AS image_url,
             pr.ingredients,
             pr.dietary
-        FROM plate_info p
-        INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.kitchen_day = %s
+        FROM vianda_info p
+        INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.kitchen_day = %s
           AND pkd.is_archived = FALSE AND pkd.status = 'active'
         INNER JOIN product_info pr ON pr.product_id = p.product_id AND pr.is_archived = FALSE
         WHERE p.restaurant_id IN ("""
@@ -447,16 +447,16 @@ def get_plates_for_restaurants(
     )
     rows = db_read(query, tuple(params), connection=db) or []
     by_restaurant: dict = {}
-    plate_ids: list[Any] = []
+    vianda_ids: list[Any] = []
     for row in rows:
         rid = row["restaurant_id"]
-        plate_ids.append(row["plate_id"])
+        vianda_ids.append(row["vianda_id"])
         if rid not in by_restaurant:
             by_restaurant[rid] = []
-        fav_ids = {str(x) for x in (favorite_plate_ids or [])}
+        fav_ids = {str(x) for x in (favorite_vianda_ids or [])}
         by_restaurant[rid].append(
             {
-                "plate_id": row["plate_id"],
+                "vianda_id": row["vianda_id"],
                 "product_name": (row.get("product_name") or "").strip(),
                 "price": float(row["price"]),
                 "credit": int(row["credit"]),
@@ -468,14 +468,14 @@ def get_plates_for_restaurants(
                 "average_portion_size": None,
                 "portion_size": "insufficient_reviews",
                 "review_count": 0,
-                "is_favorite": str(row["plate_id"]) in fav_ids,
+                "is_favorite": str(row["vianda_id"]) in fav_ids,
             }
         )
     # Merge review aggregates; apply minimum-threshold (5 reviews) and portion_size bucketing
-    aggregates = get_plate_review_aggregates(plate_ids, db)
-    for _rid, plates in by_restaurant.items():
-        for p in plates:
-            pid_str = str(p["plate_id"])
+    aggregates = get_vianda_review_aggregates(vianda_ids, db)
+    for _rid, viandas in by_restaurant.items():
+        for p in viandas:
+            pid_str = str(p["vianda_id"])
             if pid_str in aggregates:
                 agg = aggregates[pid_str]
                 rc = agg["review_count"]
@@ -507,8 +507,8 @@ def _match_city_in_country(
           AND r.is_archived = FALSE
           AND r.status = 'active'
           AND EXISTS (
-            SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
+            SELECT 1 FROM vianda_info p
+            INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (
@@ -541,7 +541,7 @@ def _query_city_restaurants(
 
     Optional filters (all apply in the WHERE clause, before cursor slicing):
     - cuisine_filter: list of cuisine_name values; restricts to restaurants whose
-      cuisine matches any of the given names (restaurant-level, NOT plate-level).
+      cuisine matches any of the given names (restaurant-level, NOT vianda-level).
       City vs radius AND-composition: a restaurant must satisfy BOTH city and radius.
     - geo_filter: (lat, lng, radius_km) tuple; restricts to restaurants within
       radius_km kilometres via PostGIS ST_DWithin on r.location::geography.
@@ -589,8 +589,8 @@ def _query_city_restaurants(
           AND r.is_archived = FALSE
           AND r.status = 'active'
           AND EXISTS (
-            SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
+            SELECT 1 FROM vianda_info p
+            INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (
@@ -630,14 +630,14 @@ def _build_restaurant_dict(row: dict, country: str) -> dict:
         "street_name": street_name,
         "building_number": building_number,
         "address_display": format_street_display(country, street_type, street_name, building_number),
-        "plates": None,
+        "viandas": None,
         "has_volunteer": False,
         "has_coworker_offer": False,
         "has_coworker_request": False,
     }
 
 
-def _attach_plates_and_savings(
+def _attach_viandas_and_savings(
     restaurants: list[dict],
     kitchen_day: str,
     credit_cost_local_currency: float | None,
@@ -646,14 +646,14 @@ def _attach_plates_and_savings(
     max_credits: int | None = None,
     dietary_filter: list[str] | None = None,
 ) -> list[dict]:
-    """Attach plates for the kitchen day and compute savings per plate.
+    """Attach viandas for the kitchen day and compute savings per vianda.
 
-    When max_credits or dietary_filter are set, restaurants whose plate list becomes empty
-    after filtering are removed from the response (drop-on-empty-plates rule).
+    When max_credits or dietary_filter are set, restaurants whose vianda list becomes empty
+    after filtering are removed from the response (drop-on-empty-viandas rule).
     Returns the (possibly shorter) restaurants list.
     """
     rest_ids = [r["restaurant_id"] for r in restaurants]
-    plates_by_restaurant = get_plates_for_restaurants(
+    viandas_by_restaurant = get_viandas_for_restaurants(
         rest_ids,
         kitchen_day,
         db,
@@ -662,17 +662,17 @@ def _attach_plates_and_savings(
     )
     surviving: list[dict] = []
     for r in restaurants:
-        plates = plates_by_restaurant.get(r["restaurant_id"]) or []
-        # Drop restaurants with empty plate list when a plate-level filter is active
-        if (max_credits is not None or dietary_filter) and not plates:
+        viandas = viandas_by_restaurant.get(r["restaurant_id"]) or []
+        # Drop restaurants with empty vianda list when a vianda-level filter is active
+        if (max_credits is not None or dietary_filter) and not viandas:
             continue
-        for plate in plates:
-            plate["savings"] = (
-                _compute_savings_pct(plate["price"], plate["credit"], credit_cost_local_currency)
+        for vianda in viandas:
+            vianda["savings"] = (
+                _compute_savings_pct(vianda["price"], vianda["credit"], credit_cost_local_currency)
                 if credit_cost_local_currency is not None
                 else 0
             )
-        r["plates"] = plates
+        r["viandas"] = viandas
         surviving.append(r)
     return surviving
 
@@ -686,12 +686,12 @@ def _mark_volunteer_restaurants(
     """Set has_volunteer flag on restaurants that have a pickup_intent=offer."""
     vol_query = """
         SELECT DISTINCT ps.restaurant_id
-        FROM plate_selection_info ps
+        FROM vianda_selection_info ps
         INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
         WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
           AND ps.pickup_intent = 'offer' AND ps.is_archived = FALSE
           AND ump.coworkers_can_see_my_orders = TRUE
-          AND ump.can_participate_in_plate_pickups = TRUE
+          AND ump.can_participate_in_vianda_pickups = TRUE
     """
     vol_rows = db_read(vol_query, (rest_ids_str, kitchen_day), connection=db) or []
     volunteer_rest_ids = {r["restaurant_id"] for r in vol_rows}
@@ -732,13 +732,13 @@ def _query_coworker_intent_restaurants(
     query = (
         f"""
         SELECT DISTINCT ps.restaurant_id
-        FROM plate_selection_info ps
+        FROM vianda_selection_info ps
         INNER JOIN user_info u_ps ON ps.user_id = u_ps.user_id
         INNER JOIN user_messaging_preferences ump ON ps.user_id = ump.user_id
         WHERE ps.restaurant_id = ANY(%s::uuid[]) AND ps.kitchen_day = %s
           AND ps.pickup_intent = %s AND ps.is_archived = FALSE
           AND ump.coworkers_can_see_my_orders = TRUE
-          AND ump.can_participate_in_plate_pickups = TRUE
+          AND ump.can_participate_in_vianda_pickups = TRUE
           {coworker_match_clause}
     """
         + exclude_self_clause
@@ -791,30 +791,30 @@ def _mark_coworker_restaurants(
         r["has_coworker_request"] = r["restaurant_id"] in request_ids
 
 
-def _mark_reserved_plates(
+def _mark_reserved_viandas(
     restaurants: list[dict],
     user_id: UUID | None,
     kitchen_day: str | None,
     db: psycopg2.extensions.connection,
 ) -> None:
-    """Mark plates the user has already reserved for the kitchen day."""
-    reserved_plate_to_selection: dict = {}
+    """Mark viandas the user has already reserved for the kitchen day."""
+    reserved_vianda_to_selection: dict = {}
     if user_id and kitchen_day:
         reserved_query = """
-            SELECT plate_id, plate_selection_id FROM plate_selection_info
+            SELECT vianda_id, vianda_selection_id FROM vianda_selection_info
             WHERE user_id = %s AND kitchen_day = %s AND is_archived = FALSE
         """
         reserved_rows = db_read(reserved_query, (str(user_id), kitchen_day), connection=db) or []
-        reserved_plate_to_selection = {str(r["plate_id"]): str(r["plate_selection_id"]) for r in reserved_rows}
+        reserved_vianda_to_selection = {str(r["vianda_id"]): str(r["vianda_selection_id"]) for r in reserved_rows}
     for r in restaurants:
-        for p in r.get("plates") or []:
-            pid_str = str(p.get("plate_id", ""))
-            if pid_str in reserved_plate_to_selection:
+        for p in r.get("viandas") or []:
+            pid_str = str(p.get("vianda_id", ""))
+            if pid_str in reserved_vianda_to_selection:
                 p["is_already_reserved"] = True
-                p["existing_plate_selection_id"] = reserved_plate_to_selection[pid_str]
+                p["existing_vianda_selection_id"] = reserved_vianda_to_selection[pid_str]
             else:
                 p["is_already_reserved"] = False
-                p["existing_plate_selection_id"] = None
+                p["existing_vianda_selection_id"] = None
 
 
 def _apply_favorites_and_recommendations(
@@ -822,30 +822,30 @@ def _apply_favorites_and_recommendations(
     user_id: UUID | None,
     db: psycopg2.extensions.connection,
 ) -> None:
-    """Apply favorites, recommendations, sorting, and narrow plates to lean payload."""
+    """Apply favorites, recommendations, sorting, and narrow viandas to lean payload."""
     if user_id:
         from app.services.favorite_service import get_favorite_ids
         from app.services.recommendation_service import apply_recommendation
 
         fav = get_favorite_ids(user_id, db)
         fav_rest_str = {str(rid) for rid in fav["restaurant_ids"]}
-        fav_plate_str = {str(pid) for pid in fav["plate_ids"]}
+        fav_vianda_str = {str(pid) for pid in fav["vianda_ids"]}
         for r in restaurants:
             r["is_favorite"] = str(r["restaurant_id"]) in fav_rest_str
-            for p in r.get("plates") or []:
-                p["is_favorite"] = str(p["plate_id"]) in fav_plate_str
+            for p in r.get("viandas") or []:
+                p["is_favorite"] = str(p["vianda_id"]) in fav_vianda_str
         apply_recommendation(restaurants, user_id, db, favorite_ids=fav)
         _sort_by_recommendation(restaurants)
     else:
         for r in restaurants:
             r["is_favorite"] = False
             r["is_recommended"] = False
-            for p in r.get("plates") or []:
+            for p in r.get("viandas") or []:
                 p["is_favorite"] = False
                 p["is_recommended"] = False
-    # Narrow plates to lean payload (modal fetches via enriched)
+    # Narrow viandas to lean payload (modal fetches via enriched)
     for r in restaurants:
-        r["plates"] = [_build_lean_plate_dict(p) for p in (r.get("plates") or [])]
+        r["viandas"] = [_build_lean_vianda_dict(p) for p in (r.get("viandas") or [])]
 
 
 def _recommendation_sort_key(x: dict) -> tuple:
@@ -858,17 +858,17 @@ def _recommendation_sort_key(x: dict) -> tuple:
 
 
 def _sort_by_recommendation(restaurants: list[dict]) -> None:
-    """Sort restaurants and their plates by recommendation score."""
+    """Sort restaurants and their viandas by recommendation score."""
     for r in restaurants:
-        plates = r.get("plates") or []
-        plates.sort(
+        viandas = r.get("viandas") or []
+        viandas.sort(
             key=lambda x: (
                 not x.get("is_recommended", False),
                 -(x.get("_recommendation_score", 0)),
                 (x.get("product_name") or "").lower(),
             )
         )
-        r["plates"] = plates
+        r["viandas"] = viandas
     restaurants.sort(key=_recommendation_sort_key)
 
 
@@ -889,8 +889,8 @@ def _compute_city_center(
           AND r.is_archived = FALSE
           AND r.status = 'active'
           AND EXISTS (
-            SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
+            SELECT 1 FROM vianda_info p
+            INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (
@@ -934,19 +934,19 @@ def get_restaurants_by_city(
     Response: requested_city, city (matched), center (optional lat/lng), optional kitchen_day,
     and restaurants list with restaurant_id, name, cuisine, lat, lng, etc.
     When timezone_str is set and kitchen_day is omitted, resolve next available kitchen day.
-    When kitchen_day is set (or resolved), attach plates for that day to each restaurant.
+    When kitchen_day is set (or resolved), attach viandas for that day to each restaurant.
     credit_cost_local_currency: optional plan credit cost (local currency per credit); when set, savings
-    are computed per plate; otherwise savings=0.
+    are computed per vianda; otherwise savings=0.
     user_id: optional; when set, favorites are surfaced at top and is_favorite set on items.
     workplace_group_id: optional; takes precedence over employer_entity_id for coworker matching.
     employer_entity_id, employer_address_id: optional; when set (user has employer), has_coworker_offer
     and has_coworker_request are computed per restaurant for coworker-scoped pickup intents.
     cuisine_filter: optional list of cuisine_name strings (restaurant-level, multi-select OR logic).
-    max_credits: optional integer; plates with credit > max_credits are excluded. Restaurants with no
-    surviving plates after this filter are dropped from the response (drop-on-empty-plates).
-    dietary_filter: optional list of DietaryFlag values; plates whose dietary TEXT[] column does not
+    max_credits: optional integer; viandas with credit > max_credits are excluded. Restaurants with no
+    surviving viandas after this filter are dropped from the response (drop-on-empty-viandas).
+    dietary_filter: optional list of DietaryFlag values; viandas whose dietary TEXT[] column does not
     overlap with the requested flags are excluded (array overlap, NOT IN/ANY). Restaurants with no
-    surviving plates after this filter are dropped (drop-on-empty-plates).
+    surviving viandas after this filter are dropped (drop-on-empty-viandas).
     geo_filter: optional (lat, lng, radius_km) tuple; restricts to restaurants within radius_km km via
     PostGIS ST_DWithin. Applied inside the WHERE clause (before cursor slicing) so pagination is correct.
     City and radius are AND-composed: a restaurant must satisfy both constraints.
@@ -972,9 +972,9 @@ def get_restaurants_by_city(
         geo_filter=geo_filter,
     )
 
-    # Attach plates, volunteers, coworker flags, and reservations
+    # Attach viandas, volunteers, coworker flags, and reservations
     if resolved_kitchen_day and restaurants:
-        restaurants = _attach_plates_and_savings(
+        restaurants = _attach_viandas_and_savings(
             restaurants,
             resolved_kitchen_day,
             credit_cost_local_currency,
@@ -994,7 +994,7 @@ def get_restaurants_by_city(
             employer_address_id,
             db,
         )
-        _mark_reserved_plates(restaurants, user_id, resolved_kitchen_day, db)
+        _mark_reserved_viandas(restaurants, user_id, resolved_kitchen_day, db)
 
     _apply_favorites_and_recommendations(restaurants, user_id, db)
 

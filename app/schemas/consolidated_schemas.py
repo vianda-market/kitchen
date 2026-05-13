@@ -7,11 +7,11 @@ the number of small files and improve maintainability.
 
 Categories:
 1. Core Entities (User, Institution, Role)
-2. Restaurant & Food (Restaurant, Product, Plate, QR Code)
+2. Restaurant & Food (Restaurant, Product, Vianda, QR Code)
 3. Billing & Payments (Credit Currency, Bills, Payment Methods, Transactions)
 4. Location & Address (Address, Geolocation, Employer)
 5. Subscriptions & Plans (Plan, Subscription)
-6. Plate Selection & Pickup (Plate Selection, Pickup Preferences, Live Pickup)
+6. Vianda Selection & Pickup (Vianda Selection, Pickup Preferences, Live Pickup)
 7. Admin & Discretionary (Discretionary Requests, Resolutions)
 
 Benefits:
@@ -439,15 +439,17 @@ class MessagingPreferencesResponseSchema(BaseModel):
     """Schema for messaging preferences response (GET /users/me/messaging-preferences)."""
 
     notify_coworker_pickup_alert: bool = Field(
-        True, description="Receive push when a coworker offers to pick up your plate"
+        True, description="Receive push when a coworker offers to pick up your vianda"
     )
-    notify_plate_readiness_alert: bool = Field(True, description="Receive push when restaurant signals plate is ready")
+    notify_vianda_readiness_alert: bool = Field(
+        True, description="Receive push when restaurant signals vianda is ready"
+    )
     notify_promotions_push: bool = Field(True, description="Receive in-app push for promotions and marketing")
     notify_promotions_email: bool = Field(True, description="Receive email campaigns for promotions and marketing")
     coworkers_can_see_my_orders: bool = Field(
         True, description="Allow coworkers to see my orders in explore and coworker-facing lists"
     )
-    can_participate_in_plate_pickups: bool = Field(
+    can_participate_in_vianda_pickups: bool = Field(
         True, description="I can appear on coworker list for pickup offers and volunteer"
     )
 
@@ -458,11 +460,11 @@ class MessagingPreferencesUpdateSchema(BaseModel):
     """Schema for updating messaging preferences (PUT /users/me/messaging-preferences). All fields optional."""
 
     notify_coworker_pickup_alert: bool | None = None
-    notify_plate_readiness_alert: bool | None = None
+    notify_vianda_readiness_alert: bool | None = None
     notify_promotions_push: bool | None = None
     notify_promotions_email: bool | None = None
     coworkers_can_see_my_orders: bool | None = None
-    can_participate_in_plate_pickups: bool | None = None
+    can_participate_in_vianda_pickups: bool | None = None
 
 
 class UserEnrichedResponseSchema(BaseModel):
@@ -830,7 +832,7 @@ class RestaurantUpdateSchema(BaseModel):
         None, description="Enable kiosk code verification for this restaurant (Supplier Admin only)"
     )
     status: Status | None = Field(
-        None, description="Active only allowed when restaurant has active plate_kitchen_days; Inactive always allowed"
+        None, description="Active only allowed when restaurant has active vianda_kitchen_days; Inactive always allowed"
     )
 
 
@@ -933,10 +935,10 @@ class CoworkerPickupWindowsResponseSchema(BaseModel):
     )
 
 
-class PlateExplorerItemSchema(BaseModel):
-    """One plate in GET /restaurants/by-city restaurant.plates (lean payload for cards; modal fetches via enriched)."""
+class ViandaExplorerItemSchema(BaseModel):
+    """One vianda in GET /restaurants/by-city restaurant.viandas (lean payload for cards; modal fetches via enriched)."""
 
-    plate_id: UUID
+    vianda_id: UUID
     product_name: str = Field(..., description="Product name from product_info")
     image_url: str | None = Field(None, description="Product thumbnail URL (image_thumbnail_url)")
     credit: int = Field(..., description="Credit value")
@@ -944,12 +946,12 @@ class PlateExplorerItemSchema(BaseModel):
     is_recommended: bool = Field(
         False, description="True when recommendation score meets threshold; UI can show Recommended badge"
     )
-    is_favorite: bool = Field(False, description="True if the current user has favorited this plate")
+    is_favorite: bool = Field(False, description="True if the current user has favorited this vianda")
     is_already_reserved: bool = Field(
         False,
-        description="True when current user has reserved this plate for this kitchen_day; show alternative actions instead of Reserve",
+        description="True when current user has reserved this vianda for this kitchen_day; show alternative actions instead of Reserve",
     )
-    existing_plate_selection_id: str | None = Field(
+    existing_vianda_selection_id: str | None = Field(
         None, description="When is_already_reserved, use for Change or cancel (PATCH/DELETE)"
     )
 
@@ -972,8 +974,8 @@ class RestaurantExplorerItemSchema(BaseModel):
         None, description="Pre-formatted street line per market (e.g. 123 Main St or Av Santa Fe 100)"
     )
     pickup_instructions: str | None = Field(None, description="Restaurant pickup instructions for customers")
-    plates: list[PlateExplorerItemSchema] | None = Field(
-        None, description="Plates available for the response kitchen_day (when requested)"
+    viandas: list[ViandaExplorerItemSchema] | None = Field(
+        None, description="Viandas available for the response kitchen_day (when requested)"
     )
     has_volunteer: bool = Field(
         False, description="True when kitchen_day set and at least one user has pickup_intent=offer for this restaurant"
@@ -993,14 +995,15 @@ class RestaurantExplorerItemSchema(BaseModel):
 
 
 class RestaurantsByCityResponseSchema(BaseModel):
-    """Response for GET /restaurants/by-city (B2C explore list/map, optional plates by kitchen day)."""
+    """Response for GET /restaurants/by-city (B2C explore list/map, optional viandas by kitchen day)."""
 
     requested_city: str = Field(..., description="City value the client sent")
     city: str = Field(..., description="Matched city (case-insensitive)")
     center: Optional["ZipcodeCenterSchema"] = Field(None, description="Optional lat/lng center for the city")
-    kitchen_day: str | None = Field(None, description="Kitchen day used for plates (when market/kitchen_day resolved)")
+    kitchen_day: str | None = Field(None, description="Kitchen day used for viandas (when market/kitchen_day resolved)")
     restaurants: list[RestaurantExplorerItemSchema] = Field(
-        ..., description="Restaurants in the city with name, cuisine_name, geolocation; plates when kitchen_day present"
+        ...,
+        description="Restaurants in the city with name, cuisine_name, geolocation; viandas when kitchen_day present",
     )
     next_cursor: str | None = Field(None, description="Opaque cursor for the next page; null when no more results")
     has_more: bool = Field(..., description="Whether more results exist after this page")
@@ -1039,7 +1042,7 @@ class RestaurantResponseSchema(BaseModel):
         None,
         description=(
             "Computed at read time. True when the restaurant meets all activation prerequisites: "
-            "status='active', not archived, ≥1 active plate_kitchen_days, active QR code. "
+            "status='active', not archived, ≥1 active vianda_kitchen_days, active QR code. "
             "Null when the endpoint does not compute this field (e.g. plain CRUD list). "
             "No DB column — rules may evolve without a migration."
         ),
@@ -1047,7 +1050,7 @@ class RestaurantResponseSchema(BaseModel):
     missing: list[str] | None = Field(
         None,
         description=(
-            "Subset of ['status_active', 'not_archived', 'plate_kitchen_days', 'qr'] listing "
+            "Subset of ['status_active', 'not_archived', 'vianda_kitchen_days', 'qr'] listing "
             "unmet prerequisites. Empty list when is_ready_for_signup is True. "
             "Null when the endpoint does not compute this field."
         ),
@@ -1237,8 +1240,8 @@ class UploadStatusResponse(BaseModel):
     )
 
 
-class PlateCreateSchema(BaseModel):
-    """Schema for creating a new plate. Savings are computed on the fly from plan credit_cost_local_currency."""
+class ViandaCreateSchema(BaseModel):
+    """Schema for creating a new vianda. Savings are computed on the fly from plan credit_cost_local_currency."""
 
     product_id: UUID
     restaurant_id: UUID
@@ -1247,8 +1250,8 @@ class PlateCreateSchema(BaseModel):
     delivery_time_minutes: int = Field(default=15, gt=0)
 
 
-class PlateUpdateSchema(BaseModel):
-    """Schema for updating plate information"""
+class ViandaUpdateSchema(BaseModel):
+    """Schema for updating vianda information"""
 
     product_id: UUID | None = None
     restaurant_id: UUID | None = None
@@ -1257,10 +1260,10 @@ class PlateUpdateSchema(BaseModel):
     delivery_time_minutes: int | None = Field(None, gt=0)
 
 
-class PlateResponseSchema(BaseModel):
-    """Schema for plate response data"""
+class ViandaResponseSchema(BaseModel):
+    """Schema for vianda response data"""
 
-    plate_id: UUID
+    vianda_id: UUID
     product_id: UUID
     restaurant_id: UUID
     price: MoneyDecimal  # serialises as JSON number; see app/schemas/types.py
@@ -1278,33 +1281,33 @@ class PlateResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateUpsertByKeySchema(BaseModel):
-    """Schema for idempotent plate upsert by canonical_key.
+class ViandaUpsertByKeySchema(BaseModel):
+    """Schema for idempotent vianda upsert by canonical_key.
 
-    If a plate with the given canonical_key already exists it is updated in-place;
-    otherwise a new plate is inserted with that canonical_key.
+    If a vianda with the given canonical_key already exists it is updated in-place;
+    otherwise a new vianda is inserted with that canonical_key.
     Use this endpoint for Postman seed runs and fixture data — never for
-    ad-hoc plate creation (use POST /plates instead).
+    ad-hoc vianda creation (use POST /viandas instead).
     """
 
     canonical_key: str = Field(
         ...,
         max_length=200,
-        description="Stable human-readable identifier, e.g. 'RESTAURANT_LA_COCINA_PORTENA_PLATE_BONDIOLA'",
+        description="Stable human-readable identifier, e.g. 'RESTAURANT_LA_COCINA_PORTENA_VIANDA_BONDIOLA'",
     )
-    product_id: UUID = Field(..., description="FK to ops.product_info — the recipe this plate is based on")
-    restaurant_id: UUID = Field(..., description="FK to ops.restaurant_info — the restaurant offering this plate")
+    product_id: UUID = Field(..., description="FK to ops.product_info — the recipe this vianda is based on")
+    restaurant_id: UUID = Field(..., description="FK to ops.restaurant_info — the restaurant offering this vianda")
     price: Decimal = Field(..., ge=0, description="Local-currency price charged to subscribers")
     credit: int = Field(..., gt=0, description="Credit cost deducted from the subscriber's balance")
-    delivery_time_minutes: int = Field(default=15, gt=0, description="Estimated minutes from order to plate readiness")
+    delivery_time_minutes: int = Field(default=15, gt=0, description="Estimated minutes from order to vianda readiness")
     status: Status = Status.ACTIVE
 
 
-class PlateEnrichedResponseSchema(BaseModel):
-    """Schema for enriched plate response data with institution, restaurant, product, and address details"""
+class ViandaEnrichedResponseSchema(BaseModel):
+    """Schema for enriched vianda response data with institution, restaurant, product, and address details"""
 
-    # filter-registry:exempt reason="enriched join field; not a direct column on plate_info"
-    plate_id: UUID
+    # filter-registry:exempt reason="enriched join field; not a direct column on vianda_info"
+    vianda_id: UUID
     # filter-registry:exempt reason="enriched join field; product_id is a join key, not a filterable dimension"
     product_id: UUID
     restaurant_id: UUID
@@ -1320,7 +1323,7 @@ class PlateEnrichedResponseSchema(BaseModel):
     pickup_instructions: str | None = None
     # filter-registry:exempt reason="enriched join field; country_code is registered instead"
     country_name: str
-    # filter-registry:exempt reason="enriched join field; address join country; not registered for plate-level filtering"
+    # filter-registry:exempt reason="enriched join field; address join country; not registered for vianda-level filtering"
     country_code: str
     # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     province: str
@@ -1351,7 +1354,7 @@ class PlateEnrichedResponseSchema(BaseModel):
     )
     # filter-registry:exempt reason="computed aggregate; not independently filterable"
     review_count: int = 0
-    # filter-registry:exempt reason="enriched join field; filter by plate_id instead"
+    # filter-registry:exempt reason="enriched join field; filter by vianda_id instead"
     product_name: str
     # filter-registry:exempt reason="i18n translation payload; not filterable"
     product_name_i18n: dict | None = Field(None, exclude=True)
@@ -1374,7 +1377,7 @@ class PlateEnrichedResponseSchema(BaseModel):
     no_show_discount: int | None = Field(None, description="From supplier_terms; null when no terms configured")
     # filter-registry:exempt reason="enriched join field; not independently filterable"
     delivery_time_minutes: int
-    # filter-registry:exempt reason="status field used in restaurant scoping; not a plate filter dimension"
+    # filter-registry:exempt reason="status field used in restaurant scoping; not a vianda filter dimension"
     is_archived: bool
     status: Status
     # filter-registry:exempt reason="Python-computed contextual flag; not a DB column"
@@ -1392,7 +1395,7 @@ class PlateEnrichedResponseSchema(BaseModel):
 class RestaurantActivatedSchema(BaseModel):
     """Embedded in mutation responses when lazy activation fires for a restaurant.
 
-    Included as ``restaurant_activated`` on POST /plate-kitchen-days and POST /qr-codes.
+    Included as ``restaurant_activated`` on POST /vianda-kitchen-days and POST /qr-codes.
     Value is ``null`` (field present, value None) when activation did not fire.
     """
 
@@ -1402,10 +1405,10 @@ class RestaurantActivatedSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateKitchenDayCreateSchema(BaseModel):
-    """Schema for creating plate kitchen day assignments (supports single or multiple days)"""
+class ViandaKitchenDayCreateSchema(BaseModel):
+    """Schema for creating vianda kitchen day assignments (supports single or multiple days)"""
 
-    plate_id: UUID
+    vianda_id: UUID
     kitchen_days: list[KitchenDay] = Field(
         ..., description="List of days of the week: Monday, Tuesday, Wednesday, Thursday, or Friday"
     )
@@ -1418,21 +1421,21 @@ class PlateKitchenDayCreateSchema(BaseModel):
     def validate_kitchen_days(cls, v):
         """Validate that all kitchen_days are valid weekdays"""
         if not v:
-            raise I18nValueError("validation.plate.kitchen_days_empty")
+            raise I18nValueError("validation.vianda.kitchen_days_empty")
         # Check for duplicates
         if len(v) != len(set(v)):
-            raise I18nValueError("validation.plate.kitchen_days_duplicate")
+            raise I18nValueError("validation.vianda.kitchen_days_duplicate")
         return v
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateKitchenDayUpdateSchema(BaseModel):
-    """Schema for updating plate kitchen day assignment.
-    plate_id is immutable; if sent on update, the request will be rejected with 400.
-    To change plate_id: create a new record and archive the old one."""
+class ViandaKitchenDayUpdateSchema(BaseModel):
+    """Schema for updating vianda kitchen day assignment.
+    vianda_id is immutable; if sent on update, the request will be rejected with 400.
+    To change vianda_id: create a new record and archive the old one."""
 
-    plate_id: UUID | None = Field(None, description="Immutable - cannot be changed; if provided, returns 400")
+    vianda_id: UUID | None = Field(None, description="Immutable - cannot be changed; if provided, returns 400")
     kitchen_day: KitchenDay | None = Field(
         None, description="Day of the week: Monday, Tuesday, Wednesday, Thursday, or Friday"
     )
@@ -1442,11 +1445,11 @@ class PlateKitchenDayUpdateSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateKitchenDayResponseSchema(BaseModel):
-    """Schema for plate kitchen day response data"""
+class ViandaKitchenDayResponseSchema(BaseModel):
+    """Schema for vianda kitchen day response data"""
 
-    plate_kitchen_day_id: UUID
-    plate_id: UUID
+    vianda_kitchen_day_id: UUID
+    vianda_id: UUID
     kitchen_day: KitchenDay
     status: Status
     is_archived: bool
@@ -1458,23 +1461,23 @@ class PlateKitchenDayResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateKitchenDayUpsertByKeySchema(BaseModel):
-    """Schema for idempotent plate kitchen day upsert by canonical_key.
+class ViandaKitchenDayUpsertByKeySchema(BaseModel):
+    """Schema for idempotent vianda kitchen day upsert by canonical_key.
 
-    If a plate kitchen day with the given canonical_key already exists it is
+    If a vianda kitchen day with the given canonical_key already exists it is
     updated in-place; otherwise a new row is inserted.  Use this endpoint for
     Postman seed runs and fixture data — never for ad-hoc kitchen day creation
-    (use POST /plate-kitchen-days instead).
+    (use POST /vianda-kitchen-days instead).
 
     Auth: Internal only (get_employee_user dependency). Returns 403 for
     Customer/Supplier roles.
 
     Immutable fields on UPDATE:
-        - ``plate_id`` — FK to the plate; cannot change after creation.
-          To reassign a kitchen day to a different plate, archive the old row
+        - ``vianda_id`` — FK to the vianda; cannot change after creation.
+          To reassign a kitchen day to a different vianda, archive the old row
           and create a new one.
         - ``kitchen_day`` — the weekday this row represents; cannot change after
-          creation.  To reassign the same plate to a different day, archive the
+          creation.  To reassign the same vianda to a different day, archive the
           old row and create a new canonical row for the new day.
     """
 
@@ -1483,15 +1486,15 @@ class PlateKitchenDayUpsertByKeySchema(BaseModel):
         max_length=200,
         description="Stable identifier, e.g. 'E2E_PKD_CAMBALACHE_BONDIOLA_MONDAY'",
     )
-    plate_id: UUID = Field(..., description="FK to ops.plate_info. Immutable after INSERT.")
+    vianda_id: UUID = Field(..., description="FK to ops.vianda_info. Immutable after INSERT.")
     kitchen_day: KitchenDay = Field(..., description="Weekday (Monday–Friday). Immutable after INSERT.")
     status: Status = Status.ACTIVE
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateKitchenDayCreateResponseSchema(BaseModel):
-    """Response schema for POST /plate-kitchen-days.
+class ViandaKitchenDayCreateResponseSchema(BaseModel):
+    """Response schema for POST /vianda-kitchen-days.
 
     Wraps the list of created records plus an optional ``restaurant_activated``
     envelope that is populated when lazy activation fires for the restaurant.
@@ -1499,22 +1502,22 @@ class PlateKitchenDayCreateResponseSchema(BaseModel):
     activation did not fire) so clients can reliably check the field.
     """
 
-    items: list[PlateKitchenDayResponseSchema]
+    items: list[ViandaKitchenDayResponseSchema]
     restaurant_activated: RestaurantActivatedSchema | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateKitchenDayEnrichedResponseSchema(BaseModel):
-    """Schema for enriched plate kitchen day response data with institution, restaurant, plate, and product details"""
+class ViandaKitchenDayEnrichedResponseSchema(BaseModel):
+    """Schema for enriched vianda kitchen day response data with institution, restaurant, vianda, and product details"""
 
-    plate_kitchen_day_id: UUID
-    plate_id: UUID
+    vianda_kitchen_day_id: UUID
+    vianda_id: UUID
     kitchen_day: KitchenDay
     status: Status
     institution_name: str
     restaurant_name: str
-    plate_name: str  # Actually from product_info.name
+    vianda_name: str  # Actually from product_info.name
     dietary: list[DietaryFlag] | None  # From product_info.dietary
     is_archived: bool
     created_date: datetime
@@ -1524,15 +1527,15 @@ class PlateKitchenDayEnrichedResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateReviewCreateSchema(BaseModel):
-    """Schema for creating a plate review. One review per pickup; immutable after creation."""
+class ViandaReviewCreateSchema(BaseModel):
+    """Schema for creating a vianda review. One review per pickup; immutable after creation."""
 
-    plate_pickup_id: UUID = Field(
+    vianda_pickup_id: UUID = Field(
         ..., description="The pickup being reviewed; must be completed (was_collected=true) and belong to the user"
     )
     stars_rating: int = Field(..., ge=1, le=5, description="Star rating 1-5")
     portion_size_rating: int = Field(..., ge=1, le=3, description="Portion size rating 1-3")
-    would_order_again: bool | None = Field(None, description="Would order this plate again")
+    would_order_again: bool | None = Field(None, description="Would order this vianda again")
     comment: str | None = Field(
         None, max_length=500, description="Optional text feedback for the restaurant (max 500 chars)"
     )
@@ -1540,13 +1543,13 @@ class PlateReviewCreateSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PlateReviewResponseSchema(BaseModel):
-    """Schema for plate review response data"""
+class ViandaReviewResponseSchema(BaseModel):
+    """Schema for vianda review response data"""
 
-    plate_review_id: UUID
+    vianda_review_id: UUID
     user_id: UUID
-    plate_id: UUID
-    plate_pickup_id: UUID
+    vianda_id: UUID
+    vianda_pickup_id: UUID
     stars_rating: int
     portion_size_rating: int
     would_order_again: bool | None = None
@@ -1591,12 +1594,12 @@ class NotificationAcknowledgeSchema(BaseModel):
     action_taken: str = Field(..., pattern=r"^(dismissed|opened|completed)$")
 
 
-class PlateReviewEnrichedResponseSchema(BaseModel):
-    """Supplier-facing enriched plate review — no customer PII."""
+class ViandaReviewEnrichedResponseSchema(BaseModel):
+    """Supplier-facing enriched vianda review — no customer PII."""
 
-    plate_review_id: UUID
-    plate_id: UUID
-    plate_name: str
+    vianda_review_id: UUID
+    vianda_id: UUID
+    vianda_name: str
     restaurant_name: str
     stars_rating: int
     portion_size_rating: int
@@ -1610,7 +1613,7 @@ class PlateReviewEnrichedResponseSchema(BaseModel):
 class PortionComplaintCreateSchema(BaseModel):
     """Schema for filing a portion complaint after rating portion size as 1."""
 
-    plate_pickup_id: UUID = Field(..., description="The pickup being complained about")
+    vianda_pickup_id: UUID = Field(..., description="The pickup being complained about")
     complaint_text: str | None = Field(None, max_length=1000, description="Details about the portion issue")
 
     model_config = ConfigDict(from_attributes=True)
@@ -1620,8 +1623,8 @@ class PortionComplaintResponseSchema(BaseModel):
     """Schema for portion complaint response."""
 
     complaint_id: UUID
-    plate_pickup_id: UUID
-    plate_review_id: UUID | None = None
+    vianda_pickup_id: UUID
+    vianda_review_id: UUID | None = None
     restaurant_id: UUID
     photo_storage_path: str | None = None
     complaint_text: str | None = None
@@ -1632,10 +1635,10 @@ class PortionComplaintResponseSchema(BaseModel):
 
 
 class FavoriteCreateSchema(BaseModel):
-    """Schema for adding a favorite. entity_type is 'plate' or 'restaurant'; entity_id is the plate_id or restaurant_id."""
+    """Schema for adding a favorite. entity_type is 'vianda' or 'restaurant'; entity_id is the vianda_id or restaurant_id."""
 
-    entity_type: FavoriteEntityType = Field(..., description="Type of entity to favorite: plate or restaurant")
-    entity_id: UUID = Field(..., description="plate_id or restaurant_id")
+    entity_type: FavoriteEntityType = Field(..., description="Type of entity to favorite: vianda or restaurant")
+    entity_id: UUID = Field(..., description="vianda_id or restaurant_id")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1655,7 +1658,7 @@ class FavoriteResponseSchema(BaseModel):
 class FavoriteIdsResponseSchema(BaseModel):
     """Lightweight response with favorite IDs for client sorting/highlighting"""
 
-    plate_ids: list[UUID] = Field(default_factory=list, description="Plate IDs the user has favorited")
+    vianda_ids: list[UUID] = Field(default_factory=list, description="Vianda IDs the user has favorited")
     restaurant_ids: list[UUID] = Field(default_factory=list, description="Restaurant IDs the user has favorited")
 
 
@@ -2437,7 +2440,7 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     address_id: UUID
     # filter-registry:exempt reason="enriched join field; country_code is registered instead"
     country_name: str
-    # filter-registry:exempt reason="enriched join field; address join country; not registered for plate-level filtering"
+    # filter-registry:exempt reason="enriched join field; address join country; not registered for vianda-level filtering"
     country_code: str
     # filter-registry:exempt reason="enriched join field; address subfield, not independently filterable"
     province: str
@@ -2450,7 +2453,7 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     # filter-registry:exempt reason="enriched join field; market dimension, not a restaurant filter"
     market_credit_value_supplier_local: MoneyDecimal = Field(  # serialises as JSON number; see app/schemas/types.py
         ...,
-        description="Supplier credit value in local currency for this market (credit_value_supplier_local); use for live calculation of expected_payout_local_currency when creating plates (credit × market_credit_value_supplier_local)",
+        description="Supplier credit value in local currency for this market (credit_value_supplier_local); use for live calculation of expected_payout_local_currency when creating viandas (credit × market_credit_value_supplier_local)",
     )
     # filter-registry:exempt reason="free-text label; use search filter instead"
     name: str
@@ -2496,7 +2499,7 @@ class RestaurantEnrichedResponseSchema(BaseModel):
         None,
         description=(
             "Computed at read time. True when the restaurant meets all activation prerequisites: "
-            "status='active', not archived, ≥1 active plate_kitchen_days, active QR code. "
+            "status='active', not archived, ≥1 active vianda_kitchen_days, active QR code. "
             "Admin-facing endpoints compute this field; public/B2C endpoints do not."
         ),
     )
@@ -2504,7 +2507,7 @@ class RestaurantEnrichedResponseSchema(BaseModel):
     missing: list[str] | None = Field(
         None,
         description=(
-            "Subset of ['status_active', 'not_archived', 'plate_kitchen_days', 'qr'] listing "
+            "Subset of ['status_active', 'not_archived', 'vianda_kitchen_days', 'qr'] listing "
             "unmet prerequisites. Empty list when is_ready_for_signup is True."
         ),
     )
@@ -2558,7 +2561,7 @@ class RestaurantTransactionResponseSchema(BaseModel):
 
     transaction_id: UUID
     restaurant_id: UUID
-    plate_selection_id: UUID | None
+    vianda_selection_id: UUID | None
     discretionary_id: UUID | None
     currency_metadata_id: UUID
     was_collected: bool
@@ -2582,7 +2585,7 @@ class RestaurantTransactionResponseSchema(BaseModel):
 
 
 class RestaurantTransactionEnrichedResponseSchema(BaseModel):
-    """Schema for enriched restaurant transaction response data with institution, entity, restaurant, plate, and address details (read-only)"""
+    """Schema for enriched restaurant transaction response data with institution, entity, restaurant, vianda, and address details (read-only)"""
 
     transaction_id: UUID
     restaurant_id: UUID
@@ -2591,8 +2594,8 @@ class RestaurantTransactionEnrichedResponseSchema(BaseModel):
     institution_entity_id: UUID
     institution_entity_name: str
     restaurant_name: str
-    plate_selection_id: UUID | None
-    plate_name: str | None  # Optional because plate_selection_id can be NULL for discretionary transactions
+    vianda_selection_id: UUID | None
+    vianda_name: str | None  # Optional because vianda_selection_id can be NULL for discretionary transactions
     discretionary_id: UUID | None
     currency_metadata_id: UUID
     currency_code: str | None
@@ -2672,16 +2675,16 @@ class QRCodePrintContextSchema(BaseModel):
 
 
 # =============================================================================
-# 5. PLATE SELECTION & PICKUP SCHEMAS
+# 5. VIANDA SELECTION & PICKUP SCHEMAS
 
 
-class PlatePickupEnrichedResponseSchema(BaseModel):
-    """Schema for enriched plate pickup response data with restaurant, address, product, and credit information"""
+class ViandaPickupEnrichedResponseSchema(BaseModel):
+    """Schema for enriched vianda pickup response data with restaurant, address, product, and credit information"""
 
     # filter-registry:exempt reason="primary key"
-    plate_pickup_id: UUID
+    vianda_pickup_id: UUID
     # filter-registry:exempt reason="FK; not a filter dimension"
-    plate_selection_id: UUID
+    vianda_selection_id: UUID
     # filter-registry:exempt reason="auth-scoped via JWT; not a user-input filter"
     user_id: UUID
     restaurant_id: UUID
@@ -2697,7 +2700,7 @@ class PlatePickupEnrichedResponseSchema(BaseModel):
     postal_code: str
     # filter-registry:exempt reason="computed display string"
     address_display: str | None = None
-    plate_id: UUID
+    vianda_id: UUID
     # filter-registry:exempt reason="free-text label"
     product_name: str
     # filter-registry:exempt reason="range-bound; use credit_from / credit_to filter params"
@@ -2729,10 +2732,10 @@ class PlatePickupEnrichedResponseSchema(BaseModel):
 # =============================================================================
 
 
-class PlateSelectionCreateSchema(BaseModel):
-    """Schema for creating a new plate selection"""
+class ViandaSelectionCreateSchema(BaseModel):
+    """Schema for creating a new vianda selection"""
 
-    plate_id: UUID
+    vianda_id: UUID
     restaurant_id: UUID
     product_id: UUID
     qr_code_id: UUID
@@ -2745,10 +2748,10 @@ class PlateSelectionCreateSchema(BaseModel):
     flexible_on_time: bool | None = Field(None, description="Only when pickup_intent=request; ±30 min flexibility")
 
 
-class PlateSelectionUpdateSchema(BaseModel):
-    """Schema for updating plate selection information"""
+class ViandaSelectionUpdateSchema(BaseModel):
+    """Schema for updating vianda selection information"""
 
-    plate_id: UUID | None = None
+    vianda_id: UUID | None = None
     restaurant_id: UUID | None = None
     product_id: UUID | None = None
     qr_code_id: UUID | None = None
@@ -2760,12 +2763,12 @@ class PlateSelectionUpdateSchema(BaseModel):
     cancel: bool | None = Field(None, description="If true, cancel selection and refund credits")
 
 
-class PlateSelectionResponseSchema(BaseModel):
-    """Schema for plate selection response data"""
+class ViandaSelectionResponseSchema(BaseModel):
+    """Schema for vianda selection response data"""
 
-    plate_selection_id: UUID
+    vianda_selection_id: UUID
     user_id: UUID
-    plate_id: UUID
+    vianda_id: UUID
     restaurant_id: UUID
     product_id: UUID
     qr_code_id: UUID
@@ -2779,23 +2782,25 @@ class PlateSelectionResponseSchema(BaseModel):
     status: Status
     created_date: datetime
     modified_date: datetime
-    plate_pickup_id: UUID | None = Field(None, description="Present on create; use for Complete order and plate review")
+    vianda_pickup_id: UUID | None = Field(
+        None, description="Present on create; use for Complete order and vianda review"
+    )
     editable_until: datetime | None = Field(None, description="Cutoff for edits; 1 hour before kitchen day opens")
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class DuplicateKitchenDayDetail(BaseModel):
-    """Structured 409 response when user tries to reserve a second plate for same kitchen day"""
+    """Structured 409 response when user tries to reserve a second vianda for same kitchen day"""
 
     code: Literal["DUPLICATE_KITCHEN_DAY"]
     kitchen_day: str
-    existing_plate_selection_id: str  # UUID string
+    existing_vianda_selection_id: str  # UUID string
     message: str
 
 
 class NotifyCoworkersRequest(BaseModel):
-    """Request body for POST /plate-selections/{id}/notify-coworkers"""
+    """Request body for POST /vianda-selections/{id}/notify-coworkers"""
 
     user_ids: list[UUID] = Field(..., description="List of coworker user_ids to notify")
 
@@ -2813,11 +2818,11 @@ class CoworkerEligibilityItem(BaseModel):
 
 
 class CoworkerEligibilityResponse(RootModel[list[CoworkerEligibilityItem]]):
-    """Response for GET /plate-selections/{id}/coworkers - list of coworkers with eligibility"""
+    """Response for GET /vianda-selections/{id}/coworkers - list of coworkers with eligibility"""
 
 
 class NotifyCoworkersResponse(BaseModel):
-    """Response for POST /plate-selections/{id}/notify-coworkers"""
+    """Response for POST /vianda-selections/{id}/notify-coworkers"""
 
     notified_count: int
 
@@ -3406,11 +3411,11 @@ class NationalHolidaySyncFromProviderSchema(BaseModel):
 class DailyOrderItemSchema(BaseModel):
     """Schema for a single order item in daily orders / kiosk view"""
 
-    plate_pickup_id: UUID | None = Field(
-        None, description="Pickup ID for POST /plate-pickup/{id}/hand-out or /complete"
+    vianda_pickup_id: UUID | None = Field(
+        None, description="Pickup ID for POST /vianda-pickup/{id}/hand-out or /complete"
     )
     customer_name: str = Field(..., description="Privacy-safe customer initials (M.G.)")
-    plate_name: str = Field(..., description="Name of the plate ordered")
+    vianda_name: str = Field(..., description="Name of the vianda ordered")
     confirmation_code: str | None = Field(None, description="6-digit numeric confirmation code for kiosk verification")
     status: str = Field(..., description="Order status: Pending, Arrived, Handed Out, Completed, Cancelled")
     arrival_time: datetime | None = Field(None, description="When customer scanned QR")
@@ -3420,7 +3425,7 @@ class DailyOrderItemSchema(BaseModel):
     completion_time: datetime | None = Field(None, description="When order was completed")
     countdown_seconds: int = Field(300, description="Configured pickup countdown duration")
     extensions_used: int = Field(0, description="Timer extensions used by customer")
-    was_collected: bool = Field(False, description="Whether plate was actually picked up")
+    was_collected: bool = Field(False, description="Whether vianda was actually picked up")
     pickup_time_range: str = Field(..., description="Expected pickup time range (HH:MM-HH:MM)")
     kitchen_day: str = Field(..., description="Kitchen day for the order")
     pickup_type: str | None = Field(None, description="self / offer / request — from pickup preferences")
@@ -3483,10 +3488,10 @@ class VerifyAndHandoffRequest(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class VerifyCodePlateSchema(BaseModel):
-    """Plate info in verify-and-handoff response"""
+class VerifyCodeViandaSchema(BaseModel):
+    """Vianda info in verify-and-handoff response"""
 
-    plate_name: str
+    vianda_name: str
     quantity: int
 
     model_config = ConfigDict(from_attributes=True)
@@ -3497,8 +3502,8 @@ class VerifyAndHandoffResponse(BaseModel):
 
     match: bool = Field(..., description="Whether a matching order was found")
     customer_initials: str | None = Field(None, description="Customer initials (M.G.)")
-    plate_pickup_ids: list[UUID] | None = Field(None, description="Matched pickup IDs")
-    plates: list[VerifyCodePlateSchema] | None = Field(None, description="Plates in this order")
+    vianda_pickup_ids: list[UUID] | None = Field(None, description="Matched pickup IDs")
+    viandas: list[VerifyCodeViandaSchema] | None = Field(None, description="Viandas in this order")
     status: str | None = Field(None, description="New status after handoff (Handed Out)")
     arrival_time: datetime | None = Field(None, description="When customer scanned QR")
     expected_completion_time: datetime | None = Field(None, description="Pickup deadline")
@@ -3580,7 +3585,7 @@ class MarketResponseSchema(BaseModel):
         None,
         description=(
             "Computed at read time. True when market.status='active' AND the market has at least one "
-            "active restaurant with active plate_kitchen_days and an active QR code. "
+            "active restaurant with active vianda_kitchen_days and an active QR code. "
             "Null on plain (non-enriched) endpoints that do not compute this field. "
             "Do not add a DB column or constraint — the readiness rules may evolve."
         ),
@@ -3803,7 +3808,7 @@ class MarketPublicMinimalSchema(BaseModel):
     )
     has_active_kitchens: bool = Field(
         ...,
-        description="True when this market has at least one active institution → restaurant → plate → plate_kitchen_days chain. Use to gate subscribable markets on the marketing site.",
+        description="True when this market has at least one active institution → restaurant → vianda → vianda_kitchen_days chain. Use to gate subscribable markets on the marketing site.",
     )
 
     @computed_field
@@ -3928,7 +3933,7 @@ class MarketUpdateSchema(BaseModel):
         False,
         description=(
             "Second-confirm flag for setting status='inactive' on a market that currently has active "
-            "plate coverage. Required (must be True) for that specific case; ignored otherwise. "
+            "vianda coverage. Required (must be True) for that specific case; ignored otherwise. "
             "Prevents accidental customer-facing takedowns."
         ),
     )
@@ -4179,7 +4184,7 @@ class LeadsCityWithCountSchema(BaseModel):
     """Single city entry for GET /api/v1/leads/cities?mode=coverage (vianda-home marketing site)."""
 
     city: str = Field(..., description="City display name")
-    restaurant_count: int = Field(..., ge=0, description="Active restaurants with plate coverage in this city")
+    restaurant_count: int = Field(..., ge=0, description="Active restaurants with vianda coverage in this city")
 
 
 class LeadsCitiesResponseSchema(BaseModel):

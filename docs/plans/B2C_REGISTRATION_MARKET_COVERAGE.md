@@ -11,7 +11,7 @@ Two B2C customer acquisition paths exist:
 
 1. **Marketing site → App.** User visits vianda.market, checks coverage (city metrics), submits interest or goes to the app. This path works because the marketing site already gates on coverage.
 
-2. **App Store → App directly.** User finds the app on Google Play/App Store, downloads, registers. **This path is problematic** — the user can register for a market (e.g. Chile) where we have zero restaurants or active plates. They submit email + password, then discover there's nothing to order. They feel tricked.
+2. **App Store → App directly.** User finds the app on Google Play/App Store, downloads, registers. **This path is problematic** — the user can register for a market (e.g. Chile) where we have zero restaurants or active viandas. They submit email + password, then discover there's nothing to order. They feel tricked.
 
 ---
 
@@ -21,8 +21,8 @@ Two B2C customer acquisition paths exist:
 
 Replace the current registration form with:
 
-1. **Country dropdown** — only shows countries where we have active plates
-2. **City dropdown** — only shows cities within that country where we have active plates
+1. **Country dropdown** — only shows countries where we have active viandas
+2. **City dropdown** — only shows cities within that country where we have active viandas
 3. **Email + password** — standard fields
 
 The user sees immediately whether their area is served. If their country isn't listed, they know before submitting any personal data. No "check coverage" step needed — the dropdown *is* the coverage check.
@@ -31,12 +31,12 @@ The user sees immediately whether their area is served. If their country isn't l
 
 | Consumer | Endpoint | Behavior |
 |----------|----------|----------|
-| **Customer-facing** (B2C app, marketing site) | `GET /leads/markets` | Only markets with active plates (product + kitchen_day published) |
-| **Supplier-facing** (B2B platform) | `GET /markets` or `GET /markets/enriched` | All active markets (suppliers must register everywhere, including markets with no plates yet) |
+| **Customer-facing** (B2C app, marketing site) | `GET /leads/markets` | Only markets with active viandas (product + kitchen_day published) |
+| **Supplier-facing** (B2B platform) | `GET /markets` or `GET /markets/enriched` | All active markets (suppliers must register everywhere, including markets with no viandas yet) |
 
 ### C. App Store distribution
 
-Optional but complementary: list served countries in the Google Play / App Store description, or restrict distribution to countries with active plates. This is an operations decision, not a backend one.
+Optional but complementary: list served countries in the Google Play / App Store description, or restrict distribution to countries with active viandas. This is an operations decision, not a backend one.
 
 ---
 
@@ -44,13 +44,13 @@ Optional but complementary: list served countries in the Google Play / App Store
 
 ### What `GET /leads/markets` returns today
 
-Active, non-archived markets excluding the Global Marketplace (`leads.py:62-83`). Today that means all 6 country markets: AR, PE, US, CL, MX, BR — regardless of whether any of them have restaurants, plates, or kitchen days.
+Active, non-archived markets excluding the Global Marketplace (`leads.py:62-83`). Today that means all 6 country markets: AR, PE, US, CL, MX, BR — regardless of whether any of them have restaurants, viandas, or kitchen days.
 
 **The gap:** A market can be `Active` in `market_info` with zero operational presence. The leads endpoint doesn't check for actual coverage.
 
 ### What `GET /leads/cities` returns today
 
-Cities where at least one restaurant exists with an address in that city (`city_metrics_service.py:get_cities_with_coverage`). This **already** filters by active restaurants + active plates + active kitchen days. So the city dropdown is already coverage-aware.
+Cities where at least one restaurant exists with an address in that city (`city_metrics_service.py:get_cities_with_coverage`). This **already** filters by active restaurants + active viandas + active kitchen days. So the city dropdown is already coverage-aware.
 
 **The gap is at the country level only.** If we add the same coverage check to `GET /leads/markets`, both dropdowns are gated on actual operational presence.
 
@@ -62,7 +62,7 @@ Already excluded from `GET /leads/markets` (line 78: `if not is_global_market(..
 
 ## Implementation Approach
 
-### Option 1: Filter markets by plate coverage (recommended)
+### Option 1: Filter markets by vianda coverage (recommended)
 
 Add a SQL subquery to `_get_available_markets_cached()` that checks:
 
@@ -74,8 +74,8 @@ WHERE m.status = 'Active' AND m.is_archived = FALSE
   AND m.market_id != '00000000-0000-0000-0000-000000000001'::uuid  -- exclude Global
   AND EXISTS (
       SELECT 1
-      FROM ops.plate_kitchen_days pkd
-      JOIN ops.plate_info p ON pkd.plate_id = p.plate_id
+      FROM ops.vianda_kitchen_days pkd
+      JOIN ops.vianda_info p ON pkd.vianda_id = p.vianda_id
       JOIN ops.restaurant_info r ON p.restaurant_id = r.restaurant_id
       JOIN core.institution_info i ON r.institution_id = i.institution_id
       WHERE i.market_id = m.market_id
@@ -87,10 +87,10 @@ WHERE m.status = 'Active' AND m.is_archived = FALSE
 ORDER BY m.country_name
 ```
 
-This checks: market has at least one institution → restaurant → plate → kitchen_day, all active and non-archived. This is the same bar as the existing `get_cities_with_coverage` logic, just at the market level.
+This checks: market has at least one institution → restaurant → vianda → kitchen_day, all active and non-archived. This is the same bar as the existing `get_cities_with_coverage` logic, just at the market level.
 
 **Where to put this:**
-- New function in `market_service.py`: `get_markets_with_coverage(db)` — returns markets that have active plates with kitchen days
+- New function in `market_service.py`: `get_markets_with_coverage(db)` — returns markets that have active viandas with kitchen days
 - Replace the `market_service.get_all()` + Python filter in `_get_available_markets_cached()` with the new function
 - The 10-minute cache stays (coverage doesn't change minute-to-minute)
 
@@ -113,7 +113,7 @@ Same `MarketPublicMinimalSchema` response shape for both. Two separate cache ent
 
 ### Option 2: Add a `has_coverage` flag to `market_info`
 
-Add `has_plate_coverage BOOLEAN DEFAULT FALSE` to `market_info`, maintained by a cron or trigger.
+Add `has_vianda_coverage BOOLEAN DEFAULT FALSE` to `market_info`, maintained by a cron or trigger.
 
 **Rejected:** Adds complexity (sync logic, stale flag risk) for something a simple JOIN handles. The query in Option 1 is fast (small table count) and the result is cached 10 minutes. Not worth the maintenance burden.
 
@@ -180,7 +180,7 @@ This ensures no dead end: users who downloaded the app directly from the store a
 
 2. **Marketing site supplier/employer interest form.** Uses `GET /leads/markets?audience=supplier` to show all countries. Customer flow on marketing site uses the default (no param) — same as B2C app.
 
-3. **Strictness bar.** Require `plate_kitchen_days` (fully operational). A market with restaurants but no published plates is not yet serving customers. Better to surprise with availability than disappoint with none.
+3. **Strictness bar.** Require `vianda_kitchen_days` (fully operational). A market with restaurants but no published viandas is not yet serving customers. Better to surprise with availability than disappoint with none.
 
 ## Open Questions
 

@@ -650,8 +650,8 @@ AFTER INSERT OR UPDATE ON ops.image_asset
 FOR EACH ROW
 EXECUTE FUNCTION image_asset_history_trigger_func();
 
--- Before insert/update on ops.plate_info: set expected_payout_local_currency = credit * credit_value_supplier_local
-CREATE OR REPLACE FUNCTION plate_info_set_expected_payout_local_currency_func()
+-- Before insert/update on ops.vianda_info: set expected_payout_local_currency = credit * credit_value_supplier_local
+CREATE OR REPLACE FUNCTION vianda_info_set_expected_payout_local_currency_func()
 RETURNS TRIGGER AS $$
 DECLARE
     cv NUMERIC;
@@ -666,29 +666,29 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS plate_info_set_expected_payout_local_currency_trigger ON ops.plate_info;
-CREATE TRIGGER plate_info_set_expected_payout_local_currency_trigger
-BEFORE INSERT OR UPDATE ON ops.plate_info
+DROP TRIGGER IF EXISTS vianda_info_set_expected_payout_local_currency_trigger ON ops.vianda_info;
+CREATE TRIGGER vianda_info_set_expected_payout_local_currency_trigger
+BEFORE INSERT OR UPDATE ON ops.vianda_info
 FOR EACH ROW
-EXECUTE FUNCTION plate_info_set_expected_payout_local_currency_func();
+EXECUTE FUNCTION vianda_info_set_expected_payout_local_currency_func();
 
--- Trigger function for ops.plate_info history logging
-CREATE OR REPLACE FUNCTION plate_history_trigger_func()
+-- Trigger function for ops.vianda_info history logging
+CREATE OR REPLACE FUNCTION vianda_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
     new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
-        -- Mark the previous history record for this plate as not current
-        UPDATE audit.plate_history
+        -- Mark the previous history record for this vianda as not current
+        UPDATE audit.vianda_history
         SET is_current = FALSE,
             valid_until = CURRENT_TIMESTAMP
-        WHERE plate_id = OLD.plate_id AND is_current = TRUE;
+        WHERE vianda_id = OLD.vianda_id AND is_current = TRUE;
     END IF;
 
-    INSERT INTO audit.plate_history (
+    INSERT INTO audit.vianda_history (
         event_id,
-        plate_id,
+        vianda_id,
         product_id,
         restaurant_id,
         price,
@@ -705,7 +705,7 @@ BEGIN
     )
     VALUES (
         new_event_id,
-        NEW.plate_id,
+        NEW.vianda_id,
         NEW.product_id,
         NEW.restaurant_id,
         NEW.price,
@@ -725,15 +725,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create the trigger on ops.plate_info
-DROP TRIGGER IF EXISTS plate_history_trigger ON ops.plate_info;
-CREATE TRIGGER plate_history_trigger
-AFTER INSERT OR UPDATE ON ops.plate_info
+-- Create the trigger on ops.vianda_info
+DROP TRIGGER IF EXISTS vianda_history_trigger ON ops.vianda_info;
+CREATE TRIGGER vianda_history_trigger
+AFTER INSERT OR UPDATE ON ops.vianda_info
 FOR EACH ROW
-EXECUTE FUNCTION plate_history_trigger_func();
+EXECUTE FUNCTION vianda_history_trigger_func();
 
--- Trigger function for billing.client_transaction from plate_selection event
-CREATE OR REPLACE FUNCTION log_plate_selection_txn()
+-- Trigger function for billing.client_transaction from vianda_selection event
+CREATE OR REPLACE FUNCTION log_vianda_selection_txn()
   RETURNS TRIGGER
   SECURITY DEFINER               -- run with the trigger owner’s privileges
 AS $$
@@ -741,7 +741,7 @@ BEGIN
   INSERT INTO billing.client_transaction (
     user_id,
     source,
-    plate_selection_id,
+    vianda_selection_id,
     credit,
     is_archived,
     status,
@@ -750,8 +750,8 @@ BEGIN
   )
   VALUES (
     NEW.user_id,
-    'plate_selection',
-    NEW.plate_selection_id,
+    'vianda_selection',
+    NEW.vianda_selection_id,
     -NEW.credit,
     FALSE,                       -- mirror the default
     'active',                    -- mirror the default
@@ -762,32 +762,32 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_plate_selection_ct ON customer.plate_selection_info;
+DROP TRIGGER IF EXISTS trg_vianda_selection_ct ON customer.vianda_selection_info;
 
-CREATE TRIGGER trg_plate_selection_ct
-  AFTER INSERT ON customer.plate_selection_info
+CREATE TRIGGER trg_vianda_selection_ct
+  AFTER INSERT ON customer.vianda_selection_info
   FOR EACH ROW
   WHEN (NEW.status = 'active')  -- guard clause
-  EXECUTE FUNCTION log_plate_selection_txn();
+  EXECUTE FUNCTION log_vianda_selection_txn();
 
--- Trigger function for customer.plate_selection_info history logging
-CREATE OR REPLACE FUNCTION plate_selection_history_trigger_func()
+-- Trigger function for customer.vianda_selection_info history logging
+CREATE OR REPLACE FUNCTION vianda_selection_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
     new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
-        UPDATE audit.plate_selection_history
+        UPDATE audit.vianda_selection_history
         SET is_current = FALSE,
             valid_until = CURRENT_TIMESTAMP
-        WHERE plate_selection_id = OLD.plate_selection_id AND is_current = TRUE;
+        WHERE vianda_selection_id = OLD.vianda_selection_id AND is_current = TRUE;
     END IF;
 
-    INSERT INTO audit.plate_selection_history (
+    INSERT INTO audit.vianda_selection_history (
         event_id,
-        plate_selection_id,
+        vianda_selection_id,
         user_id,
-        plate_id,
+        vianda_id,
         restaurant_id,
         product_id,
         qr_code_id,
@@ -808,9 +808,9 @@ BEGIN
     )
     VALUES (
         new_event_id,
-        NEW.plate_selection_id,
+        NEW.vianda_selection_id,
         NEW.user_id,
-        NEW.plate_id,
+        NEW.vianda_id,
         NEW.restaurant_id,
         NEW.product_id,
         NEW.qr_code_id,
@@ -834,11 +834,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS plate_selection_history_trigger ON customer.plate_selection_info;
-CREATE TRIGGER plate_selection_history_trigger
-AFTER INSERT OR UPDATE ON customer.plate_selection_info
+DROP TRIGGER IF EXISTS vianda_selection_history_trigger ON customer.vianda_selection_info;
+CREATE TRIGGER vianda_selection_history_trigger
+AFTER INSERT OR UPDATE ON customer.vianda_selection_info
 FOR EACH ROW
-EXECUTE FUNCTION plate_selection_history_trigger_func();
+EXECUTE FUNCTION vianda_selection_history_trigger_func();
 
 -- Before insert/update on customer.plan_info: set credit_cost_local_currency and credit_cost_usd
 CREATE OR REPLACE FUNCTION plan_info_set_credit_cost_func()
@@ -1384,11 +1384,11 @@ AFTER INSERT OR UPDATE ON billing.supplier_invoice
 FOR EACH ROW
 EXECUTE FUNCTION supplier_invoice_history_trigger_func();
 
--- credit_currency_history_trigger and credit_currency_refresh_plate_payouts_trigger retired
+-- credit_currency_history_trigger and credit_currency_refresh_vianda_payouts_trigger retired
 -- along with core.credit_currency_info. Currency is now a two-tier split
 -- (external.iso4217_currency raw + core.currency_metadata policy); metadata history
 -- is logged by currency_metadata_history_trigger_func further below.
--- Plate-payout refresh on currency-rate change is a backlog service-layer concern.
+-- Vianda-payout refresh on currency-rate change is a backlog service-layer concern.
 
 -- Trigger function for core.market_info history logging
 CREATE OR REPLACE FUNCTION market_history_trigger_func()
@@ -1534,8 +1534,8 @@ AFTER INSERT OR UPDATE OR DELETE ON ops.restaurant_holidays
 FOR EACH ROW
 EXECUTE FUNCTION restaurant_holidays_history_trigger_func();
 
--- Trigger function for ops.plate_kitchen_days history logging
-CREATE OR REPLACE FUNCTION plate_kitchen_days_history_trigger_func()
+-- Trigger function for ops.vianda_kitchen_days history logging
+CREATE OR REPLACE FUNCTION vianda_kitchen_days_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
     v_operation audit_operation_enum;
@@ -1554,16 +1554,16 @@ BEGIN
 
     -- Mark previous records as not current
     IF TG_OP = 'UPDATE' THEN
-        UPDATE audit.plate_kitchen_days_history
+        UPDATE audit.vianda_kitchen_days_history
         SET is_current = FALSE,
             valid_until = CURRENT_TIMESTAMP
-        WHERE plate_kitchen_day_id = OLD.plate_kitchen_day_id AND is_current = TRUE;
+        WHERE vianda_kitchen_day_id = OLD.vianda_kitchen_day_id AND is_current = TRUE;
     END IF;
 
-    INSERT INTO audit.plate_kitchen_days_history (
+    INSERT INTO audit.vianda_kitchen_days_history (
         event_id,
-        plate_kitchen_day_id,
-        plate_id,
+        vianda_kitchen_day_id,
+        vianda_id,
         kitchen_day,
         status,
         is_archived,
@@ -1576,8 +1576,8 @@ BEGIN
         valid_until
     ) VALUES (
         uuidv7(),
-        COALESCE(NEW.plate_kitchen_day_id, OLD.plate_kitchen_day_id),
-        COALESCE(NEW.plate_id, OLD.plate_id),
+        COALESCE(NEW.vianda_kitchen_day_id, OLD.vianda_kitchen_day_id),
+        COALESCE(NEW.vianda_id, OLD.vianda_id),
         COALESCE(NEW.kitchen_day, OLD.kitchen_day),
         COALESCE(NEW.status, OLD.status),
         COALESCE(NEW.is_archived, OLD.is_archived),
@@ -1598,14 +1598,14 @@ END IF;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS plate_kitchen_days_history_trigger ON ops.plate_kitchen_days;
-CREATE TRIGGER plate_kitchen_days_history_trigger
-AFTER INSERT OR UPDATE OR DELETE ON ops.plate_kitchen_days
+DROP TRIGGER IF EXISTS vianda_kitchen_days_history_trigger ON ops.vianda_kitchen_days;
+CREATE TRIGGER vianda_kitchen_days_history_trigger
+AFTER INSERT OR UPDATE OR DELETE ON ops.vianda_kitchen_days
 FOR EACH ROW
-EXECUTE FUNCTION plate_kitchen_days_history_trigger_func();
+EXECUTE FUNCTION vianda_kitchen_days_history_trigger_func();
 
--- Auto-deactivate restaurant when all its ops.plate_kitchen_days become inactive (archived or deleted)
-CREATE OR REPLACE FUNCTION restaurant_auto_deactivate_when_no_plate_kitchen_days()
+-- Auto-deactivate restaurant when all its ops.vianda_kitchen_days become inactive (archived or deleted)
+CREATE OR REPLACE FUNCTION restaurant_auto_deactivate_when_no_vianda_kitchen_days()
 RETURNS TRIGGER AS $$
 DECLARE
     v_restaurant_id UUID;
@@ -1624,16 +1624,16 @@ BEGIN
     END IF;
 
     SELECT p.restaurant_id INTO v_restaurant_id
-    FROM ops.plate_info p
-    WHERE p.plate_id = COALESCE(OLD.plate_id, NEW.plate_id);
+    FROM ops.vianda_info p
+    WHERE p.vianda_id = COALESCE(OLD.vianda_id, NEW.vianda_id);
 
     IF v_restaurant_id IS NULL THEN
         RETURN COALESCE(NEW, OLD);
     END IF;
 
     SELECT COUNT(*) INTO v_active_count
-    FROM ops.plate_info p
-    INNER JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'::status_enum
+    FROM ops.vianda_info p
+    INNER JOIN ops.vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.is_archived = FALSE AND pkd.status = 'active'::status_enum
     WHERE p.restaurant_id = v_restaurant_id AND p.is_archived = FALSE;
 
     IF v_active_count = 0 THEN
@@ -1647,11 +1647,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS restaurant_auto_deactivate_on_plate_kitchen_days ON ops.plate_kitchen_days;
-CREATE TRIGGER restaurant_auto_deactivate_on_plate_kitchen_days
-AFTER UPDATE OR DELETE ON ops.plate_kitchen_days
+DROP TRIGGER IF EXISTS restaurant_auto_deactivate_on_vianda_kitchen_days ON ops.vianda_kitchen_days;
+CREATE TRIGGER restaurant_auto_deactivate_on_vianda_kitchen_days
+AFTER UPDATE OR DELETE ON ops.vianda_kitchen_days
 FOR EACH ROW
-EXECUTE FUNCTION restaurant_auto_deactivate_when_no_plate_kitchen_days();
+EXECUTE FUNCTION restaurant_auto_deactivate_when_no_vianda_kitchen_days();
 
 -- Auto-deactivate restaurant when all its active QR codes are removed (archived, deleted, or set to Inactive)
 CREATE OR REPLACE FUNCTION restaurant_auto_deactivate_when_no_active_qr_code()
@@ -2457,26 +2457,26 @@ AFTER INSERT OR UPDATE ON core.workplace_group
 FOR EACH ROW
 EXECUTE FUNCTION workplace_group_history_trigger_func();
 
--- Trigger function for customer.plate_pickup_live history logging
-CREATE OR REPLACE FUNCTION plate_pickup_live_history_trigger_func()
+-- Trigger function for customer.vianda_pickup_live history logging
+CREATE OR REPLACE FUNCTION vianda_pickup_live_history_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
     new_event_id UUID := uuidv7();
 BEGIN
     IF (TG_OP = 'UPDATE') THEN
-        UPDATE audit.plate_pickup_live_history
+        UPDATE audit.vianda_pickup_live_history
         SET is_current  = FALSE,
             valid_until = CURRENT_TIMESTAMP
-        WHERE plate_pickup_id = OLD.plate_pickup_id AND is_current = TRUE;
+        WHERE vianda_pickup_id = OLD.vianda_pickup_id AND is_current = TRUE;
     END IF;
 
-    INSERT INTO audit.plate_pickup_live_history (
+    INSERT INTO audit.vianda_pickup_live_history (
         event_id,
-        plate_pickup_id,
-        plate_selection_id,
+        vianda_pickup_id,
+        vianda_selection_id,
         user_id,
         restaurant_id,
-        plate_id,
+        vianda_id,
         product_id,
         qr_code_id,
         qr_code_payload,
@@ -2503,11 +2503,11 @@ BEGIN
     )
     VALUES (
         new_event_id,
-        NEW.plate_pickup_id,
-        NEW.plate_selection_id,
+        NEW.vianda_pickup_id,
+        NEW.vianda_selection_id,
         NEW.user_id,
         NEW.restaurant_id,
-        NEW.plate_id,
+        NEW.vianda_id,
         NEW.product_id,
         NEW.qr_code_id,
         NEW.qr_code_payload,
@@ -2537,11 +2537,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS plate_pickup_live_history_trigger ON customer.plate_pickup_live;
-CREATE TRIGGER plate_pickup_live_history_trigger
-AFTER INSERT OR UPDATE ON customer.plate_pickup_live
+DROP TRIGGER IF EXISTS vianda_pickup_live_history_trigger ON customer.vianda_pickup_live;
+CREATE TRIGGER vianda_pickup_live_history_trigger
+AFTER INSERT OR UPDATE ON customer.vianda_pickup_live
 FOR EACH ROW
-EXECUTE FUNCTION plate_pickup_live_history_trigger_func();
+EXECUTE FUNCTION vianda_pickup_live_history_trigger_func();
 
 
 -- Trigger function for billing.payment_attempt history logging

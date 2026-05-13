@@ -82,7 +82,7 @@ The updated Postman collection now:
 
 ## 📂 **Files Modified**
 
-- `docs/postman/collections/E2E Plate Selection.postman_collection.json`
+- `docs/postman/collections/E2E Vianda Selection.postman_collection.json`
   - Added "List Markets" request (new)
   - Updated "Create Subscription Plans" pre-request script
   - Updated "Create Subscription Plans" request body

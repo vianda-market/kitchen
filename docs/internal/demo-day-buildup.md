@@ -54,12 +54,12 @@ Requirements:
 - Use `street_type_enum` values correctly. The lowercase 2-letter code is `'st'` (street) and `'ave'` (avenue). The value `'str'` does **not** exist. See Section 6, gotcha 1.
 - Restaurant names must feel local (Spanish for AR, English for US, etc.).
 
-### 3.2 Plate distribution
+### 3.2 Vianda distribution
 
-- **10 plates total** distributed unevenly across the 5 restaurants. A plausible distribution is 2/2/2/2/2, 3/2/2/2/1, or 3/3/2/1/1. Do not put all 10 in one restaurant.
-- Each plate gets exactly **one product** and **one Mon–Fri plate-kitchen-day row per weekday** (5 PKDs per plate = 50 PKD upserts per market).
+- **10 viandas total** distributed unevenly across the 5 restaurants. A plausible distribution is 2/2/2/2/2, 3/2/2/2/1, or 3/3/2/1/1. Do not put all 10 in one restaurant.
+- Each vianda gets exactly **one product** and **one Mon–Fri vianda-kitchen-day row per weekday** (5 PKDs per vianda = 50 PKD upserts per market).
 - Products belong to `demoInstitutionId` (the single shared demo supplier institution, seeded in `demo_baseline.sql`).
-- Plate-kitchen-day upserts **must come after** their plate upsert in the Postman collection execution order. A plate's PKDs cannot be created if the plate_id variable has not been set. This was a real ordering bug fixed in commit `828b5f5`; don't re-introduce it.
+- Vianda-kitchen-day upserts **must come after** their vianda upsert in the Postman collection execution order. A vianda's PKDs cannot be created if the vianda_id variable has not been set. This was a real ordering bug fixed in commit `828b5f5`; don't re-introduce it.
 
 ### 3.3 Plan and savings band
 
@@ -71,16 +71,16 @@ credit_cost = plan_price / plan_credits
 savings_pct = (price - credit × credit_cost) / price × 100
 ```
 
-This value is clamped to 0 by `app/services/restaurant_explorer_service.py:_compute_savings_pct` — it will never go negative. Target: **15–25% per plate, fleet average ~20%**.
+This value is clamped to 0 by `app/services/restaurant_explorer_service.py:_compute_savings_pct` — it will never go negative. Target: **15–25% per vianda, fleet average ~20%**.
 
 **Worked example (PE):** plan_price = 80 PEN, plan_credits = 20 → credit_cost = 4 PEN.
-Plate: price = 45 PEN, credit = 9 → savings = (45 − 36) / 45 × 100 = **20.0 %**.
+Vianda: price = 45 PEN, credit = 9 → savings = (45 − 36) / 45 × 100 = **20.0 %**.
 
-**Pick a credit_cost** such that rounding plate credits to whole numbers lands all 10 plates in the 15–25 % band. The simplest path: choose credit_cost so that most plates hit exactly 20 % (credit = price × 0.80 / credit_cost, rounded), then verify no plate falls outside 15–25 %.
+**Pick a credit_cost** such that rounding vianda credits to whole numbers lands all 10 viandas in the 15–25 % band. The simplest path: choose credit_cost so that most viandas hit exactly 20 % (credit = price × 0.80 / credit_cost, rounded), then verify no vianda falls outside 15–25 %.
 
 **Currency scale guidance by market:**
 
-| Market | Plan price range | Plate price range | Credit cost |
+| Market | Plan price range | Vianda price range | Credit cost |
 |---|---|---|---|
 | PE | 70–90 PEN | 30–55 PEN | 3–5 PEN/credit |
 | AR | 14,000–20,000 ARS | 15,000–25,000 ARS | 700–1,000 ARS/credit |
@@ -142,7 +142,7 @@ When adding a new market: add the institution_market binding in Section 1 (the s
 All entities with a `PUT /by-key` endpoint are created in Postman, not SQL. Use `DEMO_*_<CC>_*` canonical keys, e.g.:
 - `DEMO_RESTAURANT_AR_LA_LAVALLE`
 - `DEMO_PRODUCT_AR_MILANESA`
-- `DEMO_PLATE_AR_R1_MILANESA`
+- `DEMO_VIANDA_AR_R1_MILANESA`
 - `DEMO_PKD_AR_R1_MILANESA_MONDAY`
 - `DEMO_PLAN_AR_ESTANDAR`
 - `DEMO_QR_AR_LA_LAVALLE`
@@ -159,20 +159,20 @@ The collection has one set of folders per market, numbered by execution order:
 
 ```
 00 Setup                           — shared: login as demo-admin; run once
-10 Supplier menu (PE)              — PE restaurants, products, plates, PKDs, plan
-12 Secondary supplier (PE)         — PE secondary institution + restaurant + plate + activate
+10 Supplier menu (PE)              — PE restaurants, products, viandas, PKDs, plan
+12 Secondary supplier (PE)         — PE secondary institution + restaurant + vianda + activate
 20 Customers (PE)                  — PE customer signup flow
 30 Subscribe each customer         — PE subscription steps
 40 Order history loop              — PE orders
 45 Supplier billing (PE)           — POST run-settlement-pipeline?country_code=PE
-10 Supplier menu (AR)              — AR restaurants, products, plates, PKDs, plan
-12 Secondary supplier (AR)         — AR secondary institution + restaurant + plate + activate
+10 Supplier menu (AR)              — AR restaurants, products, viandas, PKDs, plan
+12 Secondary supplier (AR)         — AR secondary institution + restaurant + vianda + activate
 20 Customers (AR)                  — AR customer signup flow
 30 Subscribe each customer (AR)    — AR subscription steps
 40 Order history (AR)              — AR orders
 45 Supplier billing (AR)           — POST run-settlement-pipeline?country_code=AR
-10 Supplier menu (US)              — US restaurants, products, plates, PKDs, plan
-12 Secondary supplier (US)         — US secondary institution + restaurant + plate + activate
+10 Supplier menu (US)              — US restaurants, products, viandas, PKDs, plan
+12 Secondary supplier (US)         — US secondary institution + restaurant + vianda + activate
 20 Customers (US)                  — US customer signup flow
 30 Subscribe each customer (US)    — US subscription steps
 40 Order history (US)              — US orders
@@ -184,11 +184,11 @@ The collection has one set of folders per market, numbered by execution order:
 1. Upsert all 5 restaurants (sets `restaurantXxRNId` variables).
 2. Upsert QR codes (one per restaurant, inject `restaurant_id` from the variable set in step 1).
 3. Upsert products (sets `productXxNameId` variables).
-4. Upsert plates — each injects `restaurant_id` AND `product_id` from step 1 and 3 variables.
-5. Upsert plate-kitchen-days — each injects `plate_id` from step 4 variables.
+4. Upsert viandas — each injects `restaurant_id` AND `product_id` from step 1 and 3 variables.
+5. Upsert vianda-kitchen-days — each injects `vianda_id` from step 4 variables.
 6. Upsert plan (last, so collection variables are all set).
 
-Steps 4 and 5 are the critical ordering constraint. A PKD upsert needs `plate_id`; if the plate upsert hasn't run yet, `plate_id` is an empty string and the API returns 422.
+Steps 4 and 5 are the critical ordering constraint. A PKD upsert needs `vianda_id`; if the vianda upsert hasn't run yet, `vianda_id` is an empty string and the API returns 422.
 
 **Folder 99 Sanity:** extend with new assertions for each new market. Use the established pattern: filter by `canonical_key.startsWith('DEMO_RESTAURANT_<CC>_')`, check counts, check savings band. Do not remove or loosen PE assertions when adding AR/US.
 
@@ -288,16 +288,16 @@ This is an **audited API flag** — it signals "I know this plan compresses the 
 
 ### 6.11 DEV_MODE holiday bypass — pin `target_kitchen_day` explicitly in folder 40
 
-`app/services/plate_selection_validation._find_next_available_kitchen_day_in_week` skips national holidays when auto-selecting a kitchen day. However, in `DEV_MODE` (which defaults to `True` in `app/config/settings.py`), Saturdays are mapped to `"friday"` so E2E flows work on weekends.
+`app/services/vianda_selection_validation._find_next_available_kitchen_day_in_week` skips national holidays when auto-selecting a kitchen day. However, in `DEV_MODE` (which defaults to `True` in `app/config/settings.py`), Saturdays are mapped to `"friday"` so E2E flows work on weekends.
 
-When today IS a national holiday for the plate's market AND `DEV_MODE=True`, the following sequence fires:
+When today IS a national holiday for the vianda's market AND `DEV_MODE=True`, the following sequence fires:
 1. Auto-select tries today (holiday) → skips (correct).
 2. Auto-select tries tomorrow (Saturday) → maps to `"friday"` via DEV_MODE logic.
 3. Checks if Saturday's date (`tomorrow`) is a national holiday — it is NOT.
 4. Returns `"friday"` with tomorrow's date as the target, **not today's** — bypassing the holiday guard.
 5. `_validate_restaurant_for_day` then resolves `"friday"` to today (the actual nearest Friday) → 403 holiday block.
 
-**Fix:** add `"target_kitchen_day": "wednesday"` (or any safe mid-week day) to every plate selection request body in folder 40 for non-PE markets. This bypasses auto-selection entirely and prevents the DEV_MODE edge case.
+**Fix:** add `"target_kitchen_day": "wednesday"` (or any safe mid-week day) to every vianda selection request body in folder 40 for non-PE markets. This bypasses auto-selection entirely and prevents the DEV_MODE edge case.
 
 Confirmed safe days by market (no 2026 public holidays on Wednesday):
 - AR: Wednesday is never a national holiday in 2026. Use `"wednesday"`.
@@ -307,7 +307,7 @@ PE folder 40 uses auto-selection today (no Friday holidays in the near term), bu
 
 ```json
 {
-  "plate_id": "PLACEHOLDER",
+  "vianda_id": "PLACEHOLDER",
   "pickup_time_range": "12:00-12:15",
   "target_kitchen_day": "wednesday"
 }
@@ -325,9 +325,9 @@ Work through these in order. Each item has a verification gate before proceeding
 
 3. **Identify the correct `city_metadata_id` lookup key.** Confirm the GeoNames ASCII name for the target city and country_iso code. Verify against the live DB after rebuild: `SELECT cm.city_metadata_id, gc.ascii_name FROM core.city_metadata cm JOIN external.geonames_city gc ON cm.geonames_id = gc.geonames_id WHERE cm.country_iso = '<CC>' ORDER BY gc.population DESC LIMIT 3;`
 
-4. **Design the plan.** Choose credit_cost so that 10 plates priced at locally realistic values all land in the 15–25 % savings band. Plan price = credit_cost × 20. Verify with the formula from Section 3.3.
+4. **Design the plan.** Choose credit_cost so that 10 viandas priced at locally realistic values all land in the 15–25 % savings band. Plan price = credit_cost × 20. Verify with the formula from Section 3.3.
 
-5. **Design 10 plates with locally realistic menu items.** Record for each: restaurant name, product name, price, credit count, computed savings %. Fleet average must be ~20 %.
+5. **Design 10 viandas with locally realistic menu items.** Record for each: restaurant name, product name, price, credit count, computed savings %. Fleet average must be ~20 %.
 
 6. **Draft the SQL block for `demo_baseline.sql`.** Add:
    - Institution market binding for the new market (Section 1 of the file).
@@ -336,17 +336,17 @@ Work through these in order. Each item has a verification gate before proceeding
    - Update the SUMMARY block at the end of the file.
 
 7. **Draft Postman folders** following Section 5's layout. Start from the PE folders as a template: find-replace `PE` → `<CC>`, update names, prices, addresses, market_id, etc. Verify:
-   - All plate upserts inject `restaurant_id` from the collection variable set by the preceding restaurant upsert.
-   - All PKD upserts inject `plate_id` from the collection variable set by the preceding plate upsert.
+   - All vianda upserts inject `restaurant_id` from the collection variable set by the preceding restaurant upsert.
+   - All PKD upserts inject `vianda_id` from the collection variable set by the preceding vianda upsert.
    - C06 and C07 use the `.no_plan` / `.no_orders` suffixes.
    - Subscribe folder skips C06 and subscribes C07.
    - Order folder skips both C06 and C07.
-   - Every plate selection request body in folder 40 includes `"target_kitchen_day": "wednesday"` (see Gotcha 6.11).
+   - Every vianda selection request body in folder 40 includes `"target_kitchen_day": "wednesday"` (see Gotcha 6.11).
    - The plan upsert body in folder 10 includes `"acknowledge_spread_compression": true` (see Gotcha 6.10).
 
 8. **Add collection-level variables** for all new entity IDs and tokens to the top of the collection JSON.
 
-9. **Extend folder 99 Sanity** with assertions for the new market (5 restaurants, plates in savings band, correct customer count, C06 has no subscription, C07 has no orders). Do not break existing PE assertions.
+9. **Extend folder 99 Sanity** with assertions for the new market (5 restaurants, viandas in savings band, correct customer count, C06 has no subscription, C07 has no orders). Do not break existing PE assertions.
 
 10. **Update `scripts/load_demo_data.sh`** — add the new market's customer credentials in both the early-write and final-write blocks.
 
@@ -382,7 +382,7 @@ Per market:
 - 1 institution (distinct name, e.g. "Cocina Andina S.A.C." for PE)
 - 1 institution entity with `payout_onboarding_status = 'complete'` (required for restaurant activation)
 - 1 restaurant in a different neighborhood from the primary cluster
-- 1 plate with Mon–Fri PKDs (savings within 18–22 %)
+- 1 vianda with Mon–Fri PKDs (savings within 18–22 %)
 - 1 supplier admin user (`demo.proveedor.<cc>.02.admin@vianda.demo`)
 
 ### 8.2 Why entities are pre-seeded in demo_baseline.sql
@@ -413,7 +413,7 @@ Key sub-ranges used:
 Each market gets two new top-level folders immediately after its primary `40` order folder:
 
 ```
-12 Secondary supplier (<CC>)  — institution + entity + user + restaurant + plate + PKDs + activate
+12 Secondary supplier (<CC>)  — institution + entity + user + restaurant + vianda + PKDs + activate
 45 Supplier billing (<CC>)    — POST run-settlement-pipeline?country_code=<CC>
 ```
 
@@ -592,5 +592,5 @@ a `canonical_key` on `subscription_info`; purge must delete history before info.
 - Do not touch `reference_data.sql` or migrations to add demo content.
 - Do not add demo data UUIDs to `kitchen_template`'s fingerprint in `scripts/refresh_db_template.sh`.
 - Do not hard-code `city_metadata_id` UUIDs in `demo_baseline.sql`. Always resolve them at runtime via the GeoNames JOIN — the UUID can change between rebuilds if the reference data is regenerated.
-- Do not add a `DEV_MODE` holiday-bypass patch to `app/services/plate_selection_service.py` or `restaurant_explorer_service.py` to work around a failing folder 40. Fix it in the Postman collection instead (pin `target_kitchen_day`, see Gotcha 6.11).
+- Do not add a `DEV_MODE` holiday-bypass patch to `app/services/vianda_selection_service.py` or `restaurant_explorer_service.py` to work around a failing folder 40. Fix it in the Postman collection instead (pin `target_kitchen_day`, see Gotcha 6.11).
 - Do not update the dec0 sub-range table in Section 4.1 without also documenting the new sub-range in the UUID SCHEME comment block at the top of `demo_baseline.sql`.

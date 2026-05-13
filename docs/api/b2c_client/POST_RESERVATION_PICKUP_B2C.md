@@ -3,25 +3,25 @@
 **Last Updated**: 2026-03  
 **Audience**: B2C React Native app (Customer role)
 
-This document describes the post-reservation pickup flow: pickup intent (offer/request/self), volunteer visibility, coworker search and notifications, and plate selection editability.
+This document describes the post-reservation pickup flow: pickup intent (offer/request/self), volunteer visibility, coworker search and notifications, and vianda selection editability.
 
 ---
 
 ## Overview
 
-After a user reserves a plate and selects a pickup window, they choose one of three intents:
+After a user reserves a vianda and selects a pickup window, they choose one of three intents:
 
 | Intent | Description |
 |--------|-------------|
 | `offer` | User offers to pick up a coworker's meal (same restaurant, same time) |
 | `request` | User requests a coworker to pick up their meal; if no one volunteers, user is responsible |
-| `self` | User will pick up their own plate |
+| `self` | User will pick up their own vianda |
 
 ---
 
 ## 1. Pickup Intent on Create and Update
 
-**Create (POST /api/v1/plate-selections/)**
+**Create (POST /api/v1/vianda-selections/)**
 
 Optional fields in the request body:
 
@@ -30,7 +30,7 @@ Optional fields in the request body:
 | `pickup_intent` | `"offer"` \| `"request"` \| `"self"` | `"self"` | User's pickup intent |
 | `flexible_on_time` | boolean | null | Only when `pickup_intent === "request"`; ±30 min flexibility for matching |
 
-**Update (PATCH /api/v1/plate-selections/{id})**
+**Update (PATCH /api/v1/vianda-selections/{id})**
 
 Same fields can be updated. Editable until 1 hour before kitchen day opens.
 
@@ -46,9 +46,9 @@ When users explore restaurants (GET /api/v1/restaurants/by-city) with a `kitchen
 | `has_coworker_offer` | boolean | True when user has employer and at least one **coworker** (same employer) has `pickup_intent=offer` |
 | `has_coworker_request` | boolean | True when user has employer and at least one **coworker** has `pickup_intent=request` |
 
-Coworker flags respect messaging prefs (`coworkers_can_see_my_orders`, `can_participate_in_plate_pickups`). Omit or false when user has no employer.
+Coworker flags respect messaging prefs (`coworkers_can_see_my_orders`, `can_participate_in_vianda_pickups`). Omit or false when user has no employer.
 
-**Explore Plate Modal:** Fetch `GET /api/v1/plates/enriched/{plate_id}?kitchen_day=Monday` for coworker flags when opened from Reservations. For pickup time ranges, call `GET /api/v1/restaurants/{restaurant_id}/coworker-pickup-windows?kitchen_day=Monday` only when `has_coworker_offer || has_coworker_request`.
+**Explore Vianda Modal:** Fetch `GET /api/v1/viandas/enriched/{vianda_id}?kitchen_day=Monday` for coworker flags when opened from Reservations. For pickup time ranges, call `GET /api/v1/restaurants/{restaurant_id}/coworker-pickup-windows?kitchen_day=Monday` only when `has_coworker_offer || has_coworker_request`.
 
 ### GET /api/v1/restaurants/{restaurant_id}/coworker-pickup-windows
 
@@ -66,7 +66,7 @@ Returns empty when user has no employer. When `intent=request` and coworker has 
 
 When the user selects "Offer to pick up", the client needs a list of coworkers to notify. Coworkers are users with the **same employer** (and in a future iteration, same office/address — see [EMPLOYER_ADDRESS_SCOPING_FEEDBACK.md](./EMPLOYER_ADDRESS_SCOPING_FEEDBACK.md)).
 
-### GET /api/v1/plate-selections/{plate_selection_id}/coworkers
+### GET /api/v1/vianda-selections/{vianda_selection_id}/coworkers
 
 **Auth:** Bearer token (Customer).
 
@@ -88,7 +88,7 @@ Display as "FirstName L." (e.g. "Maria G.").
 
 **Errors:** 403 if current user has no employer assigned.
 
-### POST /api/v1/plate-selections/{plate_selection_id}/notify-coworkers
+### POST /api/v1/vianda-selections/{vianda_selection_id}/notify-coworkers
 
 **Auth:** Bearer token (Customer).
 
@@ -109,43 +109,43 @@ The backend records notifications in `coworker_pickup_notification`. Push or in-
 
 ---
 
-## 5. Plate Selection Editability
+## 5. Vianda Selection Editability
 
-Plate selections are **editable** until **1 hour before the kitchen day opens** for the market.
+Vianda selections are **editable** until **1 hour before the kitchen day opens** for the market.
 
-### PATCH /api/v1/plate-selections/{plate_selection_id}
+### PATCH /api/v1/vianda-selections/{vianda_selection_id}
 
 **Allowed fields:** `pickup_time_range`, `pickup_intent`, `flexible_on_time`, `cancel` (boolean).
 
-**Response:** 200 OK with updated plate selection. Includes `editable_until` (ISO datetime).
+**Response:** 200 OK with updated vianda selection. Includes `editable_until` (ISO datetime).
 
 **Errors:** 403 or 422 if past editability cutoff.
 
-### DELETE /api/v1/plate-selections/{plate_selection_id}
+### DELETE /api/v1/vianda-selections/{vianda_selection_id}
 
 Same editability window. Refunds credits and cancels the selection.
 
 ### editable_until
 
-GET /api/v1/plate-selections/{id} and list responses include `editable_until` (ISO datetime or null). Use this to show/hide edit UI in the app.
+GET /api/v1/vianda-selections/{id} and list responses include `editable_until` (ISO datetime or null). Use this to show/hide edit UI in the app.
 
 ---
 
-## 6. Pending Pickup (Assigned User Plate Count)
+## 6. Pending Pickup (Assigned User Vianda Count)
 
-When a user with `pickup_intent=offer` is matched with requesters at the same restaurant and time, the **offering user** is assigned all plates for pickup. The pending response includes:
+When a user with `pickup_intent=offer` is matched with requesters at the same restaurant and time, the **offering user** is assigned all viandas for pickup. The pending response includes:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `plate_pickup_ids` | UUID[] | IDs for POST /plate-pickup/{id}/complete |
-| `total_plate_count` | int | Total plates the assigned user picks up (e.g. "You're picking up 4 plates") |
+| `vianda_pickup_ids` | UUID[] | IDs for POST /vianda-pickup/{id}/complete |
+| `total_vianda_count` | int | Total viandas the assigned user picks up (e.g. "You're picking up 4 viandas") |
 
-Each order in `orders` can include `plate_pickup_id` for completing individual pickups.
+Each order in `orders` can include `vianda_pickup_id` for completing individual pickups.
 
 ---
 
 ## Related Documentation
 
-- [PLATE_API_CLIENT.md](../shared_client/PLATE_API_CLIENT.md) — Plate selection create, pending, QR scan, complete
+- [VIANDA_API_CLIENT.md](../shared_client/VIANDA_API_CLIENT.md) — Vianda selection create, pending, QR scan, complete
 - [feedback_post_reservation_pickup_intent.md](./feedback_post_reservation_pickup_intent.md) — Full API contract and implementation status
 - [EMPLOYER_ADDRESS_SCOPING_FEEDBACK.md](./EMPLOYER_ADDRESS_SCOPING_FEEDBACK.md) — Future: scoping coworkers by same office (employer_address_id)

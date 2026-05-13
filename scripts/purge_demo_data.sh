@@ -115,8 +115,8 @@ WHERE institution_entity_id::text LIKE 'dddddddd-dec0-%'
        WHERE canonical_key LIKE 'DEMO_INSTITUTION_ENTITY_%'
    );
 
--- Plate reviews (linked to plate_pickup_live via plate_pickup_id)
-DELETE FROM customer.plate_review_info
+-- Vianda reviews (linked to vianda_pickup_live via vianda_pickup_id)
+DELETE FROM customer.vianda_review_info
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE user_id::text LIKE 'dddddddd-dec0-%'
@@ -128,9 +128,9 @@ WHERE user_id IN (
        OR username LIKE 'demo.empleado.%@vianda.demo'
 );
 -- Also catch any review linked to a demo pickup regardless of user_id
-DELETE FROM customer.plate_review_info
-WHERE plate_pickup_id IN (
-    SELECT plate_pickup_id FROM customer.plate_pickup_live
+DELETE FROM customer.vianda_review_info
+WHERE vianda_pickup_id IN (
+    SELECT vianda_pickup_id FROM customer.vianda_pickup_live
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
@@ -139,7 +139,7 @@ WHERE plate_pickup_id IN (
     )
 );
 
--- Billing: client transactions triggered by plate_selection inserts
+-- Billing: client transactions triggered by vianda_selection inserts
 DELETE FROM billing.client_transaction
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
@@ -150,8 +150,8 @@ WHERE user_id IN (
 
 -- Billing: restaurant transactions linked to demo restaurant
 DELETE FROM billing.restaurant_transaction
-WHERE plate_selection_id IN (
-    SELECT plate_selection_id FROM customer.plate_selection_info
+WHERE vianda_selection_id IN (
+    SELECT vianda_selection_id FROM customer.vianda_selection_info
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
@@ -217,10 +217,10 @@ WHERE payment_attempt_id IN (SELECT payment_attempt_id FROM _demo_payment_attemp
 DELETE FROM billing.payment_attempt
 WHERE payment_attempt_id IN (SELECT payment_attempt_id FROM _demo_payment_attempt_ids);
 
--- Plate selection history (audit trail for plate_selection_info)
-DELETE FROM audit.plate_selection_history
-WHERE plate_selection_id IN (
-    SELECT plate_selection_id FROM customer.plate_selection_info
+-- Vianda selection history (audit trail for vianda_selection_info)
+DELETE FROM audit.vianda_selection_history
+WHERE vianda_selection_id IN (
+    SELECT vianda_selection_id FROM customer.vianda_selection_info
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
@@ -229,10 +229,10 @@ WHERE plate_selection_id IN (
     )
 );
 
--- Plate pickup history (audit trail for plate_pickup_live)
-DELETE FROM audit.plate_pickup_live_history
-WHERE plate_pickup_id IN (
-    SELECT plate_pickup_id FROM customer.plate_pickup_live
+-- Vianda pickup history (audit trail for vianda_pickup_live)
+DELETE FROM audit.vianda_pickup_live_history
+WHERE vianda_pickup_id IN (
+    SELECT vianda_pickup_id FROM customer.vianda_pickup_live
     WHERE user_id IN (
         SELECT user_id FROM core.user_info
         WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
@@ -241,8 +241,8 @@ WHERE plate_pickup_id IN (
     )
 );
 
--- Plate pickup live (must go before plate_selection_info — FK plate_pickup_live → plate_selection_info)
-DELETE FROM customer.plate_pickup_live
+-- Vianda pickup live (must go before vianda_selection_info — FK vianda_pickup_live → vianda_selection_info)
+DELETE FROM customer.vianda_pickup_live
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
@@ -250,8 +250,8 @@ WHERE user_id IN (
        OR username LIKE 'demo.cliente.us.%@vianda.demo'
 );
 
--- Plate selections (customer orders)
-DELETE FROM customer.plate_selection_info
+-- Vianda selections (customer orders)
+DELETE FROM customer.vianda_selection_info
 WHERE user_id IN (
     SELECT user_id FROM core.user_info
     WHERE username LIKE 'demo.cliente.pe.%@vianda.demo'
@@ -338,28 +338,28 @@ WHERE user_id IN (
 );
 
 -- -------------------------------------------------------------------------
--- Tier 2: Plate kitchen days (depend on plates)
+-- Tier 2: Vianda kitchen days (depend on viandas)
 -- -------------------------------------------------------------------------
 
-DELETE FROM audit.plate_kitchen_days_history
-WHERE plate_kitchen_day_id IN (
-    SELECT plate_kitchen_day_id FROM ops.plate_kitchen_days
+DELETE FROM audit.vianda_kitchen_days_history
+WHERE vianda_kitchen_day_id IN (
+    SELECT vianda_kitchen_day_id FROM ops.vianda_kitchen_days
     WHERE canonical_key LIKE 'DEMO_%'
 );
 
-DELETE FROM ops.plate_kitchen_days
+DELETE FROM ops.vianda_kitchen_days
 WHERE canonical_key LIKE 'DEMO_%';
 
 -- -------------------------------------------------------------------------
--- Tier 3: Plates (depend on products and restaurants)
+-- Tier 3: Viandas (depend on products and restaurants)
 -- -------------------------------------------------------------------------
 
-DELETE FROM audit.plate_history
-WHERE plate_id IN (
-    SELECT plate_id FROM ops.plate_info WHERE canonical_key LIKE 'DEMO_%'
+DELETE FROM audit.vianda_history
+WHERE vianda_id IN (
+    SELECT vianda_id FROM ops.vianda_info WHERE canonical_key LIKE 'DEMO_%'
 );
 
-DELETE FROM ops.plate_info
+DELETE FROM ops.vianda_info
 WHERE canonical_key LIKE 'DEMO_%';
 
 -- -------------------------------------------------------------------------

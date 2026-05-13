@@ -23,7 +23,7 @@ The refactoring is complete. All 10 enriched endpoint groups now use the central
 - Restaurants
 - QR codes
 - Products
-- Plates
+- Viandas
 - Plans
 - Fintech links
 - Subscriptions

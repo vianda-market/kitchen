@@ -2,22 +2,22 @@
 
 ## Proposal
 
-Modify `POST /plate-kitchen-days/` to accept an array of `kitchen_day` values, even if it's just one day. This eliminates the need for a separate batch endpoint.
+Modify `POST /vianda-kitchen-days/` to accept an array of `kitchen_day` values, even if it's just one day. This eliminates the need for a separate batch endpoint.
 
 ## Current Implementation
 
 **Current Schema**:
 ```python
-class PlateKitchenDayCreateSchema(BaseModel):
-    plate_id: UUID
+class ViandaKitchenDayCreateSchema(BaseModel):
+    vianda_id: UUID
     kitchen_day: str  # Single day
 ```
 
 **Current Endpoint**:
 ```python
-@router.post("/", response_model=PlateKitchenDayResponseSchema)
-def create_plate_kitchen_day(
-    payload: PlateKitchenDayCreateSchema,  # Single day
+@router.post("/", response_model=ViandaKitchenDayResponseSchema)
+def create_vianda_kitchen_day(
+    payload: ViandaKitchenDayCreateSchema,  # Single day
     ...
 ):
     # Creates one kitchen day
@@ -27,17 +27,17 @@ def create_plate_kitchen_day(
 
 **New Schema**:
 ```python
-class PlateKitchenDayCreateSchema(BaseModel):
-    plate_id: UUID
+class ViandaKitchenDayCreateSchema(BaseModel):
+    vianda_id: UUID
     kitchen_days: List[str] = Field(..., min_items=1, max_items=5)  # Array of days
     replace_existing: Optional[bool] = Field(False, description="If True, delete existing days first")
 ```
 
 **New Endpoint**:
 ```python
-@router.post("/", response_model=List[PlateKitchenDayResponseSchema])
-def create_plate_kitchen_days(
-    payload: PlateKitchenDayCreateSchema,  # Array of days
+@router.post("/", response_model=List[ViandaKitchenDayResponseSchema])
+def create_vianda_kitchen_days(
+    payload: ViandaKitchenDayCreateSchema,  # Array of days
     ...
 ):
     # Creates multiple kitchen days atomically
@@ -47,13 +47,13 @@ def create_plate_kitchen_days(
 ## Comparison
 
 ### Option A: Separate Batch Endpoint
-- `POST /plate-kitchen-days/` - Single day
-- `POST /plate-kitchen-days/batch` - Multiple days
+- `POST /vianda-kitchen-days/` - Single day
+- `POST /vianda-kitchen-days/batch` - Multiple days
 - **Pros**: Clear separation, RESTful (one resource per call)
 - **Cons**: Two endpoints to maintain, client must choose
 
 ### Option B: Single Endpoint with Array (Proposed) ✅
-- `POST /plate-kitchen-days/` - Accepts array (1-N days)
+- `POST /vianda-kitchen-days/` - Accepts array (1-N days)
 - **Pros**: 
   - ✅ Single endpoint (simpler API)
   - ✅ Always atomic (array processed in transaction)
@@ -81,14 +81,14 @@ def create_plate_kitchen_days(
 
 **Option 1: Always return array**
 ```python
-response_model=List[PlateKitchenDayResponseSchema]
+response_model=List[ViandaKitchenDayResponseSchema]
 # Even for 1 day: [{...}]
 ```
 
 **Option 2: Return single or array based on input**
 ```python
-# If 1 day: return PlateKitchenDayResponseSchema
-# If multiple: return List[PlateKitchenDayResponseSchema]
+# If 1 day: return ViandaKitchenDayResponseSchema
+# If multiple: return List[ViandaKitchenDayResponseSchema]
 ```
 
 **Recommendation**: ✅ **Always return array** - Consistent, simpler, easier to handle client-side.
@@ -96,8 +96,8 @@ response_model=List[PlateKitchenDayResponseSchema]
 ### Backward Compatibility
 
 **Breaking Change**: Yes, but minimal:
-- Old: `{"plate_id": "...", "kitchen_day": "Monday"}`
-- New: `{"plate_id": "...", "kitchen_days": ["Monday"]}`
+- Old: `{"vianda_id": "...", "kitchen_day": "Monday"}`
+- New: `{"vianda_id": "...", "kitchen_days": ["Monday"]}`
 
 **Migration**: Simple - wrap single day in array.
 
@@ -106,8 +106,8 @@ response_model=List[PlateKitchenDayResponseSchema]
 ### Schema Design
 
 ```python
-class PlateKitchenDayCreateSchema(BaseModel):
-    plate_id: UUID
+class ViandaKitchenDayCreateSchema(BaseModel):
+    vianda_id: UUID
     kitchen_days: List[str] = Field(
         ..., 
         min_items=1, 
@@ -116,7 +116,7 @@ class PlateKitchenDayCreateSchema(BaseModel):
     )
     replace_existing: bool = Field(
         False,
-        description="If True, delete all existing kitchen days for this plate before creating new ones"
+        description="If True, delete all existing kitchen days for this vianda before creating new ones"
     )
     
     @validator('kitchen_days')
@@ -134,21 +134,21 @@ class PlateKitchenDayCreateSchema(BaseModel):
 ### Endpoint Implementation
 
 ```python
-@router.post("/", response_model=List[PlateKitchenDayResponseSchema], status_code=status.HTTP_201_CREATED)
-def create_plate_kitchen_days(
-    payload: PlateKitchenDayCreateSchema,
+@router.post("/", response_model=List[ViandaKitchenDayResponseSchema], status_code=status.HTTP_201_CREATED)
+def create_vianda_kitchen_days(
+    payload: ViandaKitchenDayCreateSchema,
     current_user: dict = Depends(get_current_user),
     db: psycopg2.extensions.connection = Depends(get_db)
 ):
     """
-    Create one or more kitchen day assignments for a plate.
+    Create one or more kitchen day assignments for a vianda.
     
     This endpoint accepts an array of kitchen days and creates them atomically.
     If any day fails validation, no days are created (atomic operation).
     
     Args:
-        payload: Contains plate_id and array of kitchen_days (1-5 days)
-        replace_existing: If True, deletes all existing days for the plate first
+        payload: Contains vianda_id and array of kitchen_days (1-5 days)
+        replace_existing: If True, deletes all existing days for the vianda first
     
     Returns:
         List of created kitchen day assignments
@@ -156,39 +156,39 @@ def create_plate_kitchen_days(
     scope = _get_scope_for_entity(current_user)
     
     def create_operation(connection: psycopg2.extensions.connection):
-        # Validate plate exists
-        plate = plate_service.get_by_id(payload.plate_id, connection)
-        if not plate:
-            raise HTTPException(status_code=404, detail=f"Plate not found: {payload.plate_id}")
+        # Validate vianda exists
+        vianda = vianda_service.get_by_id(payload.vianda_id, connection)
+        if not vianda:
+            raise HTTPException(status_code=404, detail=f"Vianda not found: {payload.vianda_id}")
         
-        # If replace_existing, delete all existing kitchen days for this plate
+        # If replace_existing, delete all existing kitchen days for this vianda
         if payload.replace_existing:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "DELETE FROM plate_kitchen_days WHERE plate_id = %s",
-                    (str(payload.plate_id),)
+                    "DELETE FROM vianda_kitchen_days WHERE vianda_id = %s",
+                    (str(payload.vianda_id),)
                 )
                 connection.commit()
         
         # Validate all days before creating any (atomic validation)
         for day in payload.kitchen_days:
-            if _check_unique_constraint(payload.plate_id, day, connection):
+            if _check_unique_constraint(payload.vianda_id, day, connection):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Plate {payload.plate_id} is already assigned to {day}"
+                    detail=f"Vianda {payload.vianda_id} is already assigned to {day}"
                 )
         
         # Create all kitchen days atomically (in transaction)
         created_days = []
         for day in payload.kitchen_days:
             data = {
-                "plate_id": str(payload.plate_id),
+                "vianda_id": str(payload.vianda_id),
                 "kitchen_day": day,
                 "is_archived": False,
                 "modified_by": current_user["user_id"]
             }
             
-            created = plate_kitchen_days_service.create(data, connection, scope=scope)
+            created = vianda_kitchen_days_service.create(data, connection, scope=scope)
             if not created:
                 raise HTTPException(
                     status_code=500, 
@@ -196,10 +196,10 @@ def create_plate_kitchen_days(
                 )
             created_days.append(created)
         
-        log_info(f"Created {len(created_days)} kitchen days for plate {payload.plate_id}")
+        log_info(f"Created {len(created_days)} kitchen days for vianda {payload.vianda_id}")
         return created_days
     
-    return handle_business_operation(create_operation, db, "create plate kitchen days")
+    return handle_business_operation(create_operation, db, "create vianda kitchen days")
 ```
 
 ### Transaction Handling
@@ -221,27 +221,27 @@ def create_plate_kitchen_days(
 
 **Old Request** (if we had single endpoint):
 ```json
-POST /plate-kitchen-days/
+POST /vianda-kitchen-days/
 {
-  "plate_id": "uuid",
+  "vianda_id": "uuid",
   "kitchen_day": "Monday"
 }
 ```
 
 **New Request**:
 ```json
-POST /plate-kitchen-days/
+POST /vianda-kitchen-days/
 {
-  "plate_id": "uuid",
+  "vianda_id": "uuid",
   "kitchen_days": ["Monday", "Tuesday", "Wednesday"]
 }
 ```
 
 **For single day**:
 ```json
-POST /plate-kitchen-days/
+POST /vianda-kitchen-days/
 {
-  "plate_id": "uuid",
+  "vianda_id": "uuid",
   "kitchen_days": ["Monday"]  // Array with 1 item
 }
 ```
@@ -277,8 +277,8 @@ await createKitchenDays(plateId, ["Monday", "Tuesday", "Wednesday"]);
 
 ## Implementation Checklist
 
-- [ ] Update `PlateKitchenDayCreateSchema` to accept `kitchen_days: List[str]`
-- [ ] Update endpoint to process array and return `List[PlateKitchenDayResponseSchema]`
+- [ ] Update `ViandaKitchenDayCreateSchema` to accept `kitchen_days: List[str]`
+- [ ] Update endpoint to process array and return `List[ViandaKitchenDayResponseSchema]`
 - [ ] Add `replace_existing` flag (optional, for "replace all" behavior)
 - [ ] Ensure atomic transaction (all succeed or all fail)
 - [ ] Update Postman collection

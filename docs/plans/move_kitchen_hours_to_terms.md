@@ -11,8 +11,8 @@
 
 Both fields carry real operational meaning:
 
-- **`kitchen_close_time`** — Drives the kitchen day cutoff: determines when reservations lock down for a plate, triggers the `restaurant_transaction` finalization, and gates the plate selection window.
-- **`kitchen_open_time`** — Will define when pickup becomes available: the moment a customer can scan a QR code at a restaurant and when the "Scan QR Code" function appears in the B2C app. This enables suppliers to offer earlier time-of-day plates (e.g., breakfast restaurants).
+- **`kitchen_close_time`** — Drives the kitchen day cutoff: determines when reservations lock down for a vianda, triggers the `restaurant_transaction` finalization, and gates the vianda selection window.
+- **`kitchen_open_time`** — Will define when pickup becomes available: the moment a customer can scan a QR code at a restaurant and when the "Scan QR Code" function appears in the B2C app. This enables suppliers to offer earlier time-of-day viandas (e.g., breakfast restaurants).
 
 Moving both to `billing.supplier_terms` (1:1 with each supplier institution) allows per-supplier customization. Market-level defaults move to `billing.market_payout_aggregator` alongside existing defaults (`require_invoice`, `max_unmatched_bill_days`). Per-restaurant overrides on top of supplier_terms are deferred.
 
@@ -45,7 +45,7 @@ market_info.kitchen_close_time  →  MarketConfiguration (Python config)  →  h
 |---|---|
 | `app/services/kitchen_day_service.py` | `_get_kitchen_close_time()` — drives kitchen day calculation, cutoff logic |
 | `app/services/market_service.py` | CRUD, serialization, enriched queries |
-| `app/services/entity_service.py` | Plate enrichment JOINs select `m.kitchen_close_time` |
+| `app/services/entity_service.py` | Vianda enrichment JOINs select `m.kitchen_close_time` |
 | `app/services/billing/institution_billing.py` | Kitchen day period, `is_kitchen_day_active()` |
 | `app/routes/admin/markets.py` | Create/update market with kitchen hours |
 | `app/schemas/consolidated_schemas.py` | Market create/update/response schemas |
@@ -203,7 +203,7 @@ def is_pickup_available(institution_id: UUID, timezone_str: str, db) -> bool:
 
 This will be consumed by:
 - QR code scan endpoint (gate the "Scan QR Code" action)
-- Plate pickup route (gate pickup availability)
+- Vianda pickup route (gate pickup availability)
 - B2C app to show/hide pickup UI
 
 #### 3d. Update all callers
@@ -214,7 +214,7 @@ This will be consumed by:
 | `app/services/entity_service.py` | Yes (via JOINs) | Pass `institution_id` + `db` |
 | `app/services/cron/kitchen_start_promotion.py` | Yes (iterates restaurants) | Pass `institution_id` + `db` |
 | `app/services/cron/notification_banner_cron.py` | Yes (restaurant context) | Pass `institution_id` + `db` |
-| `app/routes/plate_kitchen_days.py` | Depends on endpoint | Pass if available, fallback to market |
+| `app/routes/vianda_kitchen_days.py` | Depends on endpoint | Pass if available, fallback to market |
 | `app/services/restaurant_explorer_service.py` | Yes (restaurant context) | Pass `institution_id` + `db` |
 
 **Files:**
@@ -224,8 +224,8 @@ This will be consumed by:
 - `app/services/entity_service.py`
 - `app/services/cron/kitchen_start_promotion.py`
 - `app/services/cron/notification_banner_cron.py`
-- `app/routes/plate_kitchen_days.py`
-- `app/routes/plate_pickup.py` (pickup availability gating)
+- `app/routes/vianda_kitchen_days.py`
+- `app/routes/vianda_pickup.py` (pickup availability gating)
 - `app/services/restaurant_explorer_service.py`
 
 ---
@@ -242,7 +242,7 @@ This will be consumed by:
 
 #### 4b. Entity service JOINs
 
-- `app/services/entity_service.py` — replace `m.kitchen_close_time` in plate enrichment queries with a JOIN to `supplier_terms` or resolve via service call
+- `app/services/entity_service.py` — replace `m.kitchen_close_time` in vianda enrichment queries with a JOIN to `supplier_terms` or resolve via service call
 
 #### 4c. Restaurant onboarding
 

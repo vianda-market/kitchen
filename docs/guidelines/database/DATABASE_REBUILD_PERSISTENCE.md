@@ -153,8 +153,8 @@ You can instead run the same SQL files with `psql -f` (also from repo root); add
 
 ### **1. Archival Performance Indexes (15 total)**
 ```sql
--- Orders (plate_pickup_live)
-idx_plate_pickup_archival, idx_plate_pickup_archival_eligible
+-- Orders (vianda_pickup_live)
+idx_vianda_pickup_archival, idx_vianda_pickup_archival_eligible
 
 -- Transactions (restaurant_transaction)
 idx_restaurant_transaction_archival, idx_restaurant_transaction_archival_eligible
@@ -168,7 +168,7 @@ idx_user_archival, idx_user_archival_eligible
 idx_restaurant_archival, idx_restaurant_archival_eligible
 
 -- Statistics
-idx_plate_pickup_stats, idx_restaurant_transaction_stats, idx_client_transaction_stats
+idx_vianda_pickup_stats, idx_restaurant_transaction_stats, idx_client_transaction_stats
 ```
 
 ### **2. Archival Configuration**
@@ -190,7 +190,7 @@ WHERE indexname LIKE '%archival%' OR indexname LIKE '%stats%';"
 # 2. Verify core tables exist
 psql -d kitchen -c "
 SELECT table_name FROM information_schema.tables 
-WHERE table_name IN ('user_info', 'plate_pickup_live', 'client_transaction', 'restaurant_info');"
+WHERE table_name IN ('user_info', 'vianda_pickup_live', 'client_transaction', 'restaurant_info');"
 # Expected: 4 rows
 
 # 3. Run database tests
@@ -206,7 +206,7 @@ tables = get_archival_priority_order()
 print(f"Archival config: {len(tables)} tables")
 
 # Verify a table has config
-config = get_table_archival_config("plate_pickup_live")
+config = get_table_archival_config("vianda_pickup_live")
 assert config.retention_days > 0
 ```
 
@@ -246,11 +246,11 @@ The loader has two targets — `local` (default, mock payments) and `gcp-dev` (d
 
 The loader runs two layers in order:
 1. **Layer A** — `demo_baseline.sql`: inserts the supplier institution, demo admin user, addresses, and institution entity directly via SQL (no API endpoint for these entities).
-2. **Layer B** — Newman runs `900_DEMO_DAY_SEED.postman_collection.json` against the live API: upserts restaurants, QR codes, products, plates, plate-kitchen-days, and plans for all three markets (PE / AR / US); signs up and subscribes customers; sets up employer institutions and benefit-enrolled employees; runs one order per customer per market through the full pickup flow.
+2. **Layer B** — Newman runs `900_DEMO_DAY_SEED.postman_collection.json` against the live API: upserts restaurants, QR codes, products, viandas, vianda-kitchen-days, and plans for all three markets (PE / AR / US); signs up and subscribes customers; sets up employer institutions and benefit-enrolled employees; runs one order per customer per market through the full pickup flow.
 
 At the end, credentials are printed to stdout and written to `.demo_credentials.local` (gitignored).
 
-For the full narrative — markets, institutions, restaurants, plates, savings math, all credential tables, and known workarounds — read **`DEMO_DAY_DATASET.md`** in this same folder. That doc is the authoritative reference.
+For the full narrative — markets, institutions, restaurants, viandas, savings math, all credential tables, and known workarounds — read **`DEMO_DAY_DATASET.md`** in this same folder. That doc is the authoritative reference.
 
 **Re-running:** Customer signups, subscriptions, and orders are NOT idempotent — they create new rows on each run. To reset: `bash scripts/purge_demo_data.sh && bash scripts/load_demo_data.sh`.
 
@@ -305,7 +305,7 @@ Deletes all rows matching UUID prefix `dddddddd-dec0-` (and canonical_key `DEMO_
 After any database rebuild, verify:
 
 - [ ] **15 archival indexes** created
-- [ ] **Core tables** exist (user_info, plate_pickup_live, client_transaction, etc.)
+- [ ] **Core tables** exist (user_info, vianda_pickup_live, client_transaction, etc.)
 - [ ] **Database tests** pass: `pytest app/tests/database/`
 - [ ] **Archival config** loads: `get_archival_priority_order()` returns tables
 - [ ] **Admin endpoints** accessible at `/admin/archival/*` and `/admin/archival-config/*`

@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-The B2C app's Explore tab currently uses `react-native-maps` (Google Maps SDK) to show restaurant pins in a city. The map is non-interactive — users tap a pin to view a plate modal but rarely pan or zoom. The backend now serves **personalized static map images** centered on the user's selected address, which:
+The B2C app's Explore tab currently uses `react-native-maps` (Google Maps SDK) to show restaurant pins in a city. The map is non-interactive — users tap a pin to view a vianda modal but rarely pan or zoom. The backend now serves **personalized static map images** centered on the user's selected address, which:
 
 - Eliminates the heaviest native dependency in the mobile app
 - Works on all platforms (iOS, Android, web, Expo Go) as a plain `<Image>`

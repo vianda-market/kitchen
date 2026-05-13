@@ -137,15 +137,15 @@ For most enriched endpoints (users, restaurants, products, etc.):
 - **Customers** (`role_type = "Customer"`): See only records from their institution (if applicable)
 
 #### User-Level Scoping (Special Cases)
-For certain enriched endpoints that track user-specific data (e.g., plate pickups):
+For certain enriched endpoints that track user-specific data (e.g., vianda pickups):
 - **Employees** (`role_type = "Employee"`): See all records across all institutions (global access)
 - **Suppliers** (`role_type = "Supplier"`): See records for restaurants in their institution (filtered by restaurant's `institution_id`)
 - **Customers** (`role_type = "Customer"`): See only their own records (filtered by `user_id`)
 
-**Example**: The `/plate-pickup/enriched/` endpoint:
-- Employees see all plate pickups from all restaurants
-- Suppliers see plate pickups for restaurants belonging to their institution
-- Customers see only their own plate pickups
+**Example**: The `/vianda-pickup/enriched/` endpoint:
+- Employees see all vianda pickups from all restaurants
+- Suppliers see vianda pickups for restaurants belonging to their institution
+- Customers see only their own vianda pickups
 
 **Note**: The UI does not need to implement any filtering logic - the backend automatically applies the correct scoping based on the authenticated user's role type.
 
@@ -194,18 +194,18 @@ The following enriched endpoints are currently available:
 - `GET /restaurants/enriched/{restaurant_id}` - Single restaurant with institution, entity, and address details
 - `GET /restaurant-balances/enriched/` - Restaurant balances with institution, entity, restaurant, and address details (read-only)
 - `GET /restaurant-balances/enriched/{restaurant_id}` - Single restaurant balance with institution, entity, restaurant, and address details (read-only)
-- `GET /restaurant-transactions/enriched/` - Restaurant transactions with institution, entity, restaurant, plate, and address details (read-only)
-- `GET /restaurant-transactions/enriched/{transaction_id}` - Single restaurant transaction with institution, entity, restaurant, plate, and address details (read-only)
+- `GET /restaurant-transactions/enriched/` - Restaurant transactions with institution, entity, restaurant, vianda, and address details (read-only)
+- `GET /restaurant-transactions/enriched/{transaction_id}` - Single restaurant transaction with institution, entity, restaurant, vianda, and address details (read-only)
 - `GET /restaurant-holidays/enriched/` - Restaurant holidays with applicable national holidays (includes both restaurant-specific and national holidays)
 - `GET /restaurant-holidays/enriched/{restaurant_id}` - Restaurant holidays for a specific restaurant with applicable national holidays
 - `GET /qr-codes/enriched/` - QR codes with restaurant, institution, and address details
 - `GET /qr-codes/enriched/{qr_code_id}` - Single QR code with restaurant, institution, and address details
 - `GET /products/enriched/` - Products with institution names
 - `GET /products/enriched/{product_id}` - Single product with institution name
-- `GET /plates/enriched/` - Plates with institution, restaurant, product, and address details
-- `GET /plates/enriched/{plate_id}` - Single plate with institution, restaurant, product, and address details
-- `GET /plate-kitchen-days/enriched/` - Plate kitchen day assignments with institution, restaurant, plate, and product details
-- `GET /plate-kitchen-days/enriched/{kitchen_day_id}` - Single plate kitchen day assignment with institution, restaurant, plate, and product details
+- `GET /viandas/enriched/` - Viandas with institution, restaurant, product, and address details
+- `GET /viandas/enriched/{vianda_id}` - Single vianda with institution, restaurant, product, and address details
+- `GET /vianda-kitchen-days/enriched/` - Vianda kitchen day assignments with institution, restaurant, vianda, and product details
+- `GET /vianda-kitchen-days/enriched/{kitchen_day_id}` - Single vianda kitchen day assignment with institution, restaurant, vianda, and product details
 
 ### Subscription & Billing
 - `GET /subscriptions/enriched/` - Subscriptions with user and plan details
@@ -219,8 +219,8 @@ The following enriched endpoints are currently available:
 - `GET /plans/enriched/` - Plans with currency name and code
 - `GET /plans/enriched/{plan_id}` - Single plan with currency name and code
 
-### Plate Pickup
-- `GET /plate-pickup/enriched/` - Plate pickups with restaurant, address, product, and credit details
+### Vianda Pickup
+- `GET /vianda-pickup/enriched/` - Vianda pickups with restaurant, address, product, and credit details
 
 All enriched endpoints follow the same pattern and support the `include_archived` query parameter.
 

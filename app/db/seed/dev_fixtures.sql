@@ -176,20 +176,20 @@ INSERT INTO ops.restaurant_info (
 );
 
 -- =============================================================================
--- DEV FIXTURE: Canonical plates
--- Plates depend on both a product_id and a restaurant_id, both of which are
+-- DEV FIXTURE: Canonical viandas
+-- Viandas depend on both a product_id and a restaurant_id, both of which are
 -- created at test run time (via Postman) rather than seeded here.  Canonical
--- plate fixtures therefore live in the Postman collection (000 E2E Plate
--- Selection) as PUT /api/v1/plates/by-key calls, not as SQL INSERTs.
+-- vianda fixtures therefore live in the Postman collection (000 E2E Vianda
+-- Selection) as PUT /api/v1/viandas/by-key calls, not as SQL INSERTs.
 --
--- canonical_key convention: RESTAURANT_{SLUG}_PLATE_{SLUG}
+-- canonical_key convention: RESTAURANT_{SLUG}_VIANDA_{SLUG}
 -- Examples:
---   RESTAURANT_LA_COCINA_PORTENA_PLATE_BONDIOLA
---   RESTAURANT_LA_COCINA_PORTENA_PLATE_ENSALADA_GRIEGA
+--   RESTAURANT_LA_COCINA_PORTENA_VIANDA_BONDIOLA
+--   RESTAURANT_LA_COCINA_PORTENA_VIANDA_ENSALADA_GRIEGA
 --
--- If you need a fully SQL-driven plate fixture (e.g. for geo tests), create
+-- If you need a fully SQL-driven vianda fixture (e.g. for geo tests), create
 -- the product and restaurant rows with fixed UUIDs first, then INSERT INTO
--- ops.plate_info ... ON CONFLICT (canonical_key) WHERE canonical_key IS NOT NULL
+-- ops.vianda_info ... ON CONFLICT (canonical_key) WHERE canonical_key IS NOT NULL
 -- DO UPDATE SET ... — exactly like the plan fixtures below.
 -- =============================================================================
 

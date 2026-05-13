@@ -7,7 +7,7 @@
 The vianda-home marketing site has a **"Apply to Partner"** flow where a prospective supplier picks a country, then a city, then submits a lead. The flow calls two endpoints:
 
 - `GET /leads/markets?audience=supplier` — audience-aware, returns **all** active non-global markets (including unserved ones) because suppliers are how Vianda bootstraps new markets.
-- `GET /leads/cities?country_code={code}` — **not audience-aware**. Always returns only "cities with ≥1 active restaurant with plates + QR codes."
+- `GET /leads/cities?country_code={code}` — **not audience-aware**. Always returns only "cities with ≥1 active restaurant with viandas + QR codes."
 
 **The bug:** a supplier picks an unserved country (exactly the reason the expanded markets list exists), the cities endpoint returns `{"cities": []}`, the dropdown collapses, and the HTML `required` attribute blocks submission. The supplier has no way to complete the form.
 
@@ -28,7 +28,7 @@ The prompt suggested option (a) as minimum viable: "union of served cities ∪ c
 | `core.restaurant_lead.city_name` | `VARCHAR(100)` self-reported city from prior supplier lead submissions (`schema.sql:716–753`). | **No for the first supplier** in a given country (chicken-and-egg). Grows organically after. |
 | `core.lead_interest.city_name` | Customer-side interest capture. | Same as above — organic but starts empty. |
 
-**Key insight:** `city_info` is the "cities Vianda targets/supports," not a general city reference dataset. Using it for supplier dropdowns just returns the same handful of cities as the current query, minus the plate/QR filter. It does **not** solve the problem.
+**Key insight:** `city_info` is the "cities Vianda targets/supports," not a general city reference dataset. Using it for supplier dropdowns just returns the same handful of cities as the current query, minus the vianda/QR filter. It does **not** solve the problem.
 
 **Consequence:** the supplier-audience variant genuinely needs a new data source. The real options are (1) an external reference dataset seeded into a new table, or (2) a curated ops-maintained list. The user's prompt asked about (1)'s ToS and pricing — both are answered below.
 
@@ -142,7 +142,7 @@ async def get_leads_cities(
     country_code: Optional[str] = "US",
     audience: str = Query(
         None,
-        description="Optional. Pass 'supplier' for the broader lead-capture dropdown (includes cities in unserved markets). Default returns only served cities (active restaurants with plates + QR).",
+        description="Optional. Pass 'supplier' for the broader lead-capture dropdown (includes cities in unserved markets). Default returns only served cities (active restaurants with viandas + QR).",
     ),
     db: psycopg2.extensions.connection = Depends(get_db),
 ):

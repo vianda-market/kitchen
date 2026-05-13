@@ -483,11 +483,11 @@ def get_my_messaging_preferences(
     prefs = get_messaging_preferences(current_user["user_id"], db)
     return MessagingPreferencesResponseSchema(
         notify_coworker_pickup_alert=prefs.notify_coworker_pickup_alert,
-        notify_plate_readiness_alert=prefs.notify_plate_readiness_alert,
+        notify_vianda_readiness_alert=prefs.notify_vianda_readiness_alert,
         notify_promotions_push=prefs.notify_promotions_push,
         notify_promotions_email=prefs.notify_promotions_email,
         coworkers_can_see_my_orders=prefs.coworkers_can_see_my_orders,
-        can_participate_in_plate_pickups=prefs.can_participate_in_plate_pickups,
+        can_participate_in_vianda_pickups=prefs.can_participate_in_vianda_pickups,
     )
 
 
@@ -503,11 +503,11 @@ def update_my_messaging_preferences(
     prefs = update_messaging_preferences(current_user["user_id"], update_data, db)
     return MessagingPreferencesResponseSchema(
         notify_coworker_pickup_alert=prefs.notify_coworker_pickup_alert,
-        notify_plate_readiness_alert=prefs.notify_plate_readiness_alert,
+        notify_vianda_readiness_alert=prefs.notify_vianda_readiness_alert,
         notify_promotions_push=prefs.notify_promotions_push,
         notify_promotions_email=prefs.notify_promotions_email,
         coworkers_can_see_my_orders=prefs.coworkers_can_see_my_orders,
-        can_participate_in_plate_pickups=prefs.can_participate_in_plate_pickups,
+        can_participate_in_vianda_pickups=prefs.can_participate_in_vianda_pickups,
     )
 
 

@@ -59,7 +59,7 @@ If you see import errors or module not found:
 Once the server is running, you can test the endpoint:
 ```bash
 # Get a valid token first (from your Postman collection or login endpoint)
-curl -X GET "http://localhost:8000/plate-pickup/enriched" \
+curl -X GET "http://localhost:8000/vianda-pickup/enriched" \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 

@@ -76,7 +76,7 @@ class TestCreditLoadingService:
             transaction_id=uuid4(),
             user_id=uuid4(),
             source="discretionary",
-            plate_selection_id=None,
+            vianda_selection_id=None,
             discretionary_id=uuid4(),
             credit=Decimal("10.0"),
             is_archived=False,
@@ -92,7 +92,7 @@ class TestCreditLoadingService:
         return RestaurantTransactionDTO(
             transaction_id=uuid4(),
             restaurant_id=uuid4(),
-            plate_selection_id=None,
+            vianda_selection_id=None,
             discretionary_id=uuid4(),
             currency_metadata_id=uuid4(),
             was_collected=False,
@@ -317,7 +317,7 @@ class TestCreditLoadingService:
             # Verify transaction data
             call_args = mock_create_with_balance.call_args[0][0]
             assert call_args["restaurant_id"] == sample_restaurant_id
-            assert call_args["plate_selection_id"] is None
+            assert call_args["vianda_selection_id"] is None
             assert call_args["credit"] == sample_amount
             assert call_args["final_amount"] == sample_amount
             assert call_args["status"] == "pending"

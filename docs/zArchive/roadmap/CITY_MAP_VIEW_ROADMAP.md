@@ -73,7 +73,7 @@
 | **List / Map toggle** | Switch between list view and map view. Both show the same filtered data. |
 | **Focus address toggle** | "Home" vs "Work" — which address to center on. Disabled "Work" if user has no employer address. |
 | **Default focus** | Option to "Use as default for Explore" — persists via address `is_default` or user preferences (per backend contract). |
-| **Map** | Center on focus address; show user marker + restaurant pins. Use `react-native-maps` (existing). Tap pin → restaurant detail or plate modal. |
+| **Map** | Center on focus address; show user marker + restaurant pins. Use `react-native-maps` (existing). Tap pin → restaurant detail or vianda modal. |
 
 ### Data flow
 

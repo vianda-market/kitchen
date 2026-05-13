@@ -7,7 +7,7 @@
 
 ## The Problem
 
-Vianda collects payment from customers and pays restaurants, but is never physically present when the plate changes hands. This creates a three-party trust gap:
+Vianda collects payment from customers and pays restaurants, but is never physically present when the vianda changes hands. This creates a three-party trust gap:
 
 ```
 Customer ←→ Restaurant
@@ -16,7 +16,7 @@ Customer ←→ Restaurant
    (not present)
 ```
 
-**Vianda is on the hook for fulfillment.** If a customer claims they didn't receive their plate, or a restaurant claims they handed it off, Vianda has no first-hand evidence either way.
+**Vianda is on the hook for fulfillment.** If a customer claims they didn't receive their vianda, or a restaurant claims they handed it off, Vianda has no first-hand evidence either way.
 
 **Design constraint: low friction above all else.** Restaurant clerks are slammed during lunch rush on business days. Some operate from a cheap phone, not a tablet. Some are food truck operators doing everything solo. Every mitigation mechanism must be optional, progressive, and designed for worst-case hardware and attention. We don't impose verification burdens — we offer tools, and let each restaurant manage its own risk appetite.
 
@@ -28,16 +28,16 @@ Customer ←→ Restaurant
 
 | # | Risk | Description | Severity |
 |---|------|-------------|----------|
-| **C1** | **False non-receipt claim** | Customer picks up the plate, then claims they didn't receive it to get a credit/refund | High |
-| **C2** | **Confirmation screen replay** | Customer picks up plate, hands phone to someone else showing the post-scan confirmation screen. Second person approaches clerk pretending they just scanned, tries to get another plate | Medium |
+| **C1** | **False non-receipt claim** | Customer picks up the vianda, then claims they didn't receive it to get a credit/refund | High |
+| **C2** | **Confirmation screen replay** | Customer picks up vianda, hands phone to someone else showing the post-scan confirmation screen. Second person approaches clerk pretending they just scanned, tries to get another vianda | Medium |
 | **C3** | **Delegated pickup abuse** | Customer delegates pickup, then both try to claim separately | Low |
 
 ### Restaurant-Side
 
 | # | Risk | Description | Severity |
 |---|------|-------------|----------|
-| **R1** | **Phantom handoff** | Restaurant marks order as handed out without actually serving the plate | High |
-| **R2** | **Portion/quality shortchanging** | Restaurant serves a smaller or lower-quality plate than what the customer paid for | Medium |
+| **R1** | **Phantom handoff** | Restaurant marks order as handed out without actually serving the vianda | High |
+| **R2** | **Portion/quality shortchanging** | Restaurant serves a smaller or lower-quality vianda than what the customer paid for | Medium |
 
 ---
 
@@ -58,7 +58,7 @@ The kiosk receives a **push notification** and a new entry appears in the **live
 
 Each queue entry shows:
 - Initials only (e.g. "M.G.") — no full names for privacy
-- Plate(s) ordered (e.g. "1x Grilled Chicken")
+- Vianda(s) ordered (e.g. "1x Grilled Chicken")
 - Count-up timer since scan
 - Numeric code (visible to clerk on their screen)
 
@@ -72,13 +72,13 @@ Either way, the clerk now knows who this customer is and what they ordered.
 
 ### Step 3: Food prep and handoff (physical)
 
-Clerk prepares the plate (or it's already ready). Clerk gives food to customer.
+Clerk prepares the vianda (or it's already ready). Clerk gives food to customer.
 
 Clerk **may or may not** tap "Delivered" on the kiosk. This is optional — it creates a stronger record but is not required.
 
 ### Step 4: Customer confirmation (B2C)
 
-If the clerk tapped "Delivered," the customer gets an **immediate notification**: "Did you receive your plate from [Restaurant]?"
+If the clerk tapped "Delivered," the customer gets an **immediate notification**: "Did you receive your vianda from [Restaurant]?"
 
 Two options:
 - **"Received"** → order completes, survey opens (see Step 5)
@@ -99,7 +99,7 @@ Rating 2 or 3 → survey continues normally (stars, would_order_again, comment).
 Rating **1 (small)** → an additional option appears: **"File a portion complaint."** This is intentionally one extra tap of friction because a size-1 rating is subjective — a customer might think "small" but still be satisfied. The complaint is the real signal.
 
 If the customer taps "File a portion complaint":
-1. Prompt to take a photo of the plate ("Snap a photo of your plate before eating so we can review it")
+1. Prompt to take a photo of the vianda ("Snap a photo of your vianda before eating so we can review it")
 2. Text field for details
 3. Submits to support queue with order ID, timestamps, photo, and complaint flag
 
@@ -119,12 +119,12 @@ Pending → Arrived → [Handed Out] → Completed
 
 | Status | Triggered by | What it means |
 |--------|-------------|---------------|
-| **Pending** | System (plate selection promoted) | Order exists, customer hasn't shown up |
+| **Pending** | System (vianda selection promoted) | Order exists, customer hasn't shown up |
 | **Arrived** | Customer scans QR (B2C) | Customer is at restaurant. Timer and code active. |
-| **Handed Out** | Clerk taps "Delivered" (B2B) OR code entry match (B2B) | Restaurant claims they gave the plate. Optional — system works without it. |
+| **Handed Out** | Clerk taps "Delivered" (B2B) OR code entry match (B2B) | Restaurant claims they gave the vianda. Optional — system works without it. |
 | **Completed** | Customer taps "Received" (B2C) OR 5-min timeout after Handed Out OR handoff timer expiry OR kitchen-day close cron | Final state. Triggers survey if not yet shown. |
 
-The "Handed Out" status is the key addition. It separates "customer is here" from "plate was given" from "customer confirms." Three timestamps, up to two independent confirmations for dispute resolution.
+The "Handed Out" status is the key addition. It separates "customer is here" from "vianda was given" from "customer confirms." Three timestamps, up to two independent confirmations for dispute resolution.
 
 ---
 
@@ -204,7 +204,7 @@ Every restaurant gets Layer 0 automatically. Higher layers are opt-in or auto-es
 
 | Responsibility | Priority | Notes |
 |---|---|---|
-| **Live arrivals queue** | P0 | Real-time queue showing: initials (M.G.), plate(s), count-up timer, numeric code. Primary kiosk view during service. Push notification or live polling on new arrivals. |
+| **Live arrivals queue** | P0 | Real-time queue showing: initials (M.G.), vianda(s), count-up timer, numeric code. Primary kiosk view during service. Push notification or live polling on new arrivals. |
 | **Visual code matching** | P0 | The queue shows the numeric code alongside each arrival. Clerk compares it with the customer's phone — no typing needed. This is the zero-friction verification for all restaurants. |
 | **Push notification on arrival** | P0 | Customer scans QR → kiosk gets notified. Clerk taps notification → jumps to queue. Critical for phone-based kiosks. |
 | **"Delivered" one-tap button** | P1 | Per-order in the queue. Optional in Layer 0/1, part of the flow in Layer 2. One tap, no typing. |
@@ -237,9 +237,9 @@ These are global system-level settings for Phase 1. Per-restaurant granularity c
 
 #### FR-B1: "Handed Out" status
 
-Add `'Handed Out'` to `status_enum` in PostgreSQL. Update `Status` Python enum with `HANDED_OUT = "Handed Out"`. Add to `plate_pickup` status context: `[Pending, Arrived, Handed Out, Completed, Cancelled]`.
+Add `'Handed Out'` to `status_enum` in PostgreSQL. Update `Status` Python enum with `HANDED_OUT = "Handed Out"`. Add to `vianda_pickup` status context: `[Pending, Arrived, Handed Out, Completed, Cancelled]`.
 
-The status transition rules for `plate_pickup_live`:
+The status transition rules for `vianda_pickup_live`:
 - `Pending → Arrived` — triggered by QR scan (existing)
 - `Arrived → Handed Out` — triggered by clerk marking delivered or code verification match
 - `Arrived → Completed` — triggered by handoff timer expiry (no clerk action, Layer 0 fallback)
@@ -248,13 +248,13 @@ The status transition rules for `plate_pickup_live`:
 
 #### FR-B2: Numeric confirmation code
 
-Change confirmation code generation from 6-character alphanumeric to **6-digit numeric only** (e.g. `482951`). Update `_generate_confirmation_code()` in `plate_pickup_service.py`. The `confirmation_code` column (VARCHAR 10) is already wide enough.
+Change confirmation code generation from 6-character alphanumeric to **6-digit numeric only** (e.g. `482951`). Update `_generate_confirmation_code()` in `vianda_pickup_service.py`. The `confirmation_code` column (VARCHAR 10) is already wide enough.
 
 Numeric codes are faster to type on phone keypads and easier to call out verbally across a counter.
 
 #### FR-B3: Extensions tracking column
 
-Add `extensions_used INTEGER DEFAULT 0` to `plate_pickup_live`. Add to `PlatePickupLiveDTO`. This is scaffolding — always 0 until the B2C extend-timer endpoint is built (separate plan). Include in daily-orders response and scan-qr response so kiosk and B2C app can display it.
+Add `extensions_used INTEGER DEFAULT 0` to `vianda_pickup_live`. Add to `ViandaPickupLiveDTO`. This is scaffolding — always 0 until the B2C extend-timer endpoint is built (separate plan). Include in daily-orders response and scan-qr response so kiosk and B2C app can display it.
 
 #### FR-B4: Enhanced daily-orders response
 
@@ -262,13 +262,13 @@ Expand `GET /api/v1/restaurant-staff/daily-orders` to include per-order:
 
 | Field | Type | Source |
 |---|---|---|
-| `plate_pickup_id` | UUID | `plate_pickup_live.plate_pickup_id` |
-| `expected_completion_time` | datetime / null | `plate_pickup_live.expected_completion_time` |
-| `completion_time` | datetime / null | `plate_pickup_live.completion_time` |
+| `vianda_pickup_id` | UUID | `vianda_pickup_live.vianda_pickup_id` |
+| `expected_completion_time` | datetime / null | `vianda_pickup_live.expected_completion_time` |
+| `completion_time` | datetime / null | `vianda_pickup_live.completion_time` |
 | `countdown_seconds` | int | `settings.PICKUP_COUNTDOWN_SECONDS` |
-| `extensions_used` | int | `plate_pickup_live.extensions_used` |
-| `was_collected` | bool | `plate_pickup_live.was_collected` |
-| `confirmation_code` | string | `plate_pickup_live.confirmation_code` — visible to clerk for visual matching |
+| `extensions_used` | int | `vianda_pickup_live.extensions_used` |
+| `was_collected` | bool | `vianda_pickup_live.was_collected` |
+| `confirmation_code` | string | `vianda_pickup_live.confirmation_code` — visible to clerk for visual matching |
 | `pickup_type` | string / null | `pickup_preferences.pickup_type` via LEFT JOIN |
 
 Add to response envelope:
@@ -293,7 +293,7 @@ POST /api/v1/restaurant-staff/verify-and-handoff
 ```
 
 Logic:
-1. Look up `plate_pickup_live` by `confirmation_code` + `restaurant_id` where status = `Arrived` and today's kitchen day
+1. Look up `vianda_pickup_live` by `confirmation_code` + `restaurant_id` where status = `Arrived` and today's kitchen day
 2. If no match → return `{ "match": false }`
 3. If match → transition status to `Handed Out`, record `handed_out_time`, consume code (prevent reuse), return order details
 
@@ -302,8 +302,8 @@ Response on match:
 {
   "match": true,
   "customer_initials": "M.G.",
-  "plate_pickup_ids": ["uuid"],
-  "plates": [{ "plate_name": "Grilled Chicken", "quantity": 1 }],
+  "vianda_pickup_ids": ["uuid"],
+  "viandas": [{ "vianda_name": "Grilled Chicken", "quantity": 1 }],
   "status": "Handed Out",
   "handed_out_time": "2026-04-04T12:05:00-03:00"
 }
@@ -316,7 +316,7 @@ Auth: Supplier (any role, scoped to institution's restaurants) or Internal.
 New endpoint for Layer 1 manual handoff:
 
 ```
-POST /api/v1/plate-pickup/{plate_pickup_id}/hand-out
+POST /api/v1/vianda-pickup/{vianda_pickup_id}/hand-out
 ```
 
 Transitions status from `Arrived` to `Handed Out`. Records `handed_out_time`. No code required — this is the one-tap path.
@@ -325,7 +325,7 @@ Auth: Supplier (any role, scoped) or Internal.
 
 #### FR-B7: Customer confirmation endpoint
 
-Update existing `POST /api/v1/plate-pickup/{id}/complete` to accept new `completion_type` values:
+Update existing `POST /api/v1/vianda-pickup/{id}/complete` to accept new `completion_type` values:
 
 | Value | Meaning |
 |---|---|
@@ -351,7 +351,7 @@ Add to `RestaurantDTO` and relevant response schemas.
 
 #### FR-B9: Confirmation code consumed flag
 
-Add to `plate_pickup_live`:
+Add to `vianda_pickup_live`:
 
 ```sql
 code_verified BOOLEAN DEFAULT FALSE,
@@ -367,15 +367,15 @@ Add `customer.portion_complaint` table:
 ```sql
 CREATE TABLE IF NOT EXISTS customer.portion_complaint (
     complaint_id UUID PRIMARY KEY DEFAULT uuidv7(),
-    plate_pickup_id UUID NOT NULL,
-    plate_review_id UUID,
+    vianda_pickup_id UUID NOT NULL,
+    vianda_review_id UUID,
     user_id UUID NOT NULL,
     restaurant_id UUID NOT NULL,
     photo_storage_path VARCHAR(500),
     complaint_text VARCHAR(1000),
     resolution_status VARCHAR(20) DEFAULT 'open',
     created_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (plate_pickup_id) REFERENCES customer.plate_pickup_live(plate_pickup_id),
+    FOREIGN KEY (vianda_pickup_id) REFERENCES customer.vianda_pickup_live(vianda_pickup_id),
     FOREIGN KEY (user_id) REFERENCES core.user_info(user_id),
     FOREIGN KEY (restaurant_id) REFERENCES ops.restaurant_info(restaurant_id)
 );
@@ -383,7 +383,7 @@ CREATE TABLE IF NOT EXISTS customer.portion_complaint (
 
 Photos stored in GCS customer bucket: `complaints/{restaurant_id}/{complaint_id}/photo`.
 
-Endpoint: `POST /api/v1/plate-reviews/{plate_review_id}/portion-complaint` (multipart: photo + text). Customer-only, scoped to their own review.
+Endpoint: `POST /api/v1/vianda-reviews/{vianda_review_id}/portion-complaint` (multipart: photo + text). Customer-only, scoped to their own review.
 
 #### FR-B11: Configurable system settings
 
@@ -430,10 +430,10 @@ Display the 6-digit numeric confirmation code on the confirmation screen in larg
 #### FR-C4: Receipt confirmation prompt
 
 When backend sends a push notification (triggered by clerk marking Delivered):
-- Show in-app prompt: "Did you receive your plate from [Restaurant Name]?"
+- Show in-app prompt: "Did you receive your vianda from [Restaurant Name]?"
 - Two buttons: **"Received"** / **"I didn't receive this"**
-- "Received" → calls `POST /plate-pickup/{id}/complete` with `completion_type=user_confirmed` → opens survey
-- "I didn't receive this" → calls `POST /plate-pickup/{id}/complete` with `completion_type=user_disputed` → shows confirmation that dispute was filed
+- "Received" → calls `POST /vianda-pickup/{id}/complete` with `completion_type=user_confirmed` → opens survey
+- "I didn't receive this" → calls `POST /vianda-pickup/{id}/complete` with `completion_type=user_disputed` → shows confirmation that dispute was filed
 - If no response in 5 minutes → auto-complete with `completion_type=confirmation_timeout`
 - If the customer opens the app after auto-complete (timer expiry, no clerk action), show the survey directly
 
@@ -443,7 +443,7 @@ Post-completion survey flow:
 1. First question: "How was the portion size?" → 1 (small), 2 (right), 3 (generous)
 2. If rated 2 or 3 → continue to stars (1-5), would_order_again, comment
 3. If rated 1 → show same survey fields PLUS a **"File a portion complaint"** button
-4. If complaint tapped → camera opens for plate photo → text field for details → submit to `POST /plate-reviews/{id}/portion-complaint`
+4. If complaint tapped → camera opens for vianda photo → text field for details → submit to `POST /vianda-reviews/{id}/portion-complaint`
 5. If complaint not tapped (size 1 but no complaint) → survey completes normally, only the rating is recorded
 
 The complaint is the actionable flag. Size 1 alone is recorded but not escalated.
@@ -456,7 +456,7 @@ The complaint is the actionable flag. Size 1 alone is recorded but not escalated
 
 Primary kiosk view during service hours. When a customer scans QR at the restaurant:
 - New entry appears in the queue (push notification or polling, max 5s latency)
-- Each entry displays: initials ("M.G."), plate(s) with quantity, count-up timer, numeric code
+- Each entry displays: initials ("M.G."), vianda(s) with quantity, count-up timer, numeric code
 - Queue sorted by arrival time (newest at top or bottom — B2B agent decides)
 - Entries remain until order reaches Completed status
 - Completed/timed-out orders move to a "Done" section or fade out
@@ -478,7 +478,7 @@ This is the zero-friction verification available to every restaurant regardless 
 
 #### FR-K4: "Delivered" button (Layer 1)
 
-One-tap button per order in the queue. Calls `POST /plate-pickup/{id}/hand-out` (FR-B6).
+One-tap button per order in the queue. Calls `POST /vianda-pickup/{id}/hand-out` (FR-B6).
 - Available on all queue entries in `Arrived` status
 - Transitions order to `Handed Out`
 - Optional — clerk may skip it. System still works via timer.

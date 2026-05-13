@@ -101,7 +101,7 @@ For each table, the system calculates which records are eligible for archival:
 
 ```sql
 -- Example for a table with 90-day retention + 7-day grace period
-SELECT * FROM plate_pickup_live
+SELECT * FROM vianda_pickup_live
 WHERE is_archived = false 
   AND created_date < (CURRENT_TIMESTAMP - INTERVAL '97 days')
 ORDER BY created_date ASC
@@ -114,14 +114,14 @@ LIMIT 200
    ```sql
    SELECT retention_days, grace_period_days 
    FROM archival_config 
-   WHERE table_name = 'plate_pickup_live' AND is_active = true
+   WHERE table_name = 'vianda_pickup_live' AND is_active = true
    ```
 
 2. **Fallback to Code Configuration** (if database config unavailable)
    ```python
    # From app/config/archival_config.py
    TABLE_CATEGORY_MAPPING = {
-       "plate_pickup_live": ArchivalCategory.CUSTOMER_SERVICE  # 90 days
+       "vianda_pickup_live": ArchivalCategory.CUSTOMER_SERVICE  # 90 days
    }
    ```
 

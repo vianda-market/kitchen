@@ -26,7 +26,7 @@ _LABEL_SOURCE = {
     "status_user": "status",
     "status_restaurant": "status",
     "status_discretionary": "status",
-    "status_plate_pickup": "status",
+    "status_vianda_pickup": "status",
     "status_bill": "status",
 }
 
@@ -91,7 +91,7 @@ async def get_all_enums(
         # Ensure context-scoped status keys are always in the response (user form uses status_user)
         enums["status_user"] = Status.get_by_context("user")
         enums["status_discretionary"] = Status.get_by_context("discretionary")
-        enums["status_plate_pickup"] = Status.get_by_context("plate_pickup")
+        enums["status_vianda_pickup"] = Status.get_by_context("vianda_pickup")
         enums["status_bill"] = Status.get_by_context("bill")
         # Ensure discretionary_reason is always present (discretionary request form category dropdown)
         enums["discretionary_reason"] = enums.get("discretionary_reason") or DiscretionaryReason.values()
@@ -172,7 +172,7 @@ async def get_enum_by_name(enum_name: str, context: str | None = None, current_u
 
     **Query Parameters**:
     - `context`: Optional. For `enum_name=status`, restricts to a subset: `user` (Active/Inactive),
-      `discretionary`, `plate_pickup`, `bill`. Use `context=user` for user edit forms.
+      `discretionary`, `vianda_pickup`, `bill`. Use `context=user` for user edit forms.
 
     **Returns**: List of valid values for the requested enum
 

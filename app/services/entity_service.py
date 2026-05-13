@@ -21,7 +21,7 @@ import psycopg2
 from fastapi import HTTPException
 
 from app.config import Status
-from app.dto.models import GeolocationDTO, InstitutionBillDTO, PlateDTO, ProductDTO, UserDTO
+from app.dto.models import GeolocationDTO, InstitutionBillDTO, ProductDTO, UserDTO, ViandaDTO
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
 from app.schemas.consolidated_schemas import (
@@ -32,9 +32,6 @@ from app.schemas.consolidated_schemas import (
     InstitutionEntityEnrichedResponseSchema,
     MarketResponseSchema,
     PlanEnrichedResponseSchema,
-    PlateEnrichedResponseSchema,
-    PlateKitchenDayEnrichedResponseSchema,
-    PlatePickupEnrichedResponseSchema,
     ProductEnrichedResponseSchema,
     QRCodeEnrichedResponseSchema,
     QRCodePrintContextSchema,
@@ -44,6 +41,9 @@ from app.schemas.consolidated_schemas import (
     SubscriptionEnrichedResponseSchema,
     SupplierInvoiceEnrichedResponseSchema,
     UserEnrichedResponseSchema,
+    ViandaEnrichedResponseSchema,
+    ViandaKitchenDayEnrichedResponseSchema,
+    ViandaPickupEnrichedResponseSchema,
 )
 from app.schemas.payment_method import PaymentMethodEnrichedResponseSchema
 from app.schemas.restaurant_holidays import RestaurantHolidayEnrichedResponseSchema
@@ -51,9 +51,9 @@ from app.security.institution_scope import InstitutionScope
 from app.services.crud_service import (
     geolocation_service,
     institution_bill_service,
-    plate_service,
     product_service,
     user_service,
+    vianda_service,
 )
 from app.services.enriched_service import EnrichedService
 from app.services.subscription_action_service import reconcile_hold_subscriptions
@@ -1188,8 +1188,8 @@ def get_enriched_addresses_search(
 # No DB column, no DB constraint — readiness rules may evolve.
 _RESTAURANT_HAS_PKD = """EXISTS (
         SELECT 1
-        FROM ops.plate_info p
-        JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+        FROM ops.vianda_info p
+        JOIN ops.vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id
         WHERE p.restaurant_id = r.restaurant_id
           AND p.is_archived = FALSE
           AND pkd.is_archived = FALSE
@@ -1216,7 +1216,7 @@ _RESTAURANT_READINESS_SUBQUERY = f"""(
 _RESTAURANT_MISSING_SUBQUERY = f"""ARRAY_REMOVE(ARRAY[
     CASE WHEN r.status != 'active'    THEN 'status_active'    ELSE NULL END,
     CASE WHEN r.is_archived           THEN 'not_archived'      ELSE NULL END,
-    CASE WHEN NOT {_RESTAURANT_HAS_PKD} THEN 'plate_kitchen_days' ELSE NULL END,
+    CASE WHEN NOT {_RESTAURANT_HAS_PKD} THEN 'vianda_kitchen_days' ELSE NULL END,
     CASE WHEN NOT {_RESTAURANT_HAS_QR}  THEN 'qr'              ELSE NULL END
 ], NULL)::text[] AS missing"""
 
@@ -1327,11 +1327,11 @@ def get_enriched_restaurants(
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
             ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id"),
             ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
-            # Filter-only joins for kitchen_day. plate_info → plate_kitchen_days is 1:N per
+            # Filter-only joins for kitchen_day. vianda_info → vianda_kitchen_days is 1:N per
             # restaurant, so rows are deduplicated via distinct=True below. These joins surface
             # pkd.kitchen_day for WHERE filtering without adding it to the SELECT shape.
-            ("LEFT", "ops.plate_info", "pi", "pi.restaurant_id = r.restaurant_id AND pi.is_archived = FALSE"),
-            ("LEFT", "ops.plate_kitchen_days", "pkd", "pkd.plate_id = pi.plate_id AND pkd.is_archived = FALSE"),
+            ("LEFT", "ops.vianda_info", "pi", "pi.restaurant_id = r.restaurant_id AND pi.is_archived = FALSE"),
+            ("LEFT", "ops.vianda_kitchen_days", "pkd", "pkd.vianda_id = pi.vianda_id AND pkd.is_archived = FALSE"),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -1912,21 +1912,21 @@ def get_enriched_product_by_id(
 
 
 # =============================================================================
-# PLATE ENRICHED BUSINESS LOGIC
+# VIANDA ENRICHED BUSINESS LOGIC
 # =============================================================================
 
-# Initialize EnrichedService instance for plates
-_plate_enriched_service = EnrichedService(
-    base_table="plate_info",
+# Initialize EnrichedService instance for viandas
+_vianda_enriched_service = EnrichedService(
+    base_table="vianda_info",
     table_alias="p",
-    id_column="plate_id",
-    schema_class=PlateEnrichedResponseSchema,
+    id_column="vianda_id",
+    schema_class=ViandaEnrichedResponseSchema,
     institution_column="institution_id",
     institution_table_alias="r",  # institution_id is on the joined restaurant_info table
 )
 
 
-def get_enriched_plates(
+def get_enriched_viandas(
     db: psycopg2.extensions.connection,
     *,
     scope: InstitutionScope | None = None,
@@ -1934,28 +1934,28 @@ def get_enriched_plates(
     additional_conditions: list[tuple[str, list]] | None = None,
     page: int | None = None,
     page_size: int | None = None,
-) -> list[PlateEnrichedResponseSchema]:
+) -> list[ViandaEnrichedResponseSchema]:
     """
-    Get all plates with enriched data (institution, restaurant, product, address details).
+    Get all viandas with enriched data (institution, restaurant, product, address details).
 
     Args:
         db: Database connection
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records (default: False)
         additional_conditions: Optional extra (condition, param_list) tuples from the filter
-            registry (e.g. status, market_id, restaurant_id, plate_date_from, plate_date_to).
+            registry (e.g. status, market_id, restaurant_id, vianda_date_from, vianda_date_to).
 
     Returns:
-        List of PlateEnrichedResponseSchema with enriched data
+        List of ViandaEnrichedResponseSchema with enriched data
 
     Raises:
         HTTPException: For system errors or database failures
     """
-    plates = _plate_enriched_service.get_enriched(
+    viandas = _vianda_enriched_service.get_enriched(
         db,
         row_transform=None,
         select_fields=[
-            "p.plate_id",
+            "p.vianda_id",
             "p.product_id",
             "p.restaurant_id",
             "i.name as institution_name",
@@ -1986,9 +1986,9 @@ def get_enriched_plates(
             "p.delivery_time_minutes",
             "p.is_archived",
             "p.status",
-            "(SELECT ROUND(AVG(prv.stars_rating)::numeric, 1) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as average_stars",
-            "(SELECT ROUND(AVG(prv.portion_size_rating)::numeric, 1) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as average_portion_size",
-            "(SELECT COALESCE(COUNT(*)::int, 0) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as review_count",
+            "(SELECT ROUND(AVG(prv.stars_rating)::numeric, 1) FROM vianda_review_info prv WHERE prv.vianda_id = p.vianda_id AND prv.is_archived = FALSE) as average_stars",
+            "(SELECT ROUND(AVG(prv.portion_size_rating)::numeric, 1) FROM vianda_review_info prv WHERE prv.vianda_id = p.vianda_id AND prv.is_archived = FALSE) as average_portion_size",
+            "(SELECT COALESCE(COUNT(*)::int, 0) FROM vianda_review_info prv WHERE prv.vianda_id = p.vianda_id AND prv.is_archived = FALSE) as review_count",
         ],
         joins=[
             ("INNER", "product_info", "pr", "p.product_id = pr.product_id"),
@@ -2000,10 +2000,15 @@ def get_enriched_plates(
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
             ("LEFT", "cuisine", "cu", "r.cuisine_id = cu.cuisine_id"),
             ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
-            # Filter-only join for plate_date_from / plate_date_to. plate_info → plate_selection_info
-            # is 1:N (a plate can have many reservations), so rows are deduplicated via distinct=True
+            # Filter-only join for vianda_date_from / vianda_date_to. vianda_info → vianda_selection_info
+            # is 1:N (a vianda can have many reservations), so rows are deduplicated via distinct=True
             # below. psi.pickup_date is not in the SELECT list; it is exposed only for WHERE filtering.
-            ("LEFT", "customer.plate_selection_info", "psi", "psi.plate_id = p.plate_id AND psi.is_archived = FALSE"),
+            (
+                "LEFT",
+                "customer.vianda_selection_info",
+                "psi",
+                "psi.vianda_id = p.vianda_id AND psi.is_archived = FALSE",
+            ),
         ],
         scope=scope,
         include_archived=include_archived,
@@ -2012,26 +2017,26 @@ def get_enriched_plates(
         page_size=page_size,
         distinct=True,
     )
-    for plate in plates:
-        plate.address_display = format_street_display(
-            plate.country_code or "",
-            plate.street_type,
-            plate.street_name,
-            plate.building_number,
+    for vianda in viandas:
+        vianda.address_display = format_street_display(
+            vianda.country_code or "",
+            vianda.street_type,
+            vianda.street_name,
+            vianda.building_number,
         )
         # Apply minimum review threshold (5) and portion_size bucketing
-        rc = plate.review_count or 0
+        rc = vianda.review_count or 0
         if rc < 5:
-            plate.average_stars = None
-            plate.average_portion_size = None
-            plate.portion_size = "insufficient_reviews"
+            vianda.average_stars = None
+            vianda.average_portion_size = None
+            vianda.portion_size = "insufficient_reviews"
         else:
-            plate.portion_size = bucket_portion_size(plate.average_portion_size, rc)
-    return plates
+            vianda.portion_size = bucket_portion_size(vianda.average_portion_size, rc)
+    return viandas
 
 
-def get_enriched_plate_by_id(
-    plate_id: UUID,
+def get_enriched_vianda_by_id(
+    vianda_id: UUID,
     db: psycopg2.extensions.connection,
     *,
     scope: InstitutionScope | None = None,
@@ -2040,15 +2045,15 @@ def get_enriched_plate_by_id(
     employer_entity_id: UUID | None = None,
     employer_address_id: UUID | None = None,
     user_id: UUID | None = None,
-) -> PlateEnrichedResponseSchema | None:
+) -> ViandaEnrichedResponseSchema | None:
     """
-    Get a single plate by ID with enriched data (institution, restaurant, product, address details).
+    Get a single vianda by ID with enriched data (institution, restaurant, product, address details).
 
     Optionally accepts kitchen_day, employer_entity_id, employer_address_id, user_id for future
     has_coworker_offer / has_coworker_request support; currently accepted but not used.
 
     Args:
-        plate_id: Plate ID
+        vianda_id: Vianda ID
         db: Database connection
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records (default: False)
@@ -2058,17 +2063,17 @@ def get_enriched_plate_by_id(
         user_id: Optional; for future coworker flags
 
     Returns:
-        PlateEnrichedResponseSchema with enriched data, or None if not found
+        ViandaEnrichedResponseSchema with enriched data, or None if not found
 
     Raises:
         HTTPException: For system errors or database failures
     """
-    plate = _plate_enriched_service.get_enriched_by_id(
-        plate_id,
+    vianda = _vianda_enriched_service.get_enriched_by_id(
+        vianda_id,
         db,
         row_transform=None,
         select_fields=[
-            "p.plate_id",
+            "p.vianda_id",
             "p.product_id",
             "p.restaurant_id",
             "i.name as institution_name",
@@ -2099,9 +2104,9 @@ def get_enriched_plate_by_id(
             "p.delivery_time_minutes",
             "p.is_archived",
             "p.status",
-            "(SELECT ROUND(AVG(prv.stars_rating)::numeric, 1) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as average_stars",
-            "(SELECT ROUND(AVG(prv.portion_size_rating)::numeric, 1) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as average_portion_size",
-            "(SELECT COALESCE(COUNT(*)::int, 0) FROM plate_review_info prv WHERE prv.plate_id = p.plate_id AND prv.is_archived = FALSE) as review_count",
+            "(SELECT ROUND(AVG(prv.stars_rating)::numeric, 1) FROM vianda_review_info prv WHERE prv.vianda_id = p.vianda_id AND prv.is_archived = FALSE) as average_stars",
+            "(SELECT ROUND(AVG(prv.portion_size_rating)::numeric, 1) FROM vianda_review_info prv WHERE prv.vianda_id = p.vianda_id AND prv.is_archived = FALSE) as average_portion_size",
+            "(SELECT COALESCE(COUNT(*)::int, 0) FROM vianda_review_info prv WHERE prv.vianda_id = p.vianda_id AND prv.is_archived = FALSE) as review_count",
         ],
         joins=[
             ("INNER", "product_info", "pr", "p.product_id = pr.product_id"),
@@ -2117,22 +2122,22 @@ def get_enriched_plate_by_id(
         scope=scope,
         include_archived=include_archived,
     )
-    if plate:
-        plate.address_display = format_street_display(
-            plate.country_code or "",
-            plate.street_type,
-            plate.street_name,
-            plate.building_number,
+    if vianda:
+        vianda.address_display = format_street_display(
+            vianda.country_code or "",
+            vianda.street_type,
+            vianda.street_name,
+            vianda.building_number,
         )
         # Apply minimum review threshold (5) and portion_size bucketing
-        rc = plate.review_count or 0
+        rc = vianda.review_count or 0
         if rc < 5:
-            plate.average_stars = None
-            plate.average_portion_size = None
-            plate.portion_size = "insufficient_reviews"
+            vianda.average_stars = None
+            vianda.average_portion_size = None
+            vianda.portion_size = "insufficient_reviews"
         else:
-            plate.portion_size = bucket_portion_size(plate.average_portion_size, rc)
-    return plate
+            vianda.portion_size = bucket_portion_size(vianda.average_portion_size, rc)
+    return vianda
 
 
 # =============================================================================
@@ -2141,7 +2146,7 @@ def get_enriched_plate_by_id(
 
 # Subquery that computes is_ready_for_signup at read time.
 # True when: market.status = 'active' AND the market has at least one active institution ->
-# restaurant -> plate -> plate_kitchen_days -> qr_code chain.
+# restaurant -> vianda -> vianda_kitchen_days -> qr_code chain.
 # Mirrors the readiness predicate used by /leads/cities (city_metrics_service.get_cities_with_coverage).
 # No DB column, no DB constraint — readiness rules may evolve.
 _MARKET_READY_RESTAURANT_EXISTS = """EXISTS (
@@ -2149,8 +2154,8 @@ _MARKET_READY_RESTAURANT_EXISTS = """EXISTS (
         FROM core.institution_market im_sub
         JOIN core.institution_info i ON i.institution_id = im_sub.institution_id
         JOIN ops.restaurant_info r ON r.institution_id = i.institution_id
-        JOIN ops.plate_info p ON p.restaurant_id = r.restaurant_id
-        JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+        JOIN ops.vianda_info p ON p.restaurant_id = r.restaurant_id
+        JOIN ops.vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id
         JOIN ops.qr_code qc ON qc.restaurant_id = r.restaurant_id
         WHERE im_sub.market_id = m.market_id
           AND i.status = 'active' AND i.is_archived = FALSE
@@ -2765,34 +2770,34 @@ def search_products_by_name(
         raise envelope_exception(ErrorCode.SERVICE_PRODUCT_SEARCH_FAILED, status=500, locale="en") from None
 
 
-def get_plates_by_product(product_id: UUID, db: psycopg2.extensions.connection) -> list[PlateDTO]:
+def get_viandas_by_product(product_id: UUID, db: psycopg2.extensions.connection) -> list[ViandaDTO]:
     """
-    Get all plates for a product - business logic only.
+    Get all viandas for a product - business logic only.
 
     Args:
         product_id: Product ID
         db: Database connection
 
     Returns:
-        List of PlateDTOs
+        List of ViandaDTOs
 
     Raises:
         HTTPException: For system errors or database failures
     """
     try:
         # Use service layer instead of direct db_read
-        all_plates = plate_service.get_all(db)
+        all_viandas = vianda_service.get_all(db)
 
         # Filter by product_id (business logic)
-        product_plates = [plate for plate in all_plates if plate.product_id == product_id]
+        product_viandas = [vianda for vianda in all_viandas if vianda.product_id == product_id]
 
         # Sort by price (business logic)
-        product_plates.sort(key=lambda p: p.price)
+        product_viandas.sort(key=lambda p: p.price)
 
-        return product_plates
+        return product_viandas
     except Exception as e:
-        log_error(f"Error getting plates by product {product_id}: {e}")
-        raise envelope_exception(ErrorCode.SERVICE_PLATE_LIST_FAILED, status=500, locale="en") from None
+        log_error(f"Error getting viandas by product {product_id}: {e}")
+        raise envelope_exception(ErrorCode.SERVICE_VIANDA_LIST_FAILED, status=500, locale="en") from None
 
 
 # =============================================================================
@@ -3457,11 +3462,11 @@ def get_enriched_restaurant_transactions(
     page_size: int | None = None,
 ) -> list[RestaurantTransactionEnrichedResponseSchema]:
     """
-    Get all restaurant transactions with enriched data (institution name, entity name, restaurant name, plate name, currency code, country).
+    Get all restaurant transactions with enriched data (institution name, entity name, restaurant name, vianda name, currency code, country).
     Returns an array of enriched restaurant transaction records.
 
     **Note: This is a read-only endpoint. Restaurant transactions are automatically managed by the backend
-    through plate selection, QR code scanning, and billing operations. They cannot be created or modified via API.**
+    through vianda selection, QR code scanning, and billing operations. They cannot be created or modified via API.**
 
     Scoping rules:
     - If scope is global (Internal): Returns all restaurant transactions
@@ -3473,7 +3478,7 @@ def get_enriched_restaurant_transactions(
         include_archived: Whether to include archived records (default: False)
 
     Returns:
-        List of RestaurantTransactionEnrichedResponseSchema with institution, entity, restaurant, plate, and address information
+        List of RestaurantTransactionEnrichedResponseSchema with institution, entity, restaurant, vianda, and address information
 
     Raises:
         HTTPException: For system errors or database failures
@@ -3488,8 +3493,8 @@ def get_enriched_restaurant_transactions(
             "r.institution_entity_id",
             "COALESCE(ie.name, '') as institution_entity_name",
             "COALESCE(r.name, '') as restaurant_name",
-            "rt.plate_selection_id",
-            "COALESCE(pr.name, '') as plate_name",
+            "rt.vianda_selection_id",
+            "COALESCE(pr.name, '') as vianda_name",
             "rt.discretionary_id",
             "rt.currency_metadata_id",
             "rt.currency_code",
@@ -3517,8 +3522,8 @@ def get_enriched_restaurant_transactions(
             ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("LEFT", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
-            ("LEFT", "plate_selection_info", "ps", "rt.plate_selection_id = ps.plate_selection_id"),
-            ("LEFT", "plate_info", "pi", "ps.plate_id = pi.plate_id"),
+            ("LEFT", "vianda_selection_info", "ps", "rt.vianda_selection_id = ps.vianda_selection_id"),
+            ("LEFT", "vianda_info", "pi", "ps.vianda_id = pi.vianda_id"),
             ("LEFT", "product_info", "pr", "pi.product_id = pr.product_id"),
             ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
@@ -3537,10 +3542,10 @@ def get_enriched_restaurant_transaction_by_id(
     include_archived: bool = False,
 ) -> RestaurantTransactionEnrichedResponseSchema | None:
     """
-    Get a single restaurant transaction by ID with enriched data (institution name, entity name, restaurant name, plate name, currency code, country).
+    Get a single restaurant transaction by ID with enriched data (institution name, entity name, restaurant name, vianda name, currency code, country).
 
     **Note: This is a read-only endpoint. Restaurant transactions are automatically managed by the backend
-    through plate selection, QR code scanning, and billing operations. They cannot be created or modified via API.**
+    through vianda selection, QR code scanning, and billing operations. They cannot be created or modified via API.**
 
     Scoping rules:
     - If scope is global (Internal): Returns any restaurant transaction
@@ -3553,7 +3558,7 @@ def get_enriched_restaurant_transaction_by_id(
         include_archived: Whether to include archived records (default: False)
 
     Returns:
-        RestaurantTransactionEnrichedResponseSchema with institution, entity, restaurant, plate, and address information, or None if not found
+        RestaurantTransactionEnrichedResponseSchema with institution, entity, restaurant, vianda, and address information, or None if not found
 
     Raises:
         HTTPException: For system errors or database failures
@@ -3569,8 +3574,8 @@ def get_enriched_restaurant_transaction_by_id(
             "r.institution_entity_id",
             "COALESCE(ie.name, '') as institution_entity_name",
             "COALESCE(r.name, '') as restaurant_name",
-            "rt.plate_selection_id",
-            "COALESCE(pr.name, '') as plate_name",
+            "rt.vianda_selection_id",
+            "COALESCE(pr.name, '') as vianda_name",
             "rt.discretionary_id",
             "rt.currency_metadata_id",
             "rt.currency_code",
@@ -3598,8 +3603,8 @@ def get_enriched_restaurant_transaction_by_id(
             ("LEFT", "institution_entity_info", "ie", "r.institution_entity_id = ie.institution_entity_id"),
             ("LEFT", "address_info", "a", "r.address_id = a.address_id"),
             ("LEFT", "market_info", "m", "a.country_code = m.country_code"),
-            ("LEFT", "plate_selection_info", "ps", "rt.plate_selection_id = ps.plate_selection_id"),
-            ("LEFT", "plate_info", "pi", "ps.plate_id = pi.plate_id"),
+            ("LEFT", "vianda_selection_info", "ps", "rt.vianda_selection_id = ps.vianda_selection_id"),
+            ("LEFT", "vianda_info", "pi", "ps.vianda_id = pi.vianda_id"),
             ("LEFT", "product_info", "pr", "pi.product_id = pr.product_id"),
             ("LEFT", "external.geonames_country", "gc_country", "gc_country.iso_alpha2 = m.country_code"),
         ],
@@ -3609,11 +3614,11 @@ def get_enriched_restaurant_transaction_by_id(
 
 
 # =============================================================================
-# PLATE PICKUP ENRICHED BUSINESS LOGIC
+# VIANDA PICKUP ENRICHED BUSINESS LOGIC
 # =============================================================================
 
 
-def get_enriched_plate_pickups(
+def get_enriched_vianda_pickups(
     db: psycopg2.extensions.connection,
     *,
     scope: InstitutionScope | None = None,
@@ -3623,15 +3628,15 @@ def get_enriched_plate_pickups(
     additional_conditions: list[tuple[str, list]] | None = None,
     page: int | None = None,
     page_size: int | None = None,
-) -> list[PlatePickupEnrichedResponseSchema]:
+) -> list[ViandaPickupEnrichedResponseSchema]:
     """
-    Get all plate pickups with enriched data (restaurant name, address details, product name, credit).
-    Returns an array of enriched plate pickup records.
+    Get all vianda pickups with enriched data (restaurant name, address details, product name, credit).
+    Returns an array of enriched vianda pickup records.
 
     Scoping rules:
-    - If scope is global (Internal): Returns all plate pickups
-    - If scope is institution-scoped (Supplier): Returns plate pickups for restaurants in their institution
-    - If user_id is provided (Customer): Returns only plate pickups for that specific user
+    - If scope is global (Internal): Returns all vianda pickups
+    - If scope is institution-scoped (Supplier): Returns vianda pickups for restaurants in their institution
+    - If user_id is provided (Customer): Returns only vianda pickups for that specific user
 
     Args:
         db: Database connection
@@ -3642,7 +3647,7 @@ def get_enriched_plate_pickups(
             registry (e.g. status, market_id, expected_from, expected_to).
 
     Returns:
-        List of PlatePickupEnrichedResponseSchema with restaurant, address, product, and credit information
+        List of ViandaPickupEnrichedResponseSchema with restaurant, address, product, and credit information
 
     Raises:
         HTTPException: For system errors or database failures
@@ -3680,13 +3685,13 @@ def get_enriched_plate_pickups(
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         joins_fragment = """
-            FROM plate_pickup_live ppl
+            FROM vianda_pickup_live ppl
             LEFT JOIN restaurant_info r ON ppl.restaurant_id = r.restaurant_id
             LEFT JOIN address_info a ON r.address_id = a.address_id
             LEFT JOIN market_info m ON a.country_code = m.country_code
             LEFT JOIN external.geonames_country gc_country ON gc_country.iso_alpha2 = m.country_code
             LEFT JOIN product_info prod ON ppl.product_id = prod.product_id
-            LEFT JOIN plate_info p ON ppl.plate_id = p.plate_id"""
+            LEFT JOIN vianda_info p ON ppl.vianda_id = p.vianda_id"""
 
         # Convert all params to strings to avoid UUID issues
         safe_params = tuple(str(p) if isinstance(p, UUID) else p for p in params)
@@ -3708,8 +3713,8 @@ def get_enriched_plate_pickups(
 
         query = f"""
             SELECT
-                ppl.plate_pickup_id,
-                ppl.plate_selection_id,
+                ppl.vianda_pickup_id,
+                ppl.vianda_selection_id,
                 ppl.user_id,
                 ppl.restaurant_id,
                 COALESCE(r.name, '') as restaurant_name,
@@ -3721,7 +3726,7 @@ def get_enriched_plate_pickups(
                 COALESCE(a.province, '') as province,
                 COALESCE(a.city, '') as city,
                 COALESCE(a.postal_code, '') as postal_code,
-                ppl.plate_id,
+                ppl.vianda_id,
                 COALESCE(prod.name, '') as product_name,
                 COALESCE(p.credit, 0) as credit,
                 ppl.qr_code_id,
@@ -3735,7 +3740,7 @@ def get_enriched_plate_pickups(
                 ppl.confirmation_code
             {joins_fragment}
             {where_clause}
-            ORDER BY ppl.plate_pickup_id DESC{limit_clause}{offset_clause}
+            ORDER BY ppl.vianda_pickup_id DESC{limit_clause}{offset_clause}
         """
 
         results = db_read(query, safe_params, connection=db, fetch_one=False)
@@ -3767,9 +3772,9 @@ def get_enriched_plate_pickups(
                     row.get("street_name"),
                     row.get("building_number"),
                 )
-                enriched_pickups.append(PlatePickupEnrichedResponseSchema(**row_dict))
+                enriched_pickups.append(ViandaPickupEnrichedResponseSchema(**row_dict))
             except Exception as schema_error:
-                log_error(f"Error parsing plate pickup row for user {user_id}: {schema_error}. Row data: {row}")
+                log_error(f"Error parsing vianda pickup row for user {user_id}: {schema_error}. Row data: {row}")
                 # Skip invalid rows instead of failing completely
                 continue
 
@@ -3791,28 +3796,28 @@ def get_enriched_plate_pickups(
             except Exception:
                 error_msg = f"Error converting exception to string: {type(e).__name__}"
         log_error(
-            f"Error getting enriched plate pickups for user {user_id}: {error_msg}\nFull traceback:\n{error_trace}"
+            f"Error getting enriched vianda pickups for user {user_id}: {error_msg}\nFull traceback:\n{error_trace}"
         )
-        raise HTTPException(status_code=500, detail=f"Failed to get enriched plate pickups: {error_msg}") from None
+        raise HTTPException(status_code=500, detail=f"Failed to get enriched vianda pickups: {error_msg}") from None
 
 
 # =============================================================================
-# PLATE KITCHEN DAYS ENRICHED BUSINESS LOGIC
+# VIANDA KITCHEN DAYS ENRICHED BUSINESS LOGIC
 # =============================================================================
 
-# Initialize EnrichedService instance for plate kitchen days
-# Institution scoping is via: plate_kitchen_days -> plate_info -> restaurant_info -> institution_id
-_plate_kitchen_day_enriched_service = EnrichedService(
-    base_table="plate_kitchen_days",
+# Initialize EnrichedService instance for vianda kitchen days
+# Institution scoping is via: vianda_kitchen_days -> vianda_info -> restaurant_info -> institution_id
+_vianda_kitchen_day_enriched_service = EnrichedService(
+    base_table="vianda_kitchen_days",
     table_alias="pkd",
-    id_column="plate_kitchen_day_id",
-    schema_class=PlateKitchenDayEnrichedResponseSchema,
+    id_column="vianda_kitchen_day_id",
+    schema_class=ViandaKitchenDayEnrichedResponseSchema,
     institution_column="institution_id",
     institution_table_alias="r",  # institution_id is on the joined restaurant_info table
 )
 
 
-def get_enriched_plate_kitchen_days(
+def get_enriched_vianda_kitchen_days(
     db: psycopg2.extensions.connection,
     *,
     scope: InstitutionScope | None = None,
@@ -3820,9 +3825,9 @@ def get_enriched_plate_kitchen_days(
     institution_id: UUID | None = None,
     page: int | None = None,
     page_size: int | None = None,
-) -> list[PlateKitchenDayEnrichedResponseSchema]:
+) -> list[ViandaKitchenDayEnrichedResponseSchema]:
     """
-    Get all plate kitchen days with enriched data (institution name, restaurant name, plate name, dietary).
+    Get all vianda kitchen days with enriched data (institution name, restaurant name, vianda name, dietary).
 
     Args:
         db: Database connection
@@ -3831,7 +3836,7 @@ def get_enriched_plate_kitchen_days(
         institution_id: Optional institution ID to filter results (B2B Internal dropdown scoping; filters via restaurant)
 
     Returns:
-        List of PlateKitchenDayEnrichedResponseSchema with enriched data
+        List of ViandaKitchenDayEnrichedResponseSchema with enriched data
 
     Raises:
         HTTPException: For system errors or database failures
@@ -3839,16 +3844,16 @@ def get_enriched_plate_kitchen_days(
     additional_conditions: list[tuple[str, list]] = []
     if institution_id is not None:
         additional_conditions.append(("r.institution_id = %s", [institution_id]))
-    return _plate_kitchen_day_enriched_service.get_enriched(
+    return _vianda_kitchen_day_enriched_service.get_enriched(
         db,
         select_fields=[
-            "pkd.plate_kitchen_day_id",
-            "pkd.plate_id",
+            "pkd.vianda_kitchen_day_id",
+            "pkd.vianda_id",
             "pkd.kitchen_day",
             "pkd.status",
             "COALESCE(i.name, '') as institution_name",
             "COALESCE(r.name, '') as restaurant_name",
-            "COALESCE(pr.name, '') as plate_name",  # Product name is the "plate name"
+            "COALESCE(pr.name, '') as vianda_name",  # Product name is the "vianda name"
             "pr.dietary",
             "pkd.is_archived",
             "pkd.created_date",
@@ -3856,7 +3861,7 @@ def get_enriched_plate_kitchen_days(
             "pkd.modified_date",
         ],
         joins=[
-            ("INNER", "plate_info", "p", "pkd.plate_id = p.plate_id"),
+            ("INNER", "vianda_info", "p", "pkd.vianda_id = p.vianda_id"),
             ("INNER", "restaurant_info", "r", "p.restaurant_id = r.restaurant_id"),
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("INNER", "product_info", "pr", "p.product_id = pr.product_id"),
@@ -3869,39 +3874,39 @@ def get_enriched_plate_kitchen_days(
     )
 
 
-def get_enriched_plate_kitchen_day_by_id(
+def get_enriched_vianda_kitchen_day_by_id(
     kitchen_day_id: UUID,
     db: psycopg2.extensions.connection,
     *,
     scope: InstitutionScope | None = None,
     include_archived: bool = False,
-) -> PlateKitchenDayEnrichedResponseSchema | None:
+) -> ViandaKitchenDayEnrichedResponseSchema | None:
     """
-    Get a single plate kitchen day by ID with enriched data (institution name, restaurant name, plate name, dietary).
+    Get a single vianda kitchen day by ID with enriched data (institution name, restaurant name, vianda name, dietary).
 
     Args:
-        kitchen_day_id: Plate kitchen day ID
+        kitchen_day_id: Vianda kitchen day ID
         db: Database connection
         scope: Optional institution scope for filtering
         include_archived: Whether to include archived records (default: False)
 
     Returns:
-        PlateKitchenDayEnrichedResponseSchema with enriched data, or None if not found
+        ViandaKitchenDayEnrichedResponseSchema with enriched data, or None if not found
 
     Raises:
         HTTPException: For system errors or database failures
     """
-    return _plate_kitchen_day_enriched_service.get_enriched_by_id(
+    return _vianda_kitchen_day_enriched_service.get_enriched_by_id(
         kitchen_day_id,
         db,
         select_fields=[
-            "pkd.plate_kitchen_day_id",
-            "pkd.plate_id",
+            "pkd.vianda_kitchen_day_id",
+            "pkd.vianda_id",
             "pkd.kitchen_day",
             "pkd.status",
             "COALESCE(i.name, '') as institution_name",
             "COALESCE(r.name, '') as restaurant_name",
-            "COALESCE(pr.name, '') as plate_name",  # Product name is the "plate name"
+            "COALESCE(pr.name, '') as vianda_name",  # Product name is the "vianda name"
             "pr.dietary",
             "pkd.is_archived",
             "pkd.created_date",
@@ -3909,7 +3914,7 @@ def get_enriched_plate_kitchen_day_by_id(
             "pkd.modified_date",
         ],
         joins=[
-            ("INNER", "plate_info", "p", "pkd.plate_id = p.plate_id"),
+            ("INNER", "vianda_info", "p", "pkd.vianda_id = p.vianda_id"),
             ("INNER", "restaurant_info", "r", "p.restaurant_id = r.restaurant_id"),
             ("INNER", "institution_info", "i", "r.institution_id = i.institution_id"),
             ("INNER", "product_info", "pr", "p.product_id = pr.product_id"),
@@ -4306,13 +4311,13 @@ def validate_entity_can_be_archived(entity_id: UUID, db: psycopg2.extensions.con
     """Raise HTTPException if entity has active dependencies that prevent archival.
 
     Checks (in order):
-    1. Active plate pickups via entity's restaurants
+    1. Active vianda pickups via entity's restaurants
     2. Active restaurants
     """
     active_pickups = db_read(
         """
         SELECT COUNT(*) as cnt
-        FROM customer.plate_pickup_live pp
+        FROM customer.vianda_pickup_live pp
         JOIN ops.restaurant_info r ON pp.restaurant_id = r.restaurant_id
         WHERE r.institution_entity_id = %s
           AND pp.is_archived = FALSE
@@ -4350,13 +4355,13 @@ def validate_entity_can_be_archived(entity_id: UUID, db: psycopg2.extensions.con
 
 
 def validate_restaurant_can_be_archived(restaurant_id: UUID, db: psycopg2.extensions.connection) -> None:
-    """Raise HTTPException if restaurant has active plate pickups that prevent archival."""
+    """Raise HTTPException if restaurant has active vianda pickups that prevent archival."""
     active_pickups: dict[str, Any] | None = cast(
         dict[str, Any] | None,
         db_read(
             """
         SELECT COUNT(*) as cnt
-        FROM customer.plate_pickup_live pp
+        FROM customer.vianda_pickup_live pp
         WHERE pp.restaurant_id = %s
           AND pp.is_archived = FALSE
           AND pp.status IN ('pending', 'active')

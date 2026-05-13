@@ -176,7 +176,7 @@ This collection tests the **geolocation service** through the API, verifying:
 
 - **Gateway Architecture**: `docs/architecture/EXTERNAL_SERVICE_GATEWAY.md`
 - **Testing Guidelines**: `CLAUDE.md` (Testing Standards section)
-- **E2E Collection**: `docs/postman/collections/E2E Plate Selection.postman_collection.json`
+- **E2E Collection**: `docs/postman/collections/E2E Vianda Selection.postman_collection.json`
 
 ---
 

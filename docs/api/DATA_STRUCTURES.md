@@ -28,7 +28,7 @@ This is the authoritative standard for how enum data flows between frontend and 
 
 1. **Frontend fetches `GET /api/v1/enums?language={locale}` once** on login, caches for 1 hour.
 2. The response contains both `values` (canonical codes) and `labels` (localized display titles) for every enum.
-3. **Entity endpoints** (`/users/me`, `/institution-bills`, `/plate-pickup/pending`, etc.) return **values only** — never titles.
+3. **Entity endpoints** (`/users/me`, `/institution-bills`, `/vianda-pickup/pending`, etc.) return **values only** — never titles.
 4. **Frontend resolves titles locally** by looking up the cached enum labels: `enums.status.labels["active"]` → `"Active"` (en) / `"Activo"` (es).
 5. **Frontend sends values in all requests** — query params, request bodies, filters. Never send a title to the API.
 
@@ -109,7 +109,7 @@ Role values in JWT tokens (`role_type`, `role_name`) are lowercase slugs:
 | `employer_bill_payment_status` | `pending`, `paid`, `failed`, `overdue` |
 | `payment_method_provider` | `stripe`, `mercado_pago`, `payu` |
 | `audit_operation` | `create`, `update`, `archive`, `delete` |
-| `favorite_entity_type` | `plate`, `restaurant` |
+| `favorite_entity_type` | `vianda`, `restaurant` |
 | `dietary_flag` | `vegan`, `vegetarian`, `gluten_free`, `dairy_free`, `nut_free`, `halal`, `kosher` |
 | `portion_size_display` | `light`, `standard`, `large`, `insufficient_reviews` |
 | `billing_cycle` | `daily`, `weekly`, `monthly` |

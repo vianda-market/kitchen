@@ -23,14 +23,14 @@ def _make_prereqs(
     status: str = "pending",
     name: str = "Test Restaurant",
     is_archived: bool = False,
-    has_plate_kitchen_days: bool = True,
+    has_vianda_kitchen_days: bool = True,
     has_qr: bool = True,
 ) -> dict:
     return {
         "status": status,
         "name": name,
         "is_archived": is_archived,
-        "has_plate_kitchen_days": has_plate_kitchen_days,
+        "has_vianda_kitchen_days": has_vianda_kitchen_days,
         "has_qr": has_qr,
     }
 
@@ -58,12 +58,12 @@ class TestMaybeActivateRestaurantReturnsNone:
             result = maybe_activate_restaurant(restaurant_id, mock_db)
         assert result is None
 
-    def test_returns_none_when_no_plate_kitchen_days(self):
+    def test_returns_none_when_no_vianda_kitchen_days(self):
         restaurant_id = uuid4()
         mock_db = MagicMock()
         with patch(
             "app.services.activation_service._check_restaurant_prereqs",
-            return_value=_make_prereqs(has_plate_kitchen_days=False),
+            return_value=_make_prereqs(has_vianda_kitchen_days=False),
         ):
             result = maybe_activate_restaurant(restaurant_id, mock_db)
         assert result is None

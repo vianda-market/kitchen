@@ -18,7 +18,7 @@ The archival system has been successfully implemented with the following compone
 - ✅ `ARCHIVAL_SYSTEM_IMPLEMENTATION.md` - This implementation guide
 
 ### **Fixed Code**
-- ✅ `app/routes/plate_pickup.py` - Removed immediate archival
+- ✅ `app/routes/vianda_pickup.py` - Removed immediate archival
 - ✅ `app/routes/payment_methods/client_payment_attempt.py` - Fixed immediate archival
 - ✅ `application.py` - Registered admin routes
 

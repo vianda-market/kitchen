@@ -1,0 +1,254 @@
+"""
+Vianda Selection Promotion Service - Promote reservations to live at kitchen start.
+
+At kitchen_start (business_hours.open = 11:30 local), locked vianda selections
+are promoted to vianda_pickup_live and restaurant_transaction. This defers
+restaurant crediting until 1 hour after the cancel cutoff to avoid reversals.
+"""
+
+from decimal import Decimal
+from typing import Any
+from uuid import UUID
+
+import psycopg2.extensions
+from fastapi import HTTPException
+
+from app.config import Status
+from app.dto.models import (
+    RestaurantTransactionDTO,
+    ViandaPickupLiveDTO,
+    ViandaSelectionDTO,
+)
+from app.services.credit_validation_service import validate_sufficient_credits
+from app.services.crud_service import (
+    client_transaction_service,
+    create_with_conservative_balance_update,
+    credit_currency_service,
+    institution_service,
+    mark_vianda_selection_complete,
+    qr_code_service,
+    restaurant_service,
+    subscription_service,
+    supplier_terms_service,
+    update_balance,
+    vianda_pickup_live_service,
+    vianda_selection_service,
+    vianda_service,
+)
+from app.services.entity_service import get_currency_metadata_id_for_restaurant
+from app.utils.db import db_read
+from app.utils.log import log_error, log_info, log_warning
+
+
+def promote_vianda_selection_to_live(
+    vianda_selection_id: UUID, system_user_id: UUID, db: psycopg2.extensions.connection, *, commit: bool = True
+) -> UUID | None:
+    """
+    Promote a single vianda selection to live (create vianda_pickup_live + restaurant_transaction).
+
+    Idempotent: returns existing vianda_pickup_id if one already exists.
+
+    Args:
+        vianda_selection_id: The vianda selection to promote
+        system_user_id: System user for modified_by
+        db: Database connection
+        commit: Whether to commit (default True for cron, False for atomic batch)
+
+    Returns:
+        vianda_pickup_id if successful, None on failure
+    """
+    selection = vianda_selection_service.get_by_id_non_archived(vianda_selection_id, db)
+    if not selection:
+        log_warning(f"Vianda selection {vianda_selection_id} not found or archived, skip promotion")
+        return None
+
+    # Idempotency: already promoted?
+    existing = db_read(
+        "SELECT vianda_pickup_id FROM vianda_pickup_live WHERE vianda_selection_id = %s AND is_archived = FALSE",
+        (str(vianda_selection_id),),
+        connection=db,
+        fetch_one=True,
+    )
+    if existing:
+        log_info(
+            f"Vianda selection {vianda_selection_id} already promoted (vianda_pickup_id={existing['vianda_pickup_id']})"
+        )
+        return UUID(str(existing["vianda_pickup_id"]))
+
+    # Build context from selection
+    vianda = vianda_service.get_by_id(selection.vianda_id, db)
+    if not vianda:
+        log_error(f"Vianda {selection.vianda_id} not found for promotion of {vianda_selection_id}")
+        return None
+
+    restaurant = restaurant_service.get_by_id(selection.restaurant_id, db)
+    if not restaurant:
+        log_error(f"Restaurant {selection.restaurant_id} not found for promotion of {vianda_selection_id}")
+        return None
+
+    qr_code = qr_code_service.get_by_restaurant(selection.restaurant_id, db)
+    if not qr_code:
+        log_error(f"QR code not found for restaurant {selection.restaurant_id}, promotion of {vianda_selection_id}")
+        return None
+
+    currency_metadata_id = get_currency_metadata_id_for_restaurant(restaurant, db)
+    credit_currency = credit_currency_service.get_by_id(currency_metadata_id, db)
+    if not credit_currency:
+        log_error(
+            f"Credit currency not found for restaurant {selection.restaurant_id}, promotion of {vianda_selection_id}"
+        )
+        return None
+
+    institution = institution_service.get_by_id(restaurant.institution_id, db)
+    if not institution:
+        log_error(f"Institution {restaurant.institution_id} not found for promotion of {vianda_selection_id}")
+        return None
+
+    supplier_terms = supplier_terms_service.get_by_field("institution_id", restaurant.institution_id, db)
+
+    context: dict[str, Any] = {
+        "vianda": vianda,
+        "restaurant": restaurant,
+        "institution": institution,
+        "supplier_terms": supplier_terms,
+        "qr_code": qr_code,
+        "credit_currency": credit_currency,
+    }
+
+    # Validate credits before promoting (charge deferred to promotion)
+    try:
+        credit_val = validate_sufficient_credits(selection.user_id, float(vianda.credit), db)
+        if not credit_val.can_proceed:
+            log_warning(
+                f"Insufficient credits for promotion of {vianda_selection_id}: user {selection.user_id}, "
+                f"required {vianda.credit}, shortfall {credit_val.shortfall}. Skipping."
+            )
+            return None
+    except HTTPException as e:
+        log_warning(f"Credit validation failed for promotion of {vianda_selection_id}: {e.detail}. Skipping.")
+        return None
+
+    # Create pickup record
+    pickup_record = _create_pickup_record_for_promotion(selection, context, system_user_id, db)
+    if not pickup_record:
+        return None
+
+    # Create restaurant transaction
+    rt = _create_restaurant_transaction_for_promotion(selection, pickup_record, context, system_user_id, db)
+    if not rt:
+        return None
+
+    # Create client transaction and update subscription balance (charge deferred to promotion)
+    subscription = subscription_service.get_by_user(selection.user_id, db)
+    if not subscription:
+        log_error(f"Subscription not found for user {selection.user_id}, promotion of {vianda_selection_id}")
+        return None
+
+    transaction_record = client_transaction_service.create(
+        {
+            "user_id": selection.user_id,
+            "source": "vianda_selection",
+            "vianda_selection_id": vianda_selection_id,
+            "discretionary_id": None,
+            "credit": -float(vianda.credit),
+            "is_archived": False,
+            "modified_by": system_user_id,
+        },
+        db,
+        commit=False,
+    )
+    if not transaction_record:
+        log_error(f"Failed to create client transaction for promotion of {vianda_selection_id}")
+        return None
+
+    success = update_balance(subscription.subscription_id, -float(vianda.credit), db, commit=False)
+    if not success:
+        log_error(f"Failed to update subscription balance for promotion of {vianda_selection_id}")
+        return None
+
+    success = mark_vianda_selection_complete(transaction_record.transaction_id, selection.user_id, db, commit=False)
+    if not success:
+        log_error(f"Failed to mark vianda selection complete for promotion of {vianda_selection_id}")
+        return None
+
+    if commit:
+        db.commit()
+    log_info(
+        f"Promoted vianda selection {vianda_selection_id} to live (vianda_pickup_id={pickup_record.vianda_pickup_id})"
+    )
+    return pickup_record.vianda_pickup_id
+
+
+def _create_pickup_record_for_promotion(
+    selection: ViandaSelectionDTO, context: dict[str, Any], modified_by: UUID, db: psycopg2.extensions.connection
+) -> ViandaPickupLiveDTO | None:
+    """Create vianda_pickup_live record for a promoted selection."""
+    vianda = context["vianda"]
+    qr_code = context["qr_code"]
+
+    pickup_data = {
+        "vianda_selection_id": selection.vianda_selection_id,
+        "user_id": selection.user_id,
+        "restaurant_id": vianda.restaurant_id,
+        "vianda_id": vianda.vianda_id,
+        "product_id": vianda.product_id,
+        "qr_code_id": qr_code.qr_code_id,
+        "qr_code_payload": qr_code.qr_code_payload,
+        "is_archived": False,
+        "status": Status.PENDING,
+        "was_collected": False,
+        "modified_by": modified_by,
+    }
+
+    pickup_record = vianda_pickup_live_service.create(pickup_data, db, commit=False)
+    if pickup_record:
+        log_info(f"Created vianda_pickup_live {pickup_record.vianda_pickup_id} for promotion")
+    return pickup_record
+
+
+def _create_restaurant_transaction_for_promotion(
+    selection: ViandaSelectionDTO,
+    pickup_record: ViandaPickupLiveDTO,
+    context: dict[str, Any],
+    modified_by: UUID,
+    db: psycopg2.extensions.connection,
+) -> RestaurantTransactionDTO | None:
+    """Create restaurant_transaction for a promoted selection. no_show_discount comes from supplier_terms."""
+    vianda = context["vianda"]
+    supplier_terms = context.get("supplier_terms")
+    credit_currency = context["credit_currency"]
+
+    credit_decimal = vianda.credit if isinstance(vianda.credit, Decimal) else Decimal(str(vianda.credit))
+    no_show = supplier_terms.no_show_discount if supplier_terms else 0
+    discount_decimal = Decimal(str(no_show))
+    discount_multiplier = (Decimal("100") - discount_decimal) / Decimal("100")
+    final_amount = credit_decimal * discount_multiplier
+
+    restaurant_transaction_data = {
+        "transaction_id": pickup_record.vianda_pickup_id,
+        "restaurant_id": vianda.restaurant_id,
+        "vianda_selection_id": selection.vianda_selection_id,
+        "discretionary_id": None,
+        "currency_metadata_id": credit_currency.currency_metadata_id,
+        "was_collected": False,
+        "ordered_timestamp": pickup_record.created_date,
+        "collected_timestamp": None,
+        "arrival_time": None,
+        "completion_time": None,
+        "expected_completion_time": None,
+        "transaction_type": "order",
+        "credit": credit_decimal,
+        "no_show_discount": discount_decimal,
+        "currency_code": credit_currency.currency_code,
+        "final_amount": final_amount,
+        "is_archived": False,
+        "status": Status.PENDING,
+        "created_date": pickup_record.created_date,
+        "modified_by": modified_by,
+        "modified_date": pickup_record.created_date,
+    }
+
+    rt = create_with_conservative_balance_update(restaurant_transaction_data, db, commit=False)
+    if rt:
+        log_info(f"Created restaurant_transaction {rt.transaction_id} for promotion")
+    return rt

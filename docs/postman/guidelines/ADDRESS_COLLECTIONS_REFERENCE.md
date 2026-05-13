@@ -24,12 +24,12 @@ Postman cannot emulate the suggest dropdown, so it uses the **structured path** 
 
 | Collection | How address is added | Notes |
 |------------|----------------------|-------|
-| **000 E2E Plate Selection** | POST /addresses with full address fields (structured path) | No validation step; direct create with hardcoded payload |
+| **000 E2E Vianda Selection** | POST /addresses with full address fields (structured path) | No validation step; direct create with hardcoded payload |
 | **Permissions Testing** | Create Employer (atomic), Create Address for Other User | Structured address in body |
 | **INSTITUTION_BANK_ACCOUNT** | Create Address | Structured address |
 | **TIMEZONE_DEDUCTION_TESTS** | Create Address | Structured address |
 
-**E2E Plate Selection** runs **Address Suggest (E2E)** (optional; stores first suggestion in `e2eFirstSuggestion`). **Register Supplier Address**, **Register Customer Address**, and **Create Employer (atomic)** use **structured address** from the request body – province, city, street_name, building_number, postal_code, country_code must match supported cities (e.g. CABA + Buenos Aires for AR).
+**E2E Vianda Selection** runs **Address Suggest (E2E)** (optional; stores first suggestion in `e2eFirstSuggestion`). **Register Supplier Address**, **Register Customer Address**, and **Create Employer (atomic)** use **structured address** from the request body – province, city, street_name, building_number, postal_code, country_code must match supported cities (e.g. CABA + Buenos Aires for AR).
 
 ---
 

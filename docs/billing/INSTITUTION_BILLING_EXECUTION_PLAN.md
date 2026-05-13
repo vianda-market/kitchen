@@ -42,7 +42,7 @@
 #### **5. Updated Models**
 - ✅ `app/models/restaurant_balance.py` - Enhanced with no-show discount support
 - ✅ `app/models/restaurant_transaction.py` - New conservative balance update methods
-- ✅ `app/routes/plate_selection.py` - Updated to use conservative balance updates
+- ✅ `app/routes/vianda_selection.py` - Updated to use conservative balance updates
 
 ---
 

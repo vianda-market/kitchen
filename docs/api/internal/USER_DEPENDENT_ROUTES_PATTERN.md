@@ -21,7 +21,7 @@ We separate routes into two categories:
 ### 2. User-Dependent Routes (`crud_routes_user.py`)
 - **Purpose**: Operations performed by end-users who log into the app
 - **User Context**: Required - `user_id` extracted from authenticated user
-- **Examples**: Subscription, PaymentMethod, ClientBill, PlateSelection, ClientPaymentAttempt, etc.
+- **Examples**: Subscription, PaymentMethod, ClientBill, ViandaSelection, ClientPaymentAttempt, etc.
 - **Pattern**: Enhanced route factory with user context extraction
 
 ### 3. Immutable Entity Routes
@@ -131,7 +131,7 @@ An entity should use user-dependent routes if:
 - `Subscription` - belongs to a user
 - `PaymentMethod` - user's payment methods
 - `ClientBill` - user's bills
-- `PlateSelection` - user's food orders
+- `ViandaSelection` - user's food orders
 - `UserProfile` - user's profile data
 
 **Admin/System** ✅:
@@ -164,4 +164,4 @@ To migrate an existing entity to user-dependent routes:
 - ✅ `Subscription` - migrated to user-dependent routes
 - 🔄 `PaymentMethod` - candidate for migration
 - 🔄 `ClientBill` - candidate for migration
-- 🔄 `PlateSelection` - candidate for migration
+- 🔄 `ViandaSelection` - candidate for migration

@@ -23,9 +23,9 @@ def get_cities_with_coverage(
 ) -> list[str]:
     """
     Return sorted list of city names (from core.city_metadata ∪ external.geonames_city)
-    that have at least one active restaurant with plate_kitchen_days and QR code.
+    that have at least one active restaurant with vianda_kitchen_days and QR code.
     Intersection of: (a) promoted cities in core.city_metadata (signup picker flag),
-    (b) cities with Active restaurant + plate_kitchen_days.
+    (b) cities with Active restaurant + vianda_kitchen_days.
 
     Used by GET /leads/cities (public, no auth) and GET /restaurants/cities (auth).
     Single source for lead flow, signup picker, and explore dropdown.
@@ -54,8 +54,8 @@ def get_cities_with_coverage(
               AND r.is_archived = FALSE
               AND r.status = 'active'
               AND EXISTS (
-                SELECT 1 FROM ops.plate_info p
-                INNER JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+                SELECT 1 FROM ops.vianda_info p
+                INNER JOIN ops.vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id
                   AND pkd.is_archived = FALSE AND pkd.status = 'active'
                 WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
               )
@@ -80,7 +80,7 @@ def get_cities_with_restaurant_counts(
 
     Each row: {"city": <display name>, "restaurant_count": <int>}.
     Only cities in city_metadata (show_in_signup_picker = TRUE) with >=1 active restaurant
-    that has plate_kitchen_days + QR code are returned. Single JOIN query — no N+1.
+    that has vianda_kitchen_days + QR code are returned. Single JOIN query — no N+1.
 
     Backing the GET /leads/cities?mode=coverage endpoint (vianda-home multi-country landing page).
     """
@@ -106,8 +106,8 @@ def get_cities_with_restaurant_counts(
           AND cm.is_archived = FALSE
           AND cm.show_in_signup_picker = TRUE
           AND EXISTS (
-            SELECT 1 FROM ops.plate_info p
-            JOIN ops.plate_kitchen_days pkd ON pkd.plate_id = p.plate_id
+            SELECT 1 FROM ops.vianda_info p
+            JOIN ops.vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id
               AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
@@ -190,7 +190,7 @@ def get_city_metrics(
     country = country_code or ""
     requested = (city or "").strip()
 
-    # 1) Get distinct cities that have at least one Active restaurant with plate_kitchen_days
+    # 1) Get distinct cities that have at least one Active restaurant with vianda_kitchen_days
     query_cities = """
         SELECT DISTINCT TRIM(a.city) AS city
         FROM address_info a
@@ -200,8 +200,8 @@ def get_city_metrics(
           AND r.is_archived = FALSE
           AND r.status = 'active'
           AND EXISTS (
-            SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
+            SELECT 1 FROM vianda_info p
+            INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (
@@ -224,7 +224,7 @@ def get_city_metrics(
                 break
         # else: no match, matched_city stays requested, we'll return count 0
 
-    # 3) Count restaurants in matched_city (Active, with plate_kitchen_days)
+    # 3) Count restaurants in matched_city (Active, with vianda_kitchen_days)
     query_count = """
         SELECT COUNT(DISTINCT r.restaurant_id) AS cnt
         FROM restaurant_info r
@@ -235,8 +235,8 @@ def get_city_metrics(
           AND r.is_archived = FALSE
           AND r.status = 'active'
           AND EXISTS (
-            SELECT 1 FROM plate_info p
-            INNER JOIN plate_kitchen_days pkd ON pkd.plate_id = p.plate_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
+            SELECT 1 FROM vianda_info p
+            INNER JOIN vianda_kitchen_days pkd ON pkd.vianda_id = p.vianda_id AND pkd.is_archived = FALSE AND pkd.status = 'active'
             WHERE p.restaurant_id = r.restaurant_id AND p.is_archived = FALSE
           )
           AND EXISTS (

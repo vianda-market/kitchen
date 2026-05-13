@@ -40,163 +40,163 @@
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"computed display string\"",
     "field": "address_display",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"range-bound; use arrival_time_from / arrival_time_to filter params\"",
     "field": "arrival_time",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"address; restaurant scope handles location filtering\"",
     "field": "city",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"range-bound; use completion_time_from / completion_time_to filter params\"",
     "field": "completion_time",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"opaque token; never filtered\"",
     "field": "confirmation_code",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"address; restaurant scope handles location filtering\"",
     "field": "country",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"range-bound; use credit_from / credit_to filter params\"",
     "field": "credit",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"computed projection; clients display only\"",
     "field": "expected_completion_time",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"soft-delete flag; server filters by default\"",
     "field": "is_archived",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
-    "entity": "pickups",
-    "exempt_reason": "\"primary key\"",
-    "field": "plate_pickup_id",
-    "model": "PlatePickupEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plate-pickup/enriched",
-    "entity": "pickups",
-    "exempt_reason": "\"FK; not a filter dimension\"",
-    "field": "plate_selection_id",
-    "model": "PlatePickupEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"address; restaurant scope handles location filtering\"",
     "field": "postal_code",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"free-text label\"",
     "field": "product_name",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"address; restaurant scope handles location filtering\"",
     "field": "province",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"kiosk QR data; not a filter dimension\"",
     "field": "qr_code_id",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"kiosk QR data; not a filter dimension\"",
     "field": "qr_code_payload",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"free-text label\"",
     "field": "restaurant_name",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"auth-scoped via JWT; not a user-input filter\"",
     "field": "user_id",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
+    "entity": "pickups",
+    "exempt_reason": "\"primary key\"",
+    "field": "vianda_pickup_id",
+    "model": "ViandaPickupEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/vianda-pickup/enriched",
+    "entity": "pickups",
+    "exempt_reason": "\"FK; not a filter dimension\"",
+    "field": "vianda_selection_id",
+    "model": "ViandaPickupEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"range-bound; use window_from / window_to filter params (deferred to follow-up)\"",
     "field": "window_end",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
-    "endpoint": "/api/v1/plate-pickup/enriched",
+    "endpoint": "/api/v1/vianda-pickup/enriched",
     "entity": "pickups",
     "exempt_reason": "\"range-bound; use window_from / window_to filter params (deferred to follow-up)\"",
     "field": "window_start",
-    "model": "PlatePickupEnrichedResponseSchema",
+    "model": "ViandaPickupEnrichedResponseSchema",
     "status": "exempt"
   },
   {
@@ -333,278 +333,6 @@
     "exempt_reason": "\"only meaningful when rollover=true\"",
     "field": "rollover_cap",
     "model": "PlanEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; computed display field, not independently filterable\"",
-    "field": "address_display",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"computed aggregate; use portion_size for filtering\"",
-    "field": "average_portion_size",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"computed aggregate; not independently filterable\"",
-    "field": "average_stars",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
-    "field": "building_number",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
-    "field": "city",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; address join country; not registered for plate-level filtering\"",
-    "field": "country_code",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; country_code is registered instead\"",
-    "field": "country_name",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"range-bound; use credit_from / credit_to filter params\"",
-    "field": "credit",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; filter by cuisine_id instead\"",
-    "field": "cuisine_name",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"i18n translation payload; not filterable\"",
-    "field": "cuisine_name_i18n",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; not independently filterable\"",
-    "field": "delivery_time_minutes",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; free-text, not independently filterable\"",
-    "field": "description",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"i18n translation payload; not filterable\"",
-    "field": "description_i18n",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"computed display value; not filterable\"",
-    "field": "expected_payout_local_currency",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"Python-computed contextual flag; not a DB column\"",
-    "field": "has_coworker_offer",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"Python-computed contextual flag; not a DB column\"",
-    "field": "has_coworker_request",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; free-text, not independently filterable\"",
-    "field": "ingredients",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"i18n translation payload; not filterable\"",
-    "field": "ingredients_i18n",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; filter by restaurant_id instead\"",
-    "field": "institution_name",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"status field used in restaurant scoping; not a plate filter dimension\"",
-    "field": "is_archived",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; geo filtering handled by geo op if needed\"",
-    "field": "latitude",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; geo filtering handled by geo op if needed\"",
-    "field": "longitude",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; supplier_terms field, not independently filterable\"",
-    "field": "no_show_discount",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; filter by restaurant_id instead\"",
-    "field": "pickup_instructions",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; not a direct column on plate_info\"",
-    "field": "plate_id",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"range-bound; use price_from / price_to filter params\"",
-    "field": "price",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; product_id is a join key, not a filterable dimension\"",
-    "field": "product_id",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; filter by plate_id instead\"",
-    "field": "product_name",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"i18n translation payload; not filterable\"",
-    "field": "product_name_i18n",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
-    "field": "province",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; filter by restaurant_id instead\"",
-    "field": "restaurant_name",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"computed aggregate; not independently filterable\"",
-    "field": "review_count",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
-    "field": "street_name",
-    "model": "PlateEnrichedResponseSchema",
-    "status": "exempt"
-  },
-  {
-    "endpoint": "/api/v1/plates/enriched",
-    "entity": "plates",
-    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
-    "field": "street_type",
-    "model": "PlateEnrichedResponseSchema",
     "status": "exempt"
   },
   {
@@ -829,6 +557,278 @@
     "exempt_reason": "\"boolean display flag; not a filter dimension\"",
     "field": "verified_badge",
     "model": "RestaurantEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; computed display field, not independently filterable\"",
+    "field": "address_display",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"computed aggregate; use portion_size for filtering\"",
+    "field": "average_portion_size",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"computed aggregate; not independently filterable\"",
+    "field": "average_stars",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
+    "field": "building_number",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
+    "field": "city",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; address join country; not registered for vianda-level filtering\"",
+    "field": "country_code",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; country_code is registered instead\"",
+    "field": "country_name",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"range-bound; use credit_from / credit_to filter params\"",
+    "field": "credit",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; filter by cuisine_id instead\"",
+    "field": "cuisine_name",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
+    "field": "cuisine_name_i18n",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; not independently filterable\"",
+    "field": "delivery_time_minutes",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; free-text, not independently filterable\"",
+    "field": "description",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
+    "field": "description_i18n",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"computed display value; not filterable\"",
+    "field": "expected_payout_local_currency",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"Python-computed contextual flag; not a DB column\"",
+    "field": "has_coworker_offer",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"Python-computed contextual flag; not a DB column\"",
+    "field": "has_coworker_request",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; free-text, not independently filterable\"",
+    "field": "ingredients",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
+    "field": "ingredients_i18n",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; filter by restaurant_id instead\"",
+    "field": "institution_name",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"status field used in restaurant scoping; not a vianda filter dimension\"",
+    "field": "is_archived",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; geo filtering handled by geo op if needed\"",
+    "field": "latitude",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; geo filtering handled by geo op if needed\"",
+    "field": "longitude",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; supplier_terms field, not independently filterable\"",
+    "field": "no_show_discount",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; filter by restaurant_id instead\"",
+    "field": "pickup_instructions",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"range-bound; use price_from / price_to filter params\"",
+    "field": "price",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; product_id is a join key, not a filterable dimension\"",
+    "field": "product_id",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; filter by vianda_id instead\"",
+    "field": "product_name",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"i18n translation payload; not filterable\"",
+    "field": "product_name_i18n",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
+    "field": "province",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; filter by restaurant_id instead\"",
+    "field": "restaurant_name",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"computed aggregate; not independently filterable\"",
+    "field": "review_count",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
+    "field": "street_name",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; address subfield, not independently filterable\"",
+    "field": "street_type",
+    "model": "ViandaEnrichedResponseSchema",
+    "status": "exempt"
+  },
+  {
+    "endpoint": "/api/v1/viandas/enriched",
+    "entity": "viandas",
+    "exempt_reason": "\"enriched join field; not a direct column on vianda_info\"",
+    "field": "vianda_id",
+    "model": "ViandaEnrichedResponseSchema",
     "status": "exempt"
   }
 ]

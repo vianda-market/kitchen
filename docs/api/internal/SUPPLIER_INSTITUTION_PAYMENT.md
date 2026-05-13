@@ -55,7 +55,7 @@ The pipeline only creates bills when **Phase 1** creates at least one settlement
 
 - **Check balance:** `SELECT restaurant_id, balance, currency_code FROM restaurant_balance_info WHERE is_archived = FALSE AND balance > 0;`  
   If this returns no rows, the pipeline will return `settlements_created: 0`, `bills_created: 0` and no rows in `institution_settlement` or `institution_bill_info`.
-- **How balance gets created:** Restaurant balance is increased when the customer’s visit is recorded (e.g. **Post QR Code Scan** / mark arrival in plate_pickup flow). There must already be a row in `restaurant_balance_info` for that restaurant (e.g. from restaurant registration); then `update_balance_on_arrival` adds to `balance`.
+- **How balance gets created:** Restaurant balance is increased when the customer’s visit is recorded (e.g. **Post QR Code Scan** / mark arrival in vianda_pickup flow). There must already be a row in `restaurant_balance_info` for that restaurant (e.g. from restaurant registration); then `update_balance_on_arrival` adds to `balance`.
 - **API response:** When no restaurant has balance, the run-settlement-pipeline response includes `"message": "No restaurants had balance > 0. Check restaurant_balance_info ..."`.
 - **Check settlements:** If the pipeline ran with balance, you should see rows in `institution_settlement` and then in `institution_bill_info`.  
   `SELECT * FROM institution_settlement ORDER BY created_at DESC LIMIT 5;`
@@ -96,4 +96,4 @@ The E2E collection step **Generate daily restaurant settlement (pipeline)** runs
 ## Related docs
 
 - [RESTAURANT_PAYMENT_FLOW_AND_APIS.md](RESTAURANT_PAYMENT_FLOW_AND_APIS.md) — Credit/currency model → balance → settlement → bill → Stripe payout; APIs; investigation of balance units vs `final_amount`.
-- [CREDIT_AND_CURRENCY_CLIENT.md](../shared_client/CREDIT_AND_CURRENCY_CLIENT.md) — Credit values, plan pricing, plate payouts.
+- [CREDIT_AND_CURRENCY_CLIENT.md](../shared_client/CREDIT_AND_CURRENCY_CLIENT.md) — Credit values, plan pricing, vianda payouts.

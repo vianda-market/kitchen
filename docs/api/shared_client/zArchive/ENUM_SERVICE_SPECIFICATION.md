@@ -38,7 +38,7 @@ The frontend currently has **27+ entity types** with enum fields (status, method
 
 ### 1. **status** (HIGHEST PRIORITY - Used in 27+ entities)
 
-**Entities affected**: User, Institution, InstitutionEntity, Address, CreditCurrency, Market, Plan, FintechLink, Product, Plate, QRCode, Restaurant, NationalHoliday, RestaurantHoliday, PlateKitchenDay, Subscription, PaymentMethod, Employer, InstitutionBill, InstitutionBankAccount, InstitutionPaymentAttempt, RestaurantBalance, RestaurantTransaction, PlatePickup, PendingPickupSummary, DiscretionaryRequest, FintechLinkTransaction
+**Entities affected**: User, Institution, InstitutionEntity, Address, CreditCurrency, Market, Plan, FintechLink, Product, Vianda, QRCode, Restaurant, NationalHoliday, RestaurantHoliday, ViandaKitchenDay, Subscription, PaymentMethod, Employer, InstitutionBill, InstitutionBankAccount, InstitutionPaymentAttempt, RestaurantBalance, RestaurantTransaction, ViandaPickup, PendingPickupSummary, DiscretionaryRequest, FintechLinkTransaction
 
 **Current frontend default**: `"active"`
 

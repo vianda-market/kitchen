@@ -30,7 +30,7 @@ This document tracks the consolidation of redundant standalone functions into cl
 - `geolocation_service` - Geolocation operations
 - `qr_code_service` - QR code operations
 - `payment_method_service` - Payment method operations
-- `plate_service` - Plate operations
+- `vianda_service` - Vianda operations
 - `employer_service` - Employer operations
 - `restaurant_balance_service` - Restaurant balance operations
 - `restaurant_transaction_service` - Restaurant transaction operations
@@ -39,8 +39,8 @@ This document tracks the consolidation of redundant standalone functions into cl
 - `subscription_service` - Subscription operations
 - `client_bill_service` - Client bill operations
 - `institution_bill_service` - Institution bill operations
-- `plate_selection_service` - Plate selection operations
-- `plate_pickup_service` - Plate pickup operations
+- `vianda_selection_service` - Vianda selection operations
+- `vianda_pickup_service` - Vianda pickup operations
 - `discretionary_service` - Discretionary credit operations
 
 **Common Methods:**
@@ -157,7 +157,7 @@ This document tracks the consolidation of redundant standalone functions into cl
 | Line | Function | Purpose | Keep/Consolidate |
 |------|----------|---------|------------------|
 | 1149 | `update_balance()` | Update subscription balance | ✅ KEEP (complex business logic) |
-| 1180 | `mark_plate_selection_complete()` | Complete selection | ✅ KEEP (multi-step business logic) |
+| 1180 | `mark_vianda_selection_complete()` | Complete selection | ✅ KEEP (multi-step business logic) |
 | 1213 | `create_with_conservative_balance_update()` | Create + balance update | ✅ KEEP (atomic operation) |
 | 1277 | `update_balance_on_transaction_creation()` | Balance on create | ✅ KEEP (business rule) |
 | 1308 | `update_balance_on_arrival()` | Balance on arrival | ✅ KEEP (business rule) |
@@ -182,21 +182,21 @@ This document tracks the consolidation of redundant standalone functions into cl
 | 984 | `get_pending_bills()` | Get pending bills | 🔄 CONSIDER: Add to `institution_bill_service` |
 | 990 | `mark_paid()` | Mark bill as paid | 🔄 CONSIDER: Add to `institution_bill_service` |
 | 1018 | `get_by_institution_and_period()` | Bills by institution/period | 🔄 CONSIDER: Add to `institution_bill_service` |
-| 1031 | `get_all_by_user_address_city()` | Plates by user location | ✅ KEEP (complex spatial query) |
-| 1043 | `get_all_active_for_today_by_user_address_city()` | Active plates by location/date | ✅ KEEP (complex query) |
-| 1136 | `get_all_by_user()` | Plate selections by user | 🔄 CONSIDER: Add to `plate_selection_service` |
-| 1271 | `get_by_plate_selection_id()` | Transaction by selection | 🔄 CONSIDER: Add to `restaurant_transaction_service` |
+| 1031 | `get_all_by_user_address_city()` | Viandas by user location | ✅ KEEP (complex spatial query) |
+| 1043 | `get_all_active_for_today_by_user_address_city()` | Active viandas by location/date | ✅ KEEP (complex query) |
+| 1136 | `get_all_by_user()` | Vianda selections by user | 🔄 CONSIDER: Add to `vianda_selection_service` |
+| 1271 | `get_by_vianda_selection_id()` | Transaction by selection | 🔄 CONSIDER: Add to `restaurant_transaction_service` |
 | 1379 | `get_by_payment_id()` | Bill by payment | 🔄 CONSIDER: Add to `client_bill_service` |
 | 1402 | `get_by_institution_bill()` | Payment attempts by bill | 🔄 CONSIDER: Add to `institution_payment_attempt_service` |
 | 1430 | `get_pending_by_institution_entity()` | Pending payments by entity | 🔄 CONSIDER: Add to `institution_payment_attempt_service` |
 | 1477 | `get_by_restaurant()` | Balance by restaurant | 🔄 CONSIDER: Add to `restaurant_balance_service` |
 | 1497 | `get_current_balance_event_id()` | Current balance event | 🔄 CONSIDER: Add to `restaurant_balance_service` |
 | 1625 | `get_by_restaurant_and_day()` | Kitchen days by restaurant/day | 🔄 CONSIDER: Add to related service |
-| 1632 | `get_all_by_user_address_city()` | Plates by location (duplicate?) | ⚠️ CHECK: Duplicate of line 1031? |
-| 1652 | `get_all_active_for_today_by_user_address_city()` | Active plates (duplicate?) | ⚠️ CHECK: Duplicate of line 1043? |
-| 1696 | `get_by_plate_selection_id()` | Transaction by selection (duplicate?) | ⚠️ CHECK: Duplicate of line 1271? |
+| 1632 | `get_all_by_user_address_city()` | Viandas by location (duplicate?) | ⚠️ CHECK: Duplicate of line 1031? |
+| 1652 | `get_all_active_for_today_by_user_address_city()` | Active viandas (duplicate?) | ⚠️ CHECK: Duplicate of line 1043? |
+| 1696 | `get_by_vianda_selection_id()` | Transaction by selection (duplicate?) | ⚠️ CHECK: Duplicate of line 1271? |
 | 1753 | `find_matching_preferences()` | Find pickup preferences | ✅ KEEP (complex matching logic) |
-| 1771 | `get_plates_by_credit_currency_id()` | Plates by currency | ✅ KEEP (specific query) |
+| 1771 | `get_viandas_by_credit_currency_id()` | Viandas by currency | ✅ KEEP (specific query) |
 
 #### Category F: State Management Helpers
 

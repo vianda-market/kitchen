@@ -67,7 +67,7 @@ CREATE INDEX IF NOT EXISTS idx_notification_banner_expires
 | Decision | Rationale |
 |----------|-----------|
 | `JSONB payload` | Notification types have different payloads; avoid type-specific columns. Validated at service layer per type. |
-| `dedup_key` (UNIQUE per user) | Prevents duplicate notifications for the same event. Format: `{type}:{source_id}` (e.g. `survey_available:{plate_selection_id}`). |
+| `dedup_key` (UNIQUE per user) | Prevents duplicate notifications for the same event. Format: `{type}:{source_id}` (e.g. `survey_available:{vianda_selection_id}`). |
 | `client_types` array | Backend owns filtering. Each notification declares which clients should see it. |
 | `action_status` enum | Single column tracks lifecycle: active -> dismissed/opened/completed/expired. |
 | No audit/history table | Low-value for Phase 1. Acknowledgment data lives on the row itself. Add history table if analytics needs grow. |
@@ -80,14 +80,14 @@ CREATE INDEX IF NOT EXISTS idx_notification_banner_expires
 
 | Field | Value |
 |-------|-------|
-| Trigger | Plate pickup completed + survey not yet submitted + grace period elapsed (configurable, default 2h) |
+| Trigger | Vianda pickup completed + survey not yet submitted + grace period elapsed (configurable, default 2h) |
 | Expiry | 48h after pickup completion |
 | Priority | `normal` |
 | Client types | `b2c-mobile`, `b2c-web` |
-| Dedup key | `survey_available:{plate_selection_id}` |
-| Payload | `{ plate_name, pickup_date, plate_selection_id, survey_id }` |
-| Action | `type: "open_survey"`, `label: "Rate this plate"` |
-| Trigger point | `plate_pickup_service.py` — after marking pickup complete |
+| Dedup key | `survey_available:{vianda_selection_id}` |
+| Payload | `{ vianda_name, pickup_date, vianda_selection_id, survey_id }` |
+| Action | `type: "open_survey"`, `label: "Rate this vianda"` |
+| Trigger point | `vianda_pickup_service.py` — after marking pickup complete |
 
 ### `peer_pickup_volunteer`
 
@@ -100,7 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_notification_banner_expires
 | Dedup key | `peer_pickup_volunteer:{peer_pickup_id}:{user_id}` |
 | Payload | `{ coworker_name, restaurant_name, pickup_window, peer_pickup_id }` |
 | Action | `type: "volunteer_pickup"`, `label: "I can pick it up"` |
-| Trigger point | `plate_selection_service.py` — inside `notify_coworkers` flow |
+| Trigger point | `vianda_selection_service.py` — inside `notify_coworkers` flow |
 
 ### `reservation_reminder`
 
@@ -110,8 +110,8 @@ CREATE INDEX IF NOT EXISTS idx_notification_banner_expires
 | Expiry | End of pickup window |
 | Priority | `normal` |
 | Client types | `b2c-mobile`, `b2c-web` |
-| Dedup key | `reservation_reminder:{plate_selection_id}:{pickup_date}` |
-| Payload | `{ plate_name, restaurant_name, pickup_window, plate_selection_id }` |
+| Dedup key | `reservation_reminder:{vianda_selection_id}:{pickup_date}` |
+| Payload | `{ vianda_name, restaurant_name, pickup_window, vianda_selection_id }` |
 | Action | `type: "view_reservation"`, `label: "View details"` |
 | Trigger point | New cron job (see Phase 2) |
 
@@ -141,7 +141,7 @@ Returns active, unexpired notifications for the authenticated user, filtered by 
       "payload": { ... },
       "action": {
         "action_type": "open_survey",
-        "action_label": "Rate this plate"
+        "action_label": "Rate this vianda"
       }
     }
   ]
@@ -216,9 +216,9 @@ Each `notification_type` has a required payload schema validated at creation tim
 
 ```python
 REQUIRED_PAYLOAD_FIELDS = {
-    "survey_available": {"plate_name", "pickup_date", "plate_selection_id", "survey_id"},
+    "survey_available": {"vianda_name", "pickup_date", "vianda_selection_id", "survey_id"},
     "peer_pickup_volunteer": {"coworker_name", "restaurant_name", "pickup_window", "peer_pickup_id"},
-    "reservation_reminder": {"plate_name", "restaurant_name", "pickup_window", "plate_selection_id"},
+    "reservation_reminder": {"vianda_name", "restaurant_name", "pickup_window", "vianda_selection_id"},
 }
 ```
 
@@ -261,7 +261,7 @@ Per CLAUDE.md "DB Schema Change — Sync All Layers":
 3. `notification_banner_service.py` — CRUD operations
 4. `notification_banner.py` route — GET active, POST acknowledge
 5. Register route in `application.py`
-6. Wire `survey_available` trigger into `plate_pickup_service.py` — after `complete_pickup()`, create notification if no review exists
+6. Wire `survey_available` trigger into `vianda_pickup_service.py` — after `complete_pickup()`, create notification if no review exists
 7. Expiry cleanup: add `expire_stale_notifications()` call to an existing daily cron or create a lightweight one
 
 **Deliverable:** Frontend can poll `/notifications/active` and get survey banners. Acknowledge works.
@@ -272,8 +272,8 @@ Per CLAUDE.md "DB Schema Change — Sync All Layers":
 
 1. New cron: `app/services/cron/notification_banner_cron.py` -- DONE
    - `run_notification_banner_cron()` generates reminders + expires stale notifications
-   - Queries `plate_selection_info` (joined with product, restaurant, user, market) for selections with pickup window starting within 1h in market-local time
-   - Creates `reservation_reminder` notifications (dedup by `reservation_reminder:{plate_selection_id}:{pickup_date}`)
+   - Queries `vianda_selection_info` (joined with product, restaurant, user, market) for selections with pickup window starting within 1h in market-local time
+   - Creates `reservation_reminder` notifications (dedup by `reservation_reminder:{vianda_selection_id}:{pickup_date}`)
 2. Expiry cleanup wired into same cron -- DONE
 3. Cron endpoint: `POST /api/v1/notifications/generate-reminders` (employee auth) -- DONE
 
@@ -281,9 +281,9 @@ Per CLAUDE.md "DB Schema Change — Sync All Layers":
 
 **Scope:** Peer pickup volunteer notifications.
 
-1. Wire into existing `notify_coworkers` flow in `plate_selection_service.py`
+1. Wire into existing `notify_coworkers` flow in `vianda_selection_service.py`
 2. Create `peer_pickup_volunteer` notification for each eligible coworker
-3. Respect `user_messaging_preferences.can_participate_in_plate_pickups` — skip users who opted out
+3. Respect `user_messaging_preferences.can_participate_in_vianda_pickups` — skip users who opted out
 
 ### Phase 4: Analytics + new types
 
@@ -299,7 +299,7 @@ Per CLAUDE.md "DB Schema Change — Sync All Layers":
 
 | System | Integration |
 |--------|-------------|
-| `user_messaging_preferences` | `peer_pickup_volunteer` respects `can_participate_in_plate_pickups`. Future types respect relevant preferences. |
+| `user_messaging_preferences` | `peer_pickup_volunteer` respects `can_participate_in_vianda_pickups`. Future types respect relevant preferences. |
 | FCM push (`push_notification_service.py`) | Complementary — push for background, banners for foreground. Same event may trigger both. Frontend deduplicates by `notification_id`. |
 | `coworker_pickup_notification` table | Existing table records the notification event. New banner system delivers it visually. Both can coexist. |
 | `x-client-type` header | Already sent by B2C mobile. `client_type` query param is the filtering mechanism for banners. |

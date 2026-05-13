@@ -413,7 +413,7 @@ FAKE_REGISTRY_ENUM: dict = {
             "op": "eq",
             "cast": "text",
             "enum": "Status",
-            "context": "plate_pickup",
+            "context": "vianda_pickup",
         },
         # field without enum (no validation)
         "city": {"col": "city", "alias": "t", "op": "eq", "cast": "text"},
@@ -474,7 +474,7 @@ def test_no_enum_field_no_validation(patch_enum_registry):
 
 
 def test_context_scoped_enum_valid_value_accepted(patch_enum_registry):
-    """Value valid in context (plate_pickup) → condition generated normally."""
+    """Value valid in context (vianda_pickup) → condition generated normally."""
     result = build_filter_conditions("enum_entity", {"pickup_status": "pending"})
     assert result is not None
     condition, param = result[0]
@@ -483,13 +483,13 @@ def test_context_scoped_enum_valid_value_accepted(patch_enum_registry):
 
 
 def test_context_scoped_enum_rejects_out_of_context_value(patch_enum_registry):
-    """'active' is valid in full Status enum but not in plate_pickup context → 400."""
+    """'active' is valid in full Status enum but not in vianda_pickup context → 400."""
     with pytest.raises(ValueError, match="Invalid value 'active'"):
         build_filter_conditions("enum_entity", {"pickup_status": "active"})
 
 
 def test_context_scoped_enum_rejects_processed(patch_enum_registry):
-    """'processed' is valid in full Status enum but not in plate_pickup context → ValueError."""
+    """'processed' is valid in full Status enum but not in vianda_pickup context → ValueError."""
     with pytest.raises(ValueError, match="Invalid value 'processed'"):
         build_filter_conditions("enum_entity", {"pickup_status": "processed"})
 

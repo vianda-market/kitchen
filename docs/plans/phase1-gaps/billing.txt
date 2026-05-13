@@ -25,7 +25,7 @@ billing.client_transaction.discretionary_id
 billing.client_transaction.is_archived
 billing.client_transaction.modified_by
 billing.client_transaction.modified_date
-billing.client_transaction.plate_selection_id
+billing.client_transaction.vianda_selection_id
 billing.client_transaction.referral_id
 billing.client_transaction.source
 billing.client_transaction.status
@@ -137,7 +137,7 @@ billing.restaurant_transaction.discretionary_id
 billing.restaurant_transaction.is_archived
 billing.restaurant_transaction.modified_by
 billing.restaurant_transaction.modified_date
-billing.restaurant_transaction.plate_selection_id
+billing.restaurant_transaction.vianda_selection_id
 billing.restaurant_transaction.restaurant_id
 billing.restaurant_transaction.status
 billing.restaurant_transaction.transaction_id

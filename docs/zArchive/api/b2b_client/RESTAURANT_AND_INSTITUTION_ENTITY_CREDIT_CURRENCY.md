@@ -32,5 +32,5 @@ The restaurant response may still include `credit_currency_id` for API compatibi
 ## Related documentation
 
 - [PLAN_API_MARKET_CURRENCY.md](./PLAN_API_MARKET_CURRENCY.md) — Plans also derive currency from market; no `credit_currency_id` on create.
-- [RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md](../shared_client/RESTAURANT_STATUS_AND_PLATE_KITCHEN_DAYS.md) — Restaurant create and status.
+- [RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md](../shared_client/RESTAURANT_STATUS_AND_VIANDA_KITCHEN_DAYS.md) — Restaurant create and status.
 - [CUISINES_API_CLIENT.md](../shared_client/CUISINES_API_CLIENT.md) — Cuisine dropdown: GET /api/v1/cuisines/ for restaurant form.

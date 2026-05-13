@@ -27,7 +27,7 @@ The backend already uses Places API (Autocomplete, Place Details) and Geocoding 
 
 **Value add**:
 - **User experience**: Display “~12 min drive” so users can judge pickup timing and avoid late arrivals.
-- **Plate selection**: Surface restaurants within a time range (e.g. &lt; 20 min).
+- **Vianda selection**: Surface restaurants within a time range (e.g. &lt; 20 min).
 - **Operations**: Help pickup volunteers plan routes.
 
 **Considerations**: Cost per element; batch requests for multiple origins/destinations.

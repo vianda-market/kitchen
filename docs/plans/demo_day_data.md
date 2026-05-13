@@ -17,7 +17,7 @@
 Provide a realistic, demo-ready PE market dataset for stakeholder demos. The dataset must:
 1. Show a **clustered map** of multiple restaurants (San Isidro, Lima).
 2. Show customers in distinguishable **subscription/order states** (active subscriber with orders, subscriber without orders, user without subscription).
-3. Show plates with **positive, visible savings** (~15–25% per plate).
+3. Show viandas with **positive, visible savings** (~15–25% per vianda).
 
 ---
 
@@ -31,11 +31,11 @@ Provide a realistic, demo-ready PE market dataset for stakeholder demos. The dat
 | `credit` | 20 | 20 |
 | `credit_cost_per_credit` | 7.5 PEN | **4 PEN** |
 
-At 7.5 PEN/credit every plate yielded negative savings (clamped to 0 by `_compute_savings_pct`). At 4 PEN/credit all plates score 15–25%.
+At 7.5 PEN/credit every vianda yielded negative savings (clamped to 0 by `_compute_savings_pct`). At 4 PEN/credit all viandas score 15–25%.
 
-### Savings sanity check (all 10 plates, 4 PEN/credit)
+### Savings sanity check (all 10 viandas, 4 PEN/credit)
 
-| Restaurant | Plate | Price (S/) | Credits | Cost (S/) | Savings % |
+| Restaurant | Vianda | Price (S/) | Credits | Cost (S/) | Savings % |
 |---|---|---|---|---|---|
 | Sabores del Pacifico | Ceviche Clasico | 45 | 9 | 36 | **20.0%** |
 | Sabores del Pacifico | Lomo Saltado | 52 | 10 | 40 | **23.1%** |
@@ -97,7 +97,7 @@ Canonical key prefix for all Postman-seeded entities: `DEMO_*`
 | Folder | Contents |
 |---|---|
 | `00 Setup` | Login as demo-admin@vianda.market |
-| `10 Supplier menu (PE)` | 5 restaurants, 5 QR codes, 10 products, 10 plates, 50 PKDs (Mon–Fri), 1 plan |
+| `10 Supplier menu (PE)` | 5 restaurants, 5 QR codes, 10 products, 10 viandas, 50 PKDs (Mon–Fri), 1 plan |
 | `20 Customers (PE)` | Signup + verify + login + register address for C01–C07 |
 | `30 Subscribe each customer` | Subscribe C01–C05 + C07; C06 intentionally skipped |
 | `40 Order history loop` | 5 orders each for C01–C05 (C06/C07 not in this folder) |
@@ -108,12 +108,12 @@ Canonical key prefix for all Postman-seeded entities: `DEMO_*`
 ## Sanity check assertions (folder 99)
 
 1. ≥ 5 PE demo restaurants exist.
-2. All demo plates in `by-city` response have `savings` between 15 and 30 (none are 0).
+2. All demo viandas in `by-city` response have `savings` between 15 and 30 (none are 0).
 3. `DEMO_PLAN_PE_ESTANDAR` exists with `price=80.0` and `credit=20`.
 4. ≥ 7 PE demo customers exist.
-5. ≥ 10 PE demo plates exist.
+5. ≥ 10 PE demo viandas exist.
 6. ≥ 6 active subscriptions (C01–C05 + C07; C06 excluded).
-7. ≥ 5 completed plate pickups.
+7. ≥ 5 completed vianda pickups.
 8. C06 has 0 subscriptions.
 9. C07 has ≥ 1 active subscription (verified via C07 token — no orders in folder 40).
 
@@ -137,8 +137,8 @@ C06 and C07 usernames (`demo.cliente.pe.06@vianda.demo`, `demo.cliente.pe.07@via
 - [x] Plan marketing_description and features updated to reflect new price
 - [x] 4 new restaurants in collection 10 (upsert + QR + activate)
 - [x] 6 new products in collection 10
-- [x] 6 new plates in collection 10 (R2: 2, R3: 1, R4: 2, R5: 1)
-- [x] 30 new PKD rows in collection 10 (6 plates × Mon–Fri)
+- [x] 6 new viandas in collection 10 (R2: 2, R3: 1, R4: 2, R5: 1)
+- [x] 30 new PKD rows in collection 10 (6 viandas × Mon–Fri)
 - [x] C06 and C07 added to collection 20 (signup + verify + login + address)
 - [x] C07 added to collection 30 (subscribe; C06 skipped)
 - [x] Folder 99 updated: 5 restaurants, savings 15–30%, 7 customers, 6 active subs, C06/C07 state checks

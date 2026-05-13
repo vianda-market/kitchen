@@ -42,7 +42,7 @@ This document outlines the comprehensive unit testing strategy for the refactore
 - `test_validate_signup_data_rejects_weak_password()`
 - `test_apply_customer_signup_rules_sets_defaults()`
 
-### 2. **Plate Pickup Service** - `app/services/plate_pickup_service.py`
+### 2. **Vianda Pickup Service** - `app/services/vianda_pickup_service.py`
 **Priority: HIGH** - Complex multi-service validation logic
 
 **Test Functions Needed:**
@@ -94,15 +94,15 @@ This document outlines the comprehensive unit testing strategy for the refactore
 
 ## Priority 2: Core Services (Medium Impact)
 
-### 6. **Plate Selection Service** - `app/services/plate_selection_service.py`
-**Priority: MEDIUM** - Complex business logic for plate selection
+### 6. **Vianda Selection Service** - `app/services/vianda_selection_service.py`
+**Priority: MEDIUM** - Complex business logic for vianda selection
 
 **Test Functions Needed:**
-- `test_create_plate_selection_with_transactions_validates_data()`
-- `test_create_plate_selection_with_transactions_creates_records()`
-- `test_create_plate_selection_with_transactions_updates_balances()`
+- `test_create_vianda_selection_with_transactions_validates_data()`
+- `test_create_vianda_selection_with_transactions_creates_records()`
+- `test_create_vianda_selection_with_transactions_updates_balances()`
 - `test_determine_target_kitchen_day_finds_available_day()`
-- `test_validate_plate_selection_data_checks_constraints()`
+- `test_validate_vianda_selection_data_checks_constraints()`
 
 ### 7. **Entity Service** - `app/services/entity_service.py`
 **Priority: MEDIUM** - Entity-specific business logic
@@ -177,11 +177,11 @@ This document outlines the comprehensive unit testing strategy for the refactore
 app/tests/
 ├── services/
 │   ├── test_user_signup_service.py
-│   ├── test_plate_pickup_service.py
+│   ├── test_vianda_pickup_service.py
 │   ├── test_address_service.py
 │   ├── test_client_bill_service.py
 │   ├── test_bank_account_service.py
-│   ├── test_plate_selection_service.py
+│   ├── test_vianda_selection_service.py
 │   ├── test_entity_service.py
 │   ├── test_error_handling.py
 │   └── test_crud_service.py
@@ -213,13 +213,13 @@ httpx>=0.24.0  # For testing FastAPI
 
 ### Phase 1: Core Business Logic (Week 1)
 1. User Signup Service
-2. Plate Pickup Service
+2. Vianda Pickup Service
 3. Address Service
 
 ### Phase 2: Supporting Services (Week 2)
 4. Client Bill Service
 5. Bank Account Service
-6. Plate Selection Service
+6. Vianda Selection Service
 
 ### Phase 3: Infrastructure (Week 3)
 7. Entity Service

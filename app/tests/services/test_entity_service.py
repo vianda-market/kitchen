@@ -19,8 +19,8 @@ from app.services.entity_service import (
     get_bills_by_status,
     get_enriched_discretionary_request_by_id,
     get_enriched_discretionary_requests,
-    get_enriched_plate_by_id,
-    get_enriched_plates,
+    get_enriched_vianda_by_id,
+    get_enriched_viandas,
     get_products_by_institution,
     get_user_by_email,
     get_user_by_username,
@@ -464,16 +464,16 @@ class TestEnrichedDiscretionary:
 
 
 class TestEnrichedPlatesPortionSize:
-    """Tests for portion_size and minimum review threshold in enriched plates."""
+    """Tests for portion_size and minimum review threshold in enriched viandas."""
 
-    @patch("app.services.entity_service._plate_enriched_service")
+    @patch("app.services.entity_service._vianda_enriched_service")
     @patch.dict("sys.modules", {"google": Mock(), "google.cloud": Mock(), "google.cloud.storage": Mock()})
-    def test_portion_size_insufficient_reviews_when_review_count_below_5(self, mock_plate_enriched, mock_db):
+    def test_portion_size_insufficient_reviews_when_review_count_below_5(self, mock_vianda_enriched, mock_db):
         """When review_count < 5, portion_size is insufficient_reviews and averages are null."""
-        from app.schemas.consolidated_schemas import PlateEnrichedResponseSchema
+        from app.schemas.consolidated_schemas import ViandaEnrichedResponseSchema
 
-        plate = PlateEnrichedResponseSchema(
-            plate_id=uuid4(),
+        vianda = ViandaEnrichedResponseSchema(
+            vianda_id=uuid4(),
             product_id=uuid4(),
             restaurant_id=uuid4(),
             institution_name="Test",
@@ -506,9 +506,9 @@ class TestEnrichedPlatesPortionSize:
             created_date=datetime.now(UTC),
             modified_date=datetime.now(UTC),
         )
-        mock_plate_enriched.get_enriched.return_value = [plate]
+        mock_vianda_enriched.get_enriched.return_value = [vianda]
 
-        result = get_enriched_plates(mock_db)
+        result = get_enriched_viandas(mock_db)
 
         assert len(result) == 1
         p = result[0]
@@ -516,14 +516,14 @@ class TestEnrichedPlatesPortionSize:
         assert p.average_stars is None
         assert p.average_portion_size is None
 
-    @patch("app.services.entity_service._plate_enriched_service")
+    @patch("app.services.entity_service._vianda_enriched_service")
     @patch.dict("sys.modules", {"google": Mock(), "google.cloud": Mock(), "google.cloud.storage": Mock()})
-    def test_portion_size_bucketed_when_review_count_ge_5(self, mock_plate_enriched, mock_db):
+    def test_portion_size_bucketed_when_review_count_ge_5(self, mock_vianda_enriched, mock_db):
         """When review_count >= 5, portion_size is bucketed from average_portion_size."""
-        from app.schemas.consolidated_schemas import PlateEnrichedResponseSchema
+        from app.schemas.consolidated_schemas import ViandaEnrichedResponseSchema
 
-        plate = PlateEnrichedResponseSchema(
-            plate_id=uuid4(),
+        vianda = ViandaEnrichedResponseSchema(
+            vianda_id=uuid4(),
             product_id=uuid4(),
             restaurant_id=uuid4(),
             institution_name="Test",
@@ -556,9 +556,9 @@ class TestEnrichedPlatesPortionSize:
             created_date=datetime.now(UTC),
             modified_date=datetime.now(UTC),
         )
-        mock_plate_enriched.get_enriched.return_value = [plate]
+        mock_vianda_enriched.get_enriched.return_value = [vianda]
 
-        result = get_enriched_plates(mock_db)
+        result = get_enriched_viandas(mock_db)
 
         assert len(result) == 1
         p = result[0]
@@ -566,15 +566,15 @@ class TestEnrichedPlatesPortionSize:
         assert p.average_stars == 4.2
         assert p.average_portion_size == 2.1
 
-    @patch("app.services.entity_service._plate_enriched_service")
+    @patch("app.services.entity_service._vianda_enriched_service")
     @patch.dict("sys.modules", {"google": Mock(), "google.cloud": Mock(), "google.cloud.storage": Mock()})
-    def test_get_enriched_plate_by_id_portion_size(self, mock_plate_enriched, mock_db):
-        """get_enriched_plate_by_id applies portion_size logic."""
-        from app.schemas.consolidated_schemas import PlateEnrichedResponseSchema
+    def test_get_enriched_vianda_by_id_portion_size(self, mock_vianda_enriched, mock_db):
+        """get_enriched_vianda_by_id applies portion_size logic."""
+        from app.schemas.consolidated_schemas import ViandaEnrichedResponseSchema
 
-        plate_id = uuid4()
-        plate = PlateEnrichedResponseSchema(
-            plate_id=plate_id,
+        vianda_id = uuid4()
+        vianda = ViandaEnrichedResponseSchema(
+            vianda_id=vianda_id,
             product_id=uuid4(),
             restaurant_id=uuid4(),
             institution_name="Test",
@@ -594,7 +594,7 @@ class TestEnrichedPlatesPortionSize:
             average_stars=4.0,
             average_portion_size=1.2,  # -> light
             review_count=10,
-            product_name="Small Plate",
+            product_name="Small Vianda",
             dietary=None,
             ingredients=None,
             price=Decimal("8.00"),
@@ -607,9 +607,9 @@ class TestEnrichedPlatesPortionSize:
             created_date=datetime.now(UTC),
             modified_date=datetime.now(UTC),
         )
-        mock_plate_enriched.get_enriched_by_id.return_value = plate
+        mock_vianda_enriched.get_enriched_by_id.return_value = vianda
 
-        result = get_enriched_plate_by_id(plate_id, mock_db)
+        result = get_enriched_vianda_by_id(vianda_id, mock_db)
 
         assert result is not None
         assert result.portion_size == "light"

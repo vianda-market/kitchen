@@ -19,12 +19,12 @@ Maintain `market_info.status` automatically so the customer-facing `/leads/count
 
 ### 1. Window definition
 
-**Default:** rolling 30-day forward — market is `active` iff it has ≥1 active kitchen-day with ≥1 active plate within the next 30 days.
+**Default:** rolling 30-day forward — market is `active` iff it has ≥1 active kitchen-day with ≥1 active vianda within the next 30 days.
 
 **Open variants to evaluate:**
 - **Forward-only (30 days):** baseline. Simple, predictable, what most people picture.
 - **Forward + 7-day backward:** smooths over brief coverage gaps (a market that paused for a week shouldn't flip off). Reduces churn at the cost of lagging genuine wind-downs.
-- **Weekly-recurring existence:** `plate_kitchen_days.kitchen_day` is a day-of-week enum, not a calendar date. One active row implies continuous forward coverage. If the schema never gets a calendar-date dimension, the "30-day" framing collapses to a simple existence check — and the current admin override validation already uses exactly that predicate (`market_has_active_plate_coverage` in `app/services/market_service.py`).
+- **Weekly-recurring existence:** `vianda_kitchen_days.kitchen_day` is a day-of-week enum, not a calendar date. One active row implies continuous forward coverage. If the schema never gets a calendar-date dimension, the "30-day" framing collapses to a simple existence check — and the current admin override validation already uses exactly that predicate (`market_has_active_vianda_coverage` in `app/services/market_service.py`).
 
 Pick the window based on whether calendar-date coverage columns have been introduced by the time the cron ships. If they haven't, the cron is thin: just re-run the same existence check that the admin override uses. If they have, the cron does real date arithmetic.
 
@@ -82,5 +82,5 @@ Pick the window based on whether calendar-date coverage columns have been introd
 
 - Original feature plan: `docs/plans/` (country-filter work, consumed by vianda-home).
 - Shipped contract and semantics: `docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md`.
-- Admin override predicate (already in code): `market_has_active_plate_coverage` in `app/services/market_service.py`.
+- Admin override predicate (already in code): `market_has_active_vianda_coverage` in `app/services/market_service.py`.
 - vianda-home frontend spec: `/Users/cdeachaval/learn/vianda/vianda-home/docs/plans/country-filter.md`.

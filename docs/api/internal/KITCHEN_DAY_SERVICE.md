@@ -8,7 +8,7 @@ Centralized service for kitchen day logic. Single source of truth for effective 
 
 ## Overview
 
-The Kitchen Day Service eliminates duplicate logic previously spread across `date_service`, `restaurant_explorer_service`, `institution_billing`, `restaurant_staff_service`, and `plate_selection_service`. All kitchen-day calculations now delegate here.
+The Kitchen Day Service eliminates duplicate logic previously spread across `date_service`, `restaurant_explorer_service`, `institution_billing`, `restaurant_staff_service`, and `vianda_selection_service`. All kitchen-day calculations now delegate here.
 
 ---
 
@@ -85,8 +85,8 @@ Resolves the kitchen day for a given date.
 | `restaurant_explorer_service` | `get_effective_current_day`, `is_today_kitchen_closed`, `VALID_KITCHEN_DAYS` |
 | `institution_billing` | `date_to_kitchen_day` |
 | `restaurant_staff_service` | `get_kitchen_day_for_date` |
-| `plate_selection_service` | `get_effective_current_day` (with timezone and country_code) |
-| `plate_selection_validation` | `VALID_KITCHEN_DAYS`, timezone-aware today |
+| `vianda_selection_service` | `get_effective_current_day` (with timezone and country_code) |
+| `vianda_selection_validation` | `VALID_KITCHEN_DAYS`, timezone-aware today |
 
 ---
 

@@ -19,9 +19,9 @@ from app.utils.db import db_read
 from app.utils.log import log_error, log_info, log_warning
 
 REQUIRED_PAYLOAD_FIELDS = {
-    "survey_available": {"plate_name", "pickup_date", "plate_selection_id", "plate_pickup_id"},
+    "survey_available": {"vianda_name", "pickup_date", "vianda_selection_id", "vianda_pickup_id"},
     "peer_pickup_volunteer": {"coworker_name", "restaurant_name", "pickup_window", "peer_pickup_id"},
-    "reservation_reminder": {"plate_name", "restaurant_name", "pickup_window", "plate_selection_id"},
+    "reservation_reminder": {"vianda_name", "restaurant_name", "pickup_window", "vianda_selection_id"},
 }
 
 

@@ -24,7 +24,7 @@ outlier), and one employer institution per market with 3 benefit-enrolled employ
 
 - 1 primary supplier institution (shared legal entity with 3 currency-bound entities)
 - 5 cluster restaurants (primary) + 1 outlier restaurant (secondary)
-- 11 plates per market (10 primary + 1 secondary), each available Mon–Fri
+- 11 viandas per market (10 primary + 1 secondary), each available Mon–Fri
 - 1 subscription plan
 - 7 customers: C01–C05 with active subscriptions and order history; C06 = no plan;
   C07 = plan but no orders
@@ -66,7 +66,7 @@ production sample. No trend charts. No multi-week retention curves.
 
 All 5 cluster restaurants are within ~300 m of Calle Miguel Dasso, San Isidro.
 
-| # | Restaurant | Address | Plates | price (S/) | credits | savings |
+| # | Restaurant | Address | Viandas | price (S/) | credits | savings |
 |---|---|---|---|---|---|---|
 | R1 | Sabores del Pacifico | Av. Larco 345, Miraflores | Ceviche Clasico | 45 | 9 | 20% |
 | R1 | Sabores del Pacifico | | Lomo Saltado | 52 | 10 | 23% |
@@ -81,7 +81,7 @@ All 5 cluster restaurants are within ~300 m of Calle Miguel Dasso, San Isidro.
 
 PE secondary (Barranco outlier):
 
-| Restaurant | Address | Plate | price (S/) | credits | savings |
+| Restaurant | Address | Vianda | price (S/) | credits | savings |
 |---|---|---|---|---|---|
 | La Alpaca Barranco | Pedro de Osma 150, Barranco | Lomo Saltado de Alpaca | 44 | 9 | 18% |
 
@@ -89,7 +89,7 @@ PE secondary (Barranco outlier):
 
 All 5 cluster restaurants are within ~300 m of Calle Lavalle, Microcentro.
 
-| # | Restaurant | Address | Plates | price (ARS) | credits | savings |
+| # | Restaurant | Address | Viandas | price (ARS) | credits | savings |
 |---|---|---|---|---|---|---|
 | R1 | Parrilla La Lavalle | Lavalle 402 | Milanesa a la Napolitana | 20,000 | 20 | 20% |
 | R1 | Parrilla La Lavalle | | Asado de Tira con Chimichurri | 23,000 | 22 | 23% |
@@ -104,7 +104,7 @@ All 5 cluster restaurants are within ~300 m of Calle Lavalle, Microcentro.
 
 AR secondary (Recoleta outlier):
 
-| Restaurant | Address | Plate | price (ARS) | credits | savings |
+| Restaurant | Address | Vianda | price (ARS) | credits | savings |
 |---|---|---|---|---|---|
 | El Clasico de Recoleta | Av. Santa Fe 2450, Recoleta | Noquis de Papa al Estofado | 21,000 | 21 | 20% |
 
@@ -112,7 +112,7 @@ AR secondary (Recoleta outlier):
 
 All 5 cluster restaurants are within ~300 m of Pike Place Market.
 
-| # | Restaurant | Address | Plates | price (USD) | credits | savings |
+| # | Restaurant | Address | Viandas | price (USD) | credits | savings |
 |---|---|---|---|---|---|---|
 | R1 | Pike Place Chowder | Pike Pl 1428 | Clam Chowder | $13 | 14 | 19% |
 | R1 | Pike Place Chowder | | Fish and Chips | $15 | 16 | 20% |
@@ -122,12 +122,12 @@ All 5 cluster restaurants are within ~300 m of Pike Place Market.
 | R3 | Post Alley Pizza | | Pepperoni Pizza Slice | $14 | 15 | 20% |
 | R4 | Market Street Poke | Pike Pl 1500 | Salmon Poke Bowl | $16 | 17 | 20% |
 | R4 | Market Street Poke | | Ahi Tuna Poke Bowl | $15 | 16 | 20% |
-| R5 | Stewart Street Diner | Western Ave 2000 | Northwest Clam Bake Plate | $18 | 19 | 21% |
+| R5 | Stewart Street Diner | Western Ave 2000 | Northwest Clam Bake Vianda | $18 | 19 | 21% |
 | R5 | Stewart Street Diner | | Turkey Club Sandwich | $12 | 13 | 19% |
 
 US secondary (Capitol Hill outlier):
 
-| Restaurant | Address | Plate | price (USD) | credits | savings |
+| Restaurant | Address | Vianda | price (USD) | credits | savings |
 |---|---|---|---|---|---|
 | Summit Bowl Capitol Hill | E Pike St 500, Capitol Hill | Grains and Greens Bowl | $15 | 16 | 20% |
 
@@ -136,8 +136,8 @@ on the plan upsert. This is an audit-logged toggle in `app/services/credit_sprea
 that fires when the supplier spread compresses below the configured floor. Demo plans
 are deliberately priced thin so customers see ~19–21% savings without overpaying
 suppliers; the flag acknowledges the compression with an audit record. It does not
-indicate negative savings — US savings are positive ~19–21% across all plates
-(plan price $15 / 20 credits = $0.75 per credit; a 14-credit plate costs $10.50 in
+indicate negative savings — US savings are positive ~19–21% across all viandas
+(plan price $15 / 20 credits = $0.75 per credit; a 14-credit vianda costs $10.50 in
 plan value vs. $13 retail = 19.2% savings).
 
 ---
@@ -309,10 +309,10 @@ for institutions that have no live order flow in the demo.
 
 | Scenario | vianda-app (B2C) | vianda-platform (B2B) |
 |---|---|---|
-| Explore / map | Multi-restaurant cluster (5 pins + 1 outlier per market). Positive savings on PE and AR plates. | — |
+| Explore / map | Multi-restaurant cluster (5 pins + 1 outlier per market). Positive savings on PE and AR viandas. | — |
 | Subscription purchase | C06 (no plan): shows the full subscription purchase flow. | Subscription appears on supplier dashboard. |
-| First order | C07 (subscribed, no orders): shows plate-selection flow for a subscriber who has never ordered. | — |
-| Active order history | C01–C05: have completed pickups and plate reviews. | Dashboard order counts, revenue, activity feed. |
+| First order | C07 (subscribed, no orders): shows vianda-selection flow for a subscriber who has never ordered. | — |
+| Active order history | C01–C05: have completed pickups and vianda reviews. | Dashboard order counts, revenue, activity feed. |
 | Multi-tenant supplier | Two institutions per market visible in the restaurant explorer (primary cluster + outlier). | Separate institution rows, billing, entity admin. |
 | Employer program | — | Employer admin sees enrolled employees, active benefit program. Employee accounts show employer-sponsored subscriptions. |
 | Billing / payouts | — | Primary supplier: pipeline-computed bills. Secondary supplier: pre-seeded pending + paid rows. |
@@ -371,10 +371,10 @@ For DB rebuild procedures, worktree clone patterns, and migration sequence, see
 
 ## 11. Known workarounds
 
-**Folder 40 pins `target_kitchen_day` to dodge kitchen#257.** AR and US plate
+**Folder 40 pins `target_kitchen_day` to dodge kitchen#257.** AR and US vianda
 selection requests in folder 40 include `"target_kitchen_day": "wednesday"` (AR) or
 `"target_kitchen_day": "monday"` (US). This bypasses the auto-selection logic in
-`plate_selection_validation._find_next_available_kitchen_day_in_week`, which skips
+`vianda_selection_validation._find_next_available_kitchen_day_in_week`, which skips
 national holidays and, in `DEV_MODE`, maps Saturdays to `"friday"`. Pinning an
 explicit mid-week day makes the order history loop day-of-week agnostic. PE folder 40
 does not pin `target_kitchen_day` — it runs against the current date and works on any

@@ -53,13 +53,13 @@ with db.cursor() as cursor:
 
 ---
 
-### Pattern 3: Plate Selection with Multiple Transactions (Refined)
+### Pattern 3: Vianda Selection with Multiple Transactions (Refined)
 
-**Example**: `create_plate_selection_with_transactions()`
+**Example**: `create_vianda_selection_with_transactions()`
 ```python
 # Creates multiple records in single workflow:
-# 1. plate_selection
-# 2. plate_pickup_live (created with Pending status)
+# 1. vianda_selection
+# 2. vianda_pickup_live (created with Pending status)
 # 3. restaurant_transaction
 # 4. client_transaction
 # 5. Updates subscription balance
@@ -68,8 +68,8 @@ with db.cursor() as cursor:
 **Current Behavior**: Uses CRUD service, each operation commits separately
 **Issue**: If step 5 fails, steps 1-4 are already committed → inconsistent state
 
-**Why Atomic**: All records represent the initial effects of plate selection (single API call).
-**NOT Atomic**: Plate pickup happens later (separate client action, hours later).
+**Why Atomic**: All records represent the initial effects of vianda selection (single API call).
+**NOT Atomic**: Vianda pickup happens later (separate client action, hours later).
 
 **Refined Understanding**:
 - **Atomic Group 1**: Selection workflow (create selection, pickup record, transactions, balance update)
@@ -100,7 +100,7 @@ with db.cursor() as cursor:
 - **Time delays** between operations (hours, days)
 - **Human decision points** (approvals, reviews)
 - **Batch processing** (end-of-day, scheduled jobs)
-- **Separate client actions** (user selects plate, then picks up later)
+- **Separate client actions** (user selects vianda, then picks up later)
 
 Then those operations should NOT be atomic together.
 
@@ -139,14 +139,14 @@ Then those operations should NOT be atomic together.
 
 **Examples**:
 
-1. **Plate Selection - Initial Effects** ✅
-   - **Atomic**: Create plate_selection → Create restaurant_transaction → Create client_transaction → Update subscription balance
-   - **Why Atomic**: All happen when user selects plate (single API call)
-   - **NOT Atomic**: Plate pickup happens hours later (separate client action)
+1. **Vianda Selection - Initial Effects** ✅
+   - **Atomic**: Create vianda_selection → Create restaurant_transaction → Create client_transaction → Update subscription balance
+   - **Why Atomic**: All happen when user selects vianda (single API call)
+   - **NOT Atomic**: Vianda pickup happens hours later (separate client action)
    
-2. **Plate Pickup - Backend Processing** ✅
-   - **Atomic**: Update plate_pickup_live status → Update plate_selection status → Update transaction status
-   - **Why Atomic**: All happen when user picks up plate (single API call)
+2. **Vianda Pickup - Backend Processing** ✅
+   - **Atomic**: Update vianda_pickup_live status → Update vianda_selection status → Update transaction status
+   - **Why Atomic**: All happen when user picks up vianda (single API call)
    - **NOT Atomic**: Initial selection (happened hours earlier)
    
 3. **Payment Processing** ✅
@@ -174,7 +174,7 @@ Then those operations should NOT be atomic together.
 **Examples**:
 
 1. **Status Updates with Cascading Effects** ✅
-   - Update plate_selection status → Update plate_pickup_live status → Update transaction status
+   - Update vianda_selection status → Update vianda_pickup_live status → Update transaction status
    - **All atomic**: All happen in single status update workflow
    
 2. **Balance Updates - Transaction Level** ✅
@@ -201,13 +201,13 @@ Then those operations should NOT be atomic together.
 
 ✅ **Multiple Existing Cases**:
 1. `create_employer_with_address()` - Current case
-2. `create_plate_selection_with_transactions()` - Already exists, likely has same issue
+2. `create_vianda_selection_with_transactions()` - Already exists, likely has same issue
 3. `create_restaurant()` with balance - Likely needs atomicity
 4. `create_qr_code_atomic()` - Already uses raw SQL (workaround)
 
 ✅ **Business Logic Patterns**:
 - Parent-child relationships are common (employer-address, restaurant-balance, user-subscription)
-- Multi-step business transactions are common (plate selection, payment processing)
+- Multi-step business transactions are common (vianda selection, payment processing)
 - Cascading updates are common (status changes, balance updates)
 
 ✅ **Data Integrity Requirements**:
@@ -318,7 +318,7 @@ def create_employer_with_address(...):
 
 1. ✅ `create_employer_with_address()` - **Current case** (4 operations)
 2. ⚠️ `create_restaurant()` with balance - **Has issue** (2 operations, balance uses raw SQL but restaurant uses CRUD)
-3. ⚠️ `create_plate_selection_with_transactions()` - **Has issue** (5+ operations)
+3. ⚠️ `create_vianda_selection_with_transactions()` - **Has issue** (5+ operations)
 4. ⚠️ `create_with_conservative_balance_update()` - **Has issue** (create transaction + update balance)
 5. ⚠️ Payment processing flows - **Likely has issue**
 6. ⚠️ Discretionary credit flows - **Likely has issue**
@@ -337,8 +337,8 @@ def create_employer_with_address(...):
 - User subscription requires payment method (business rule)
 
 **Multi-Step Business Transactions** (Refined):
-- **Plate selection (initial)**: selection + pickup record + transactions + balance update (atomic - single API call)
-- **Plate pickup (later)**: update pickup status + update selection status + update transaction status (atomic - single API call)
+- **Vianda selection (initial)**: selection + pickup record + transactions + balance update (atomic - single API call)
+- **Vianda pickup (later)**: update pickup status + update selection status + update transaction status (atomic - single API call)
 - **Note**: Selection and pickup are separate atomic groups (hours apart, different client actions)
 - **Payment**: attempt + bill + subscription update (atomic - single workflow)
 - **Discretionary credit (request)**: request creation + initial records (atomic - single API call)
@@ -364,8 +364,8 @@ def create_employer_with_address(...):
 - Balance creation fails ❌
 - **Result**: Restaurant exists but no balance → Can't process transactions
 
-**Scenario 3: Plate Selection Failure (Initial Workflow)**
-- Plate selection created ✅
+**Scenario 3: Vianda Selection Failure (Initial Workflow)**
+- Vianda selection created ✅
 - Pickup record created ✅
 - Restaurant transaction created ✅
 - Client transaction created ✅
@@ -373,7 +373,7 @@ def create_employer_with_address(...):
 - **Result**: Order exists but credits not deducted → User gets free meal
 - **Note**: This is the initial selection workflow. Pickup happens later (separate atomic group).
 
-**Scenario 4: Plate Pickup Failure (Later Workflow)**
+**Scenario 4: Vianda Pickup Failure (Later Workflow)**
 - Pickup status updated ✅
 - Selection status updated ✅
 - Transaction status update fails ❌
@@ -565,20 +565,20 @@ def create_restaurant(...):
 
 ---
 
-#### Step 2.3: Plate Selection - Initial Workflow
-**File**: `app/services/plate_selection_service.py`
-**Function**: `create_plate_selection_with_transactions()`
+#### Step 2.3: Vianda Selection - Initial Workflow
+**File**: `app/services/vianda_selection_service.py`
+**Function**: `create_vianda_selection_with_transactions()`
 
 **Current Issue**: Multiple operations commit separately
 **Solution**: Use `commit=False` for all operations in initial workflow, commit at end
 
 **Changes**:
 ```python
-def create_plate_selection_with_transactions(...):
+def create_vianda_selection_with_transactions(...):
     try:
         # All operations with commit=False
-        selection = plate_selection_service.create(selection_data, db, commit=False)
-        pickup = plate_pickup_live_service.create(pickup_data, db, commit=False)
+        selection = vianda_selection_service.create(selection_data, db, commit=False)
+        pickup = vianda_pickup_live_service.create(pickup_data, db, commit=False)
         restaurant_transaction = restaurant_transaction_service.create(rt_data, db, commit=False)
         client_transaction = client_transaction_service.create(ct_data, db, commit=False)
         
@@ -602,8 +602,8 @@ def create_plate_selection_with_transactions(...):
 
 ---
 
-#### Step 2.4: Plate Pickup - Status Updates
-**File**: `app/services/plate_pickup_service.py`
+#### Step 2.4: Vianda Pickup - Status Updates
+**File**: `app/services/vianda_pickup_service.py`
 **Function**: Update pickup status workflow
 
 **Current Issue**: Status updates may commit separately
@@ -614,8 +614,8 @@ def create_plate_selection_with_transactions(...):
 def update_pickup_status(...):
     try:
         # All status updates with commit=False
-        plate_pickup_live_service.update(pickup_id, {"status": Status.COMPLETE}, db, commit=False)
-        plate_selection_service.update(selection_id, {"status": Status.COMPLETE}, db, commit=False)
+        vianda_pickup_live_service.update(pickup_id, {"status": Status.COMPLETE}, db, commit=False)
+        vianda_selection_service.update(selection_id, {"status": Status.COMPLETE}, db, commit=False)
         transaction_service.update(transaction_id, {"status": Status.COMPLETE}, db, commit=False)
         
         # Commit once at end
@@ -714,8 +714,8 @@ def create_with_conservative_balance_update(data: dict, db: psycopg2.extensions.
 1. **Phase 1**: Core infrastructure (db_insert, db_update, CRUD service)
 2. **Phase 2.1**: Employer creation (current priority)
 3. **Phase 2.2**: Restaurant creation
-4. **Phase 2.3**: Plate selection initial workflow
-5. **Phase 2.4**: Plate pickup workflow
+4. **Phase 2.3**: Vianda selection initial workflow
+5. **Phase 2.4**: Vianda pickup workflow
 6. **Phase 2.5**: Transaction + balance update
 7. **Phase 3**: Audit and refactor additional services
 8. **Phase 4**: Testing and validation
@@ -775,5 +775,5 @@ def create_with_conservative_balance_update(data: dict, db: psycopg2.extensions.
 - Update payment status + bill status atomically
 - Use `commit=False` for both operations
 
-**See**: `docs/roadmap/PLATE_PICKUP_ATOMICITY_ANALYSIS.md` for detailed analysis
+**See**: `docs/roadmap/VIANDA_PICKUP_ATOMICITY_ANALYSIS.md` for detailed analysis
 

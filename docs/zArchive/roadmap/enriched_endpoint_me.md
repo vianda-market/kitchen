@@ -143,12 +143,12 @@ GET /subscriptions/me  // Returns user's subscription (enriched)
 
 ---
 
-### 5. Plate Selections
+### 5. Vianda Selections
 
 **Current Endpoints**:
-- `GET /plate-selections/` - List plate selections (user-scoped)
-- `GET /plate-selections/{selection_id}` - Get single selection
-- `POST /plate-selections/` - Create selection
+- `GET /vianda-selections/` - List vianda selections (user-scoped)
+- `GET /vianda-selections/{selection_id}` - Get single selection
+- `POST /vianda-selections/` - Create selection
 
 **Current Behavior**:
 - User-scoped: `user_id` extracted from JWT automatically
@@ -156,19 +156,19 @@ GET /subscriptions/me  // Returns user's subscription (enriched)
 
 **Analysis**:
 - ✅ Users frequently access their own selections
-- ⚠️ Could benefit from enriched data (restaurant_name, plate_name, product_name)
+- ⚠️ Could benefit from enriched data (restaurant_name, vianda_name, product_name)
 - ✅ Current endpoints don't require `user_id` in path (no security risk)
 - ✅ Backend already filters by `user_id` from JWT
 
 **Recommendation**: ⚠️ **OPTIONAL** - Medium priority
-- Enriched data would be valuable (restaurant_name, plate_name, product_name)
+- Enriched data would be valuable (restaurant_name, vianda_name, product_name)
 - But would require creating enriched endpoints first
-- Consider if UI frequently displays selection details with restaurant/plate names
+- Consider if UI frequently displays selection details with restaurant/vianda names
 
 **If Implemented**:
 ```typescript
-GET /plate-selections/me  // Returns user's selections (enriched)
-// Would require: PlateSelectionEnrichedResponseSchema
+GET /vianda-selections/me  // Returns user's selections (enriched)
+// Would require: ViandaSelectionEnrichedResponseSchema
 ```
 
 ---
@@ -182,9 +182,9 @@ GET /plate-selections/me  // Returns user's selections (enriched)
 | **Payment Methods** | ❌ No | ❌ No | High | ❌ None | Not needed |
 | **Subscriptions** | ✅ Yes | ❌ No | High | ⚠️ Medium | Optional if single subscription |
 | **Client Bills** | ❌ No | ❌ No | Medium | ❌ None | Not needed |
-| **Plate Selections** | ❌ No* | ❌ No | High | ⚠️ Medium | Optional if enriched schema created |
+| **Vianda Selections** | ❌ No* | ❌ No | High | ⚠️ Medium | Optional if enriched schema created |
 
-*Plate Selections could benefit from enriched data but schema doesn't exist yet.
+*Vianda Selections could benefit from enriched data but schema doesn't exist yet.
 
 ---
 
@@ -226,10 +226,10 @@ All critical security issues are resolved with `/users/me` endpoints.
    - **Enriched**: Include `plan_name`, `currency_code`, `user_full_name`
    - **Value**: Convenience and clarity
 
-2. **Plate Selections** (`GET /plate-selections/me`):
-   - **If**: UI frequently displays selection details with restaurant/plate names
+2. **Vianda Selections** (`GET /vianda-selections/me`):
+   - **If**: UI frequently displays selection details with restaurant/vianda names
    - **Then**: Create enriched schema first, then add `/me` endpoint
-   - **Enriched**: Include `restaurant_name`, `plate_name`, `product_name`
+   - **Enriched**: Include `restaurant_name`, `vianda_name`, `product_name`
    - **Value**: Reduced N+1 queries
 
 ### ⚠️ Low Priority: Optional Convenience
@@ -257,7 +257,7 @@ All critical security issues are resolved with `/users/me` endpoints.
 
 ### Phase 2: Schema Creation (If Needed)
 
-- [ ] Create `PlateSelectionEnrichedResponseSchema` (if proceeding with plate selections)
+- [ ] Create `ViandaSelectionEnrichedResponseSchema` (if proceeding with vianda selections)
 - [ ] Add enriched service methods
 - [ ] Update database queries with JOINs
 
@@ -307,7 +307,7 @@ For each entity:
 **Future Consideration**: 
 - Monitor UI needs for "my X" operations
 - Consider `/subscriptions/me` if users typically have single subscription
-- Consider `/plate-selections/me` if enriched data is needed and schema is created
+- Consider `/vianda-selections/me` if enriched data is needed and schema is created
 
 **Priority**: Low - These would be convenience enhancements, not security fixes.
 

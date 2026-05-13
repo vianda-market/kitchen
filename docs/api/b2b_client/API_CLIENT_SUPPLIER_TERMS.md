@@ -87,13 +87,13 @@ All fields are optional on update. If the institution has no `supplier_terms` ro
 
 The `no_show_discount` field still appears on:
 
-- **Enriched plate responses** (`GET /api/v1/plates/enriched/`) — sourced from `supplier_terms` via JOIN. Can be `null` if no terms are configured.
+- **Enriched vianda responses** (`GET /api/v1/viandas/enriched/`) — sourced from `supplier_terms` via JOIN. Can be `null` if no terms are configured.
 - **Restaurant transactions** — recorded at transaction creation time; historical value, not live config.
 
 It does **not** appear on:
 
 - Institution create/update/response (`/api/v1/institutions/`) — removed
-- Plate create/update — never did; still doesn't
+- Vianda create/update — never did; still doesn't
 
 ## UI Integration Guide
 
