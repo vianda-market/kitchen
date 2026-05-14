@@ -11445,7 +11445,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdPe01', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdPe01', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdPe01', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -11730,7 +11730,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdPe02', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdPe02', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdPe02', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -12015,7 +12015,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdPe03', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdPe03', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdPe03', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -12300,7 +12300,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdPe04', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdPe04', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdPe04', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -12585,7 +12585,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdPe05', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdPe05', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdPe05', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -12869,7 +12869,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdPe07', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdPe07', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdPe07', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -25186,7 +25186,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdAr01', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdAr01', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdAr01', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -25321,7 +25321,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdAr02', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdAr02', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdAr02', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -25456,7 +25456,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdAr03', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdAr03', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdAr03', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -25591,7 +25591,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdAr04', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdAr04', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdAr04', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -25726,7 +25726,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdAr05', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdAr05', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdAr05', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -25861,7 +25861,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdAr07', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdAr07', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdAr07', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -38238,7 +38238,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdUs01', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdUs01', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdUs01', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -38373,7 +38373,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdUs02', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdUs02', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdUs02', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -38508,7 +38508,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdUs03', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdUs03', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdUs03', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -38643,7 +38643,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdUs04', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdUs04', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdUs04', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -38778,7 +38778,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdUs05', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdUs05', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdUs05', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
@@ -38913,7 +38913,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Has subscription_id', () => { pm.expect(body).to.have.property('subscription_id'); });",
                   "pm.collectionVariables.set('subIdUs07', body.subscription_id);",
-                  "pm.collectionVariables.set('paymentIdUs07', body.payment_id || body.external_payment_id || '');"
+                  "pm.collectionVariables.set('paymentIdUs07', body.external_payment_id);"
                 ],
                 "type": "text/javascript"
               }
