@@ -11608,6 +11608,11 @@
                   "key": "payment_method",
                   "value": "pm_card_visa",
                   "type": "text"
+                },
+                {
+                  "key": "return_url",
+                  "value": "https://api.dev.vianda.market/payment-return",
+                  "type": "text"
                 }
               ]
             },
@@ -11892,6 +11897,11 @@
                 {
                   "key": "payment_method",
                   "value": "pm_card_visa",
+                  "type": "text"
+                },
+                {
+                  "key": "return_url",
+                  "value": "https://api.dev.vianda.market/payment-return",
                   "type": "text"
                 }
               ]
@@ -12178,6 +12188,11 @@
                   "key": "payment_method",
                   "value": "pm_card_visa",
                   "type": "text"
+                },
+                {
+                  "key": "return_url",
+                  "value": "https://api.dev.vianda.market/payment-return",
+                  "type": "text"
                 }
               ]
             },
@@ -12462,6 +12477,11 @@
                 {
                   "key": "payment_method",
                   "value": "pm_card_visa",
+                  "type": "text"
+                },
+                {
+                  "key": "return_url",
+                  "value": "https://api.dev.vianda.market/payment-return",
                   "type": "text"
                 }
               ]
@@ -12748,6 +12768,11 @@
                   "key": "payment_method",
                   "value": "pm_card_visa",
                   "type": "text"
+                },
+                {
+                  "key": "return_url",
+                  "value": "https://api.dev.vianda.market/payment-return",
+                  "type": "text"
                 }
               ]
             },
@@ -13030,6 +13055,11 @@
                 {
                   "key": "payment_method",
                   "value": "pm_card_visa",
+                  "type": "text"
+                },
+                {
+                  "key": "return_url",
+                  "value": "https://api.dev.vianda.market/payment-return",
                   "type": "text"
                 }
               ]
