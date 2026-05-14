@@ -1,0 +1,317 @@
+name: DB rebuild (destructive)
+
+# DESTRUCTIVE — tears down and fully rebuilds the dev Cloud SQL schema, then
+# loads the selected seed dataset. Choose seed=demo for the full demo-day
+# dataset (Layer A SQL + Newman 900 collection via Stripe sandbox + billing
+# backfill). seed=none runs only build_kitchen_db.sh (schema + reference +
+# dev_fixtures). seed=minimal is not yet implemented (kitchen#330).
+#
+# Dev data is disposable; never run against staging or prod.
+#
+# Requires:
+#   - Manual approval via GitHub Environment `dev-destructive` (configure in
+#     Settings → Environments → dev-destructive → Required reviewers).
+#   - Operator must type "REBUILD <environment>" in the `confirm` input to
+#     prevent fat-finger runs. A `confirm` job validates the phrase and gates
+#     the `rebuild` job — a wrong phrase fails loudly without touching the DB.
+#   - GitHub Environment vars (dev-destructive):
+#       WIF_PROVIDER     — Workload Identity Federation provider resource name
+#       DEPLOY_SA        — deploy service account email
+#       GCP_PROJECT      — GCP project ID
+#       DB_PRIVATE_IP    — private IP of the dev Cloud SQL instance
+#       IAM_ADMIN_EMAIL  — (optional) Cloud SQL IAM read-only user
+#       KITCHEN_API_BASE_DEV — deployed dev Cloud Run URL, e.g. https://api.dev.vianda.market
+#                          (must be HTTPS; Stripe webhooks must reach it)
+#   - GitHub repo secret: STRIPE_SECRET_KEY (sk_test_... test-mode key)
+#   - GCP secret: vianda-dev-db-password
+#   - Bastion VM `vianda-dev-bastion` (zone us-central1-a) reachable via IAP.
+#   - Deploy SA has roles/iap.tunnelResourceAccessor + roles/compute.osLogin.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+        default: dev
+      seed:
+        description: "Seed set to apply after schema rebuild. none = build_kitchen_db.sh (schema + reference + dev_fixtures). demo = build_dev_db.sh --target=gcp-dev (primitive + demo_baseline + Newman 900 seed). minimal = NOT IMPLEMENTED (see kitchen#330)."
+        required: false
+        type: choice
+        options:
+          - none
+          - demo
+          - minimal
+        default: none
+      confirm:
+        description: 'Type "REBUILD <environment>" to proceed. Drops all tables in the target DB.'
+        required: true
+        type: string
+
+run-name: "DB rebuild — ${{ inputs.environment }} seed=${{ inputs.seed }} (triggered by ${{ github.actor }})"
+
+concurrency:
+  group: db-rebuild-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────
+  # confirm — validate the operator typed the exact phrase before any
+  # destructive work runs. All other jobs gate on this one.
+  # ────────────────────────────────────────────────────────────────────
+  confirm:
+    name: Validate confirmation phrase
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation phrase
+        run: |
+          EXPECTED="REBUILD ${{ inputs.environment }}"
+          ACTUAL="${{ inputs.confirm }}"
+          if [ "${ACTUAL}" != "${EXPECTED}" ]; then
+            echo "::error::Confirmation phrase mismatch."
+            echo "::error::Expected: '${EXPECTED}'"
+            echo "::error::Got:      '${ACTUAL}'"
+            echo ""
+            echo "To proceed, type exactly: REBUILD ${{ inputs.environment }}"
+            exit 1
+          fi
+          echo "Confirmation phrase accepted: '${ACTUAL}'"
+
+  # ────────────────────────────────────────────────────────────────────
+  # rebuild — tear down the public schema, re-migrate, re-seed.
+  # ────────────────────────────────────────────────────────────────────
+  rebuild:
+    name: Rebuild DB (${{ inputs.environment }}) seed=${{ inputs.seed }}
+    needs: confirm
+    runs-on: ubuntu-latest
+    environment: dev-destructive
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      # ── IAP tunnel pre-check: validate SSH/OS Login connectivity BEFORE the
+      # expensive pip install + newman install steps so a transient OS Login
+      # propagation race fails fast (~10–60s) instead of burning ~3min of setup.
+      # Uses port 5434 (not 5433) to avoid any collision with the main step's
+      # tunnel if step ordering ever changes.  Retries up to 4 times with
+      # exponential backoff (5s → 10s → 20s → 30s) so a typical propagation
+      # race clears before CI declares the run failed.
+      - name: Validate IAP SSH tunnel
+        env:
+          DB_PRIVATE_IP: ${{ vars.DB_PRIVATE_IP }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+        run: |
+          PRECHECK_PORT=5434
+          MAX_ATTEMPTS=4
+          BACKOFF_SECONDS=(0 5 10 20 30)
+          SUCCESS=0
+
+          for attempt in $(seq 1 ${MAX_ATTEMPTS}); do
+            SLEEP_BEFORE="${BACKOFF_SECONDS[$attempt]}"
+            if [ "${attempt}" -gt 1 ]; then
+              echo "Waiting ${SLEEP_BEFORE}s before retry attempt ${attempt}…"
+              sleep "${SLEEP_BEFORE}"
+            fi
+
+            echo "=== IAP tunnel pre-check attempt ${attempt}/${MAX_ATTEMPTS} ==="
+
+            # Open a background tunnel to port ${PRECHECK_PORT}; capture
+            # stderr+stdout so we can surface the error on failure.
+            gcloud compute ssh vianda-dev-bastion \
+              --project="${GCP_PROJECT}" \
+              --zone=us-central1-a \
+              --tunnel-through-iap \
+              --ssh-flag="-L ${PRECHECK_PORT}:${DB_PRIVATE_IP}:5432" \
+              --ssh-flag="-N" \
+              --ssh-flag="-o StrictHostKeyChecking=no" \
+              &> /tmp/iap_precheck_ssh.log &
+            PRECHECK_PID=$!
+            # shellcheck disable=SC2064
+            trap "kill ${PRECHECK_PID} 2>/dev/null; wait ${PRECHECK_PID} 2>/dev/null" EXIT
+
+            # Wait for the tunnel to accept connections (up to 20s).
+            # If the SSH process dies early (e.g. auth failure), break
+            # immediately rather than waiting the full 20s.
+            TUNNEL_UP=0
+            for _i in $(seq 1 20); do
+              if ! kill -0 "${PRECHECK_PID}" 2>/dev/null; then
+                echo "SSH process exited early on attempt ${attempt}."
+                cat /tmp/iap_precheck_ssh.log || true
+                break
+              fi
+              if nc -z 127.0.0.1 "${PRECHECK_PORT}" 2>/dev/null; then
+                TUNNEL_UP=1
+                break
+              fi
+              sleep 1
+            done
+
+            if [ "${TUNNEL_UP}" -eq 0 ]; then
+              echo "Tunnel did not come up on attempt ${attempt}."
+              kill "${PRECHECK_PID}" 2>/dev/null
+              wait "${PRECHECK_PID}" 2>/dev/null || true
+              trap - EXIT
+              continue
+            fi
+
+            # Tunnel is up — fetch DB password and run a trivial connectivity check.
+            PGPASSWORD=$(gcloud secrets versions access latest \
+              --secret="vianda-dev-db-password" --project="${GCP_PROJECT}")
+
+            if PGPASSWORD="${PGPASSWORD}" psql \
+                --host=127.0.0.1 --port="${PRECHECK_PORT}" \
+                --username=kitchen_app --dbname=kitchen \
+                --no-password --tuples-only \
+                --command="SELECT 1" 2>/tmp/iap_precheck_psql.log; then
+              echo "IAP tunnel + OS Login validated on attempt ${attempt}."
+              SUCCESS=1
+              kill "${PRECHECK_PID}" 2>/dev/null
+              wait "${PRECHECK_PID}" 2>/dev/null || true
+              trap - EXIT
+              break
+            else
+              echo "psql connectivity check failed on attempt ${attempt}:"
+              cat /tmp/iap_precheck_psql.log || true
+              kill "${PRECHECK_PID}" 2>/dev/null
+              wait "${PRECHECK_PID}" 2>/dev/null || true
+              trap - EXIT
+            fi
+          done
+
+          if [ "${SUCCESS}" -ne 1 ]; then
+            echo "::error::IAP tunnel auth failed after ${MAX_ATTEMPTS} attempts."
+            echo "::error::Likely causes: (1) OS Login key propagation race — re-run the workflow;"
+            echo "::error::(2) deploy SA missing roles/iap.tunnelResourceAccessor or roles/compute.osLogin;"
+            echo "::error::(3) WIF_PROVIDER or DEPLOY_SA vars misconfigured."
+            cat /tmp/iap_precheck_ssh.log || true
+            exit 1
+          fi
+
+      # ── Python: needed by load_demo_data.sh (seed=demo) to hash the demo
+      # admin password via app.auth.security.hash_password (passlib + bcrypt).
+      # Also needed by build_kitchen_db.sh for post-rebuild sync + geocode
+      # backfill via system-python3 fallback path.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # ── Newman: needed by load_demo_data.sh Layer B (900 demo collection).
+      # Mirrors the cache + install pattern from ci.yml acceptance job.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Cache newman global install
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: newman-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            newman-${{ runner.os }}-
+
+      - name: Install newman
+        run: npm install -g newman
+
+      - name: Open IAP SSH tunnel + rebuild DB
+        env:
+          DB_PRIVATE_IP: ${{ vars.DB_PRIVATE_IP }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+          IAM_ADMIN_EMAIL: ${{ vars.IAM_ADMIN_EMAIL }}
+          # KITCHEN_API_BASE_DEV: deployed dev Cloud Run URL (e.g. https://api.dev.vianda.market).
+          # Exported as KITCHEN_API_BASE for load_demo_data.sh (env-name agnostic to target).
+          # Only used by seed=demo path; exported unconditionally to keep env wiring simple.
+          KITCHEN_API_BASE: ${{ vars.KITCHEN_API_BASE_DEV }}
+          # STRIPE_SECRET_KEY: Stripe sandbox test key (sk_test_...).
+          # Only used by seed=demo path (Newman 900 collection).
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          # Skip pytest — covered by the separate ci.yml gate.
+          SKIP_PYTEST: "1"
+          SEED: ${{ inputs.seed }}
+        run: |
+          gcloud compute ssh vianda-dev-bastion \
+            --project="${GCP_PROJECT}" \
+            --zone=us-central1-a \
+            --tunnel-through-iap \
+            --ssh-flag="-L 5433:${DB_PRIVATE_IP}:5432" \
+            --ssh-flag="-N" \
+            --ssh-flag="-o StrictHostKeyChecking=no" &
+          TUNNEL_PID=$!
+          trap "kill ${TUNNEL_PID} 2>/dev/null" EXIT
+          for i in $(seq 1 20); do nc -z 127.0.0.1 5433 && break; sleep 1; done
+
+          PGPASSWORD=$(gcloud secrets versions access latest \
+            --secret="vianda-dev-db-password" --project="${GCP_PROJECT}")
+
+          case "${SEED}" in
+            none)
+              echo "=== seed=none: running build_kitchen_db.sh (schema + reference + dev_fixtures) ==="
+              DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
+                DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" ENV=dev \
+                IAM_ADMIN_EMAIL="${IAM_ADMIN_EMAIL}" \
+                bash app/db/build_kitchen_db.sh
+              ;;
+            demo)
+              echo "=== seed=demo: running build_dev_db.sh --target=gcp-dev ==="
+              DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
+                DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" ENV=dev \
+                IAM_ADMIN_EMAIL="${IAM_ADMIN_EMAIL}" \
+                KITCHEN_API_BASE="${KITCHEN_API_BASE}" \
+                STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY}" \
+                bash app/db/build_dev_db.sh --target=gcp-dev
+              ;;
+            minimal)
+              echo "::error::seed=minimal is not yet implemented for kitchen. See kitchen#330 follow-up tracking."
+              exit 1
+              ;;
+            *)
+              echo "::error::Unknown seed value '${SEED}'. Expected 'none', 'demo', or 'minimal'."
+              exit 1
+              ;;
+          esac
+
+      # ── Upload demo credentials as an artifact so the demo admin password
+      # can be retrieved without grepping the workflow log.
+      # Retention: 90 days (explicit). if: always() captures credentials even
+      # when a later assertion in the main step fails partway through.
+      # Only relevant for seed=demo (no demo creds generated for seed=none).
+      - name: Upload demo credentials artifact
+        if: always() && inputs.seed == 'demo'
+        uses: actions/upload-artifact@v7
+        with:
+          name: demo-credentials-${{ github.run_id }}
+          path: .demo_credentials.local
+          retention-days: 90
+
+      # ── Write a step summary with retrieval instructions so any operator
+      # can find the credentials without digging through run logs.
+      - name: Summary
+        if: always() && inputs.seed == 'demo'
+        run: |
+          echo "Demo credentials uploaded as artifact \`demo-credentials-${{ github.run_id }}\`." >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Download via the Actions tab → this run → Artifacts, or:" >> "${GITHUB_STEP_SUMMARY}"
+          echo '```' >> "${GITHUB_STEP_SUMMARY}"
+          echo "gh run download ${{ github.run_id }} -R vianda-market/kitchen" >> "${GITHUB_STEP_SUMMARY}"
+          echo '```' >> "${GITHUB_STEP_SUMMARY}"

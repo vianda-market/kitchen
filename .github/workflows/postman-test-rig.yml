@@ -1,57 +1,93 @@
-name: Rebuild Dev DB + Demo Data
+name: Postman Test Rig
 
-# DESTRUCTIVE — tears down and fully rebuilds the dev Cloud SQL schema, then
-# loads the full demo-day dataset (Layer A SQL + Newman 900 collection via
-# Stripe sandbox + billing backfill). build_kitchen_db.sh then geocodes
-# restaurant coordinates from the committed Mapbox cache (replay_only, zero
-# API calls) and syncs FX rates + national holidays from public APIs
-# (open.er-api.com, date.nager.at) via its system-python3 fallback path.
+# Fast iteration loop for Postman/Newman collection bugs against the existing
+# dev DB — NO schema teardown. Purges demo rows scoped to dddddddd-dec0-* UUIDs
+# via purge_demo_data.sh, then re-runs load_demo_data.sh to restore a clean
+# demo dataset before executing the chosen test slice.
 #
-# Dev data is disposable; never run against staging or prod.
+# Use this when iterating on collection bugs: much faster than a full db-rebuild
+# because it skips migration + schema rebuild.
+#
+# TODO(kitchen#332): The IAP tunnel pre-check + Python + Newman install
+# scaffolding below (~150 lines) is duplicated from db-rebuild.yml. Target is a
+# composite action at .github/actions/iap-tunnel-with-demo-tooling/action.yml.
+# Deferred — immediate need is the test rig; duplication is functional.
 #
 # Requires:
-#   - Manual approval via GitHub Environment `dev-destructive` (configure in
-#     Settings → Environments → dev-destructive → Required reviewers).
-#   - Operator must type "RESET-DEV-DB" in the `confirm` input to prevent
-#     fat-finger runs.
-#   - GitHub Environment vars (dev-destructive):
-#       WIF_PROVIDER     — Workload Identity Federation provider resource name
-#       DEPLOY_SA        — deploy service account email
-#       GCP_PROJECT      — GCP project ID
-#       DB_PRIVATE_IP    — private IP of the dev Cloud SQL instance
-#       IAM_ADMIN_EMAIL  — (optional) Cloud SQL IAM read-only user
-#       KITCHEN_API_BASE_DEV — deployed dev Cloud Run URL, e.g. https://api.dev.vianda.market
-#                          (must be HTTPS; Stripe webhooks must reach it)
+#   - Manual approval via GitHub Environment `dev-destructive` (same as
+#     db-rebuild — required reviewers in Settings → Environments).
+#   - Operator must type "RUN-TEST-RIG <environment>" in the `confirm` input.
+#   - GitHub Environment vars (dev-destructive): same set as db-rebuild.yml
+#       WIF_PROVIDER, DEPLOY_SA, GCP_PROJECT, DB_PRIVATE_IP,
+#       IAM_ADMIN_EMAIL, KITCHEN_API_BASE_DEV
 #   - GitHub repo secret: STRIPE_SECRET_KEY (sk_test_... test-mode key)
 #   - GCP secret: vianda-dev-db-password
 #   - Bastion VM `vianda-dev-bastion` (zone us-central1-a) reachable via IAP.
-#   - Deploy SA has roles/iap.tunnelResourceAccessor + roles/compute.osLogin.
 
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+        default: dev
+      test:
+        description: "Which Postman test slice to run. New options added as test rigs are written."
+        required: true
+        type: choice
+        options:
+          - stripe-payment-path
       confirm:
-        description: 'Type "RESET-DEV-DB" to confirm you want to wipe and rebuild the dev database'
+        description: 'Type "RUN-TEST-RIG <environment>" to proceed. Purges demo data (rows scoped to dddddddd-dec0-* UUIDs) before re-running.'
         required: true
         type: string
+
+run-name: "Postman Test Rig — ${{ inputs.test }} on ${{ inputs.environment }} (triggered by ${{ github.actor }})"
+
+concurrency:
+  group: postman-test-rig-${{ inputs.environment }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  reset:
-    name: Wipe + rebuild dev DB schema + load demo data
+  # ────────────────────────────────────────────────────────────────────
+  # confirm — validate the operator typed the exact phrase before any
+  # destructive work runs. All other jobs gate on this one.
+  # ────────────────────────────────────────────────────────────────────
+  confirm:
+    name: Validate confirmation phrase
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation phrase
+        run: |
+          EXPECTED="RUN-TEST-RIG ${{ inputs.environment }}"
+          ACTUAL="${{ inputs.confirm }}"
+          if [ "${ACTUAL}" != "${EXPECTED}" ]; then
+            echo "::error::Confirmation phrase mismatch."
+            echo "::error::Expected: '${EXPECTED}'"
+            echo "::error::Got:      '${ACTUAL}'"
+            echo ""
+            echo "To proceed, type exactly: RUN-TEST-RIG ${{ inputs.environment }}"
+            exit 1
+          fi
+          echo "Confirmation phrase accepted: '${ACTUAL}'"
+
+  # ────────────────────────────────────────────────────────────────────
+  # run — purge demo rows, reload demo data, run the selected test slice.
+  # ────────────────────────────────────────────────────────────────────
+  run:
+    name: Run ${{ inputs.test }} on ${{ inputs.environment }}
+    needs: confirm
     runs-on: ubuntu-latest
     environment: dev-destructive
-    if: inputs.confirm == 'RESET-DEV-DB'
-    steps:
-      - name: Abort on wrong confirmation token
-        if: inputs.confirm != 'RESET-DEV-DB'
-        run: |
-          echo "::error::Confirmation input was '${{ inputs.confirm }}', expected 'RESET-DEV-DB'. Aborting."
-          exit 1
 
+    steps:
       - uses: actions/checkout@v6
 
       - name: Authenticate to Google Cloud (WIF)
@@ -137,7 +173,7 @@ jobs:
                 --username=kitchen_app --dbname=kitchen \
                 --no-password --tuples-only \
                 --command="SELECT 1" 2>/tmp/iap_precheck_psql.log; then
-              echo "✓ IAP tunnel + OS Login validated on attempt ${attempt}."
+              echo "IAP tunnel + OS Login validated on attempt ${attempt}."
               SUCCESS=1
               kill "${PRECHECK_PID}" 2>/dev/null
               wait "${PRECHECK_PID}" 2>/dev/null || true
@@ -173,7 +209,8 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      # ── Newman: needed by load_demo_data.sh Layer B (900 demo collection).
+      # ── Newman: needed by load_demo_data.sh Layer B (900 demo collection)
+      # and by the test slice itself.
       # Mirrors the cache + install pattern from ci.yml acceptance job.
       - uses: actions/setup-node@v6
         with:
@@ -190,26 +227,19 @@ jobs:
       - name: Install newman
         run: npm install -g newman
 
-      - name: Open IAP SSH tunnel + rebuild DB + load demo data
+      - name: Open IAP SSH tunnel + purge + reload + run test slice
         env:
           DB_PRIVATE_IP: ${{ vars.DB_PRIVATE_IP }}
           GCP_PROJECT: ${{ vars.GCP_PROJECT }}
           IAM_ADMIN_EMAIL: ${{ vars.IAM_ADMIN_EMAIL }}
           # KITCHEN_API_BASE_DEV: deployed dev Cloud Run URL (e.g. https://api.dev.vianda.market).
-          # Set as a GitHub Environment variable under dev-destructive.
-          # Must be HTTPS — load_demo_data.sh enforces this for gcp-dev target
-          # (Stripe webhooks require a publicly reachable HTTPS endpoint).
-          # Exported as KITCHEN_API_BASE for the loader (env-name agnostic to target).
+          # Exported as KITCHEN_API_BASE for load_demo_data.sh (env-name agnostic to target).
           KITCHEN_API_BASE: ${{ vars.KITCHEN_API_BASE_DEV }}
           # STRIPE_SECRET_KEY: Stripe sandbox test key (sk_test_...).
-          # Set as a GitHub repo secret (Settings → Secrets → Actions).
-          # load_demo_data.sh refuses sk_live_ keys — sandbox only.
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          # Skip pytest in CI — it requires a locally running API server and is
-          # covered by the separate ci.yml gate. Post-rebuild sync and geocode
-          # backfill run inside build_kitchen_db.sh via its system-python3 fallback
-          # (pip install above populates system Python with requirements.txt deps).
+          # Skip pytest — covered by the separate ci.yml gate.
           SKIP_PYTEST: "1"
+          TEST_SLICE: ${{ inputs.test }}
         run: |
           gcloud compute ssh vianda-dev-bastion \
             --project="${GCP_PROJECT}" \
@@ -221,19 +251,34 @@ jobs:
           TUNNEL_PID=$!
           trap "kill ${TUNNEL_PID} 2>/dev/null" EXIT
           for i in $(seq 1 20); do nc -z 127.0.0.1 5433 && break; sleep 1; done
+
           PGPASSWORD=$(gcloud secrets versions access latest \
             --secret="vianda-dev-db-password" --project="${GCP_PROJECT}")
-          DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
-            DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" ENV=dev \
-            IAM_ADMIN_EMAIL="${IAM_ADMIN_EMAIL}" \
-            KITCHEN_API_BASE="${KITCHEN_API_BASE}" \
-            STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY}" \
-            bash app/db/build_dev_db.sh --target=gcp-dev
+
+          case "${TEST_SLICE}" in
+            stripe-payment-path)
+              echo "=== Purging demo data (dddddddd-dec0-* rows) ==="
+              DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
+                DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" \
+                bash scripts/purge_demo_data.sh
+
+              echo "=== Reloading demo data via load_demo_data.sh --target=gcp-dev ==="
+              DB_HOST=127.0.0.1 DB_PORT=5433 DB_NAME=kitchen \
+                DB_USER=kitchen_app PGPASSWORD="${PGPASSWORD}" ENV=dev \
+                IAM_ADMIN_EMAIL="${IAM_ADMIN_EMAIL}" \
+                KITCHEN_API_BASE="${KITCHEN_API_BASE}" \
+                STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY}" \
+                bash scripts/load_demo_data.sh --target=gcp-dev
+              ;;
+            *)
+              echo "::error::unknown test slice: ${TEST_SLICE}"
+              exit 1
+              ;;
+          esac
 
       # ── Upload demo credentials as an artifact so the demo admin password
-      # can be retrieved without grepping the workflow log.
-      # Retention: 90 days (explicit). if: always() captures credentials even
-      # when a later assertion in the main step fails partway through.
+      # can be retrieved after the run. if: always() captures credentials even
+      # if a later assertion fails partway through.
       - name: Upload demo credentials artifact
         if: always()
         uses: actions/upload-artifact@v7
@@ -242,11 +287,11 @@ jobs:
           path: .demo_credentials.local
           retention-days: 90
 
-      # ── Write a step summary with retrieval instructions so any operator
-      # can find the credentials without digging through run logs.
       - name: Summary
         if: always()
         run: |
+          echo "## Postman Test Rig — ${{ inputs.test }} on ${{ inputs.environment }}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
           echo "Demo credentials uploaded as artifact \`demo-credentials-${{ github.run_id }}\`." >> "${GITHUB_STEP_SUMMARY}"
           echo "" >> "${GITHUB_STEP_SUMMARY}"
           echo "Download via the Actions tab → this run → Artifacts, or:" >> "${GITHUB_STEP_SUMMARY}"
