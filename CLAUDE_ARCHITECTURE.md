@@ -376,7 +376,7 @@ Enterprise meal subscription benefits — employers subsidize employee meal plan
 - **B2B login restriction:** Customer Comensals blocked from B2B platform login when `x-client-type: b2b` header is sent.
 - **Enums:** `benefit_cap_period_enum`, `enrollment_mode_enum`, `billing_cycle_enum`, `employer_bill_payment_status_enum`
 - **Address types:** B2C customer addresses are user-selected: `customer_home` (Home), `customer_employer` (Work), `customer_other` (Other). No longer auto-derived from employer linkage.
-- **Full design:** `docs/plans/MULTINATIONAL_INSTITUTIONS.md`
+- **Full design:** `docs/api/internal/INSTITUTION_MARKET_MODEL.md`
 
 ---
 
@@ -645,7 +645,7 @@ Institutions can operate across multiple countries. One institution = one set of
 - **Address types:** B2C customer addresses are user-selected (Home/Work/Other). `customer_employer` ("Work") is no longer auto-derived.
 - **JWT `market_id`:** B2C-only (vianda/restaurant scoping). Orthogonal to institution structure. B2B users use primary market for language default.
 - **Validation:** Entity creation validates address country against `institution_market`. User market assignments validate against `institution_market` (Internal bypasses).
-- **Full design:** `docs/plans/MULTINATIONAL_INSTITUTIONS.md`
+- **Full design:** `docs/api/internal/INSTITUTION_MARKET_MODEL.md`
 
 ## Filter Subsystem
 

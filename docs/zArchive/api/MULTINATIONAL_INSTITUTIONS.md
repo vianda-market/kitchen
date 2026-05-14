@@ -1,3 +1,6 @@
+> **ARCHIVED** — Durable content promoted to `docs/api/internal/INSTITUTION_MARKET_MODEL.md`.
+> This file is preserved as the original design record (motivation, detailed migration phases, risk register, documentation update checklist). For current reference on how the institution-market model works, read the permanent doc above.
+
 # Multinational Institutions
 
 **Status:** Exploration / Not Started  
