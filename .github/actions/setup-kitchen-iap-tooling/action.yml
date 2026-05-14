@@ -1,0 +1,165 @@
+name: "Setup Kitchen IAP Tooling"
+description: >
+  WIF auth, gcloud setup, IAP SSH tunnel pre-check with backoff retries,
+  Python install + requirements, Node install, and Newman global install.
+  Used by db-rebuild.yml and postman-test-rig.yml.
+
+inputs:
+  wif-provider:
+    description: "Workload Identity Federation provider resource name (vars.WIF_PROVIDER)"
+    required: true
+  deploy-sa:
+    description: "Deploy service account email (vars.DEPLOY_SA)"
+    required: true
+  gcp-project:
+    description: "GCP project ID (vars.GCP_PROJECT)"
+    required: true
+  db-private-ip:
+    description: "Private IP of the dev Cloud SQL instance (vars.DB_PRIVATE_IP)"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v6
+
+    - name: Authenticate to Google Cloud (WIF)
+      uses: google-github-actions/auth@v3
+      with:
+        workload_identity_provider: ${{ inputs.wif-provider }}
+        service_account: ${{ inputs.deploy-sa }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v3
+
+    # ── IAP tunnel pre-check: validate SSH/OS Login connectivity BEFORE the
+    # expensive pip install + newman install steps so a transient OS Login
+    # propagation race fails fast (~10–60s) instead of burning ~3min of setup.
+    # Uses port 5434 (not 5433) to avoid any collision with the main step's
+    # tunnel if step ordering ever changes.  Retries up to 4 times with
+    # exponential backoff (5s → 10s → 20s → 30s) so a typical propagation
+    # race clears before CI declares the run failed.
+    - name: Validate IAP SSH tunnel
+      shell: bash
+      env:
+        DB_PRIVATE_IP: ${{ inputs.db-private-ip }}
+        GCP_PROJECT: ${{ inputs.gcp-project }}
+      run: |
+        PRECHECK_PORT=5434
+        MAX_ATTEMPTS=4
+        BACKOFF_SECONDS=(0 5 10 20 30)
+        SUCCESS=0
+
+        for attempt in $(seq 1 ${MAX_ATTEMPTS}); do
+          SLEEP_BEFORE="${BACKOFF_SECONDS[$attempt]}"
+          if [ "${attempt}" -gt 1 ]; then
+            echo "Waiting ${SLEEP_BEFORE}s before retry attempt ${attempt}…"
+            sleep "${SLEEP_BEFORE}"
+          fi
+
+          echo "=== IAP tunnel pre-check attempt ${attempt}/${MAX_ATTEMPTS} ==="
+
+          # Open a background tunnel to port ${PRECHECK_PORT}; capture
+          # stderr+stdout so we can surface the error on failure.
+          gcloud compute ssh vianda-dev-bastion \
+            --project="${GCP_PROJECT}" \
+            --zone=us-central1-a \
+            --tunnel-through-iap \
+            --ssh-flag="-L ${PRECHECK_PORT}:${DB_PRIVATE_IP}:5432" \
+            --ssh-flag="-N" \
+            --ssh-flag="-o StrictHostKeyChecking=no" \
+            &> /tmp/iap_precheck_ssh.log &
+          PRECHECK_PID=$!
+          # shellcheck disable=SC2064
+          trap "kill ${PRECHECK_PID} 2>/dev/null; wait ${PRECHECK_PID} 2>/dev/null" EXIT
+
+          # Wait for the tunnel to accept connections (up to 20s).
+          # If the SSH process dies early (e.g. auth failure), break
+          # immediately rather than waiting the full 20s.
+          TUNNEL_UP=0
+          for _i in $(seq 1 20); do
+            if ! kill -0 "${PRECHECK_PID}" 2>/dev/null; then
+              echo "SSH process exited early on attempt ${attempt}."
+              cat /tmp/iap_precheck_ssh.log || true
+              break
+            fi
+            if nc -z 127.0.0.1 "${PRECHECK_PORT}" 2>/dev/null; then
+              TUNNEL_UP=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "${TUNNEL_UP}" -eq 0 ]; then
+            echo "Tunnel did not come up on attempt ${attempt}."
+            kill "${PRECHECK_PID}" 2>/dev/null
+            wait "${PRECHECK_PID}" 2>/dev/null || true
+            trap - EXIT
+            continue
+          fi
+
+          # Tunnel is up — fetch DB password and run a trivial connectivity check.
+          PGPASSWORD=$(gcloud secrets versions access latest \
+            --secret="vianda-dev-db-password" --project="${GCP_PROJECT}")
+
+          if PGPASSWORD="${PGPASSWORD}" psql \
+              --host=127.0.0.1 --port="${PRECHECK_PORT}" \
+              --username=kitchen_app --dbname=kitchen \
+              --no-password --tuples-only \
+              --command="SELECT 1" 2>/tmp/iap_precheck_psql.log; then
+            echo "IAP tunnel + OS Login validated on attempt ${attempt}."
+            SUCCESS=1
+            kill "${PRECHECK_PID}" 2>/dev/null
+            wait "${PRECHECK_PID}" 2>/dev/null || true
+            trap - EXIT
+            break
+          else
+            echo "psql connectivity check failed on attempt ${attempt}:"
+            cat /tmp/iap_precheck_psql.log || true
+            kill "${PRECHECK_PID}" 2>/dev/null
+            wait "${PRECHECK_PID}" 2>/dev/null || true
+            trap - EXIT
+          fi
+        done
+
+        if [ "${SUCCESS}" -ne 1 ]; then
+          echo "::error::IAP tunnel auth failed after ${MAX_ATTEMPTS} attempts."
+          echo "::error::Likely causes: (1) OS Login key propagation race — re-run the workflow;"
+          echo "::error::(2) deploy SA missing roles/iap.tunnelResourceAccessor or roles/compute.osLogin;"
+          echo "::error::(3) WIF_PROVIDER or DEPLOY_SA vars misconfigured."
+          cat /tmp/iap_precheck_ssh.log || true
+          exit 1
+        fi
+
+    # ── Python: needed by load_demo_data.sh (seed=demo) to hash the demo
+    # admin password via app.auth.security.hash_password (passlib + bcrypt).
+    # Also needed by build_kitchen_db.sh for post-rebuild sync + geocode
+    # backfill via system-python3 fallback path.
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.14"
+        allow-prereleases: true
+        cache: pip
+        cache-dependency-path: requirements.txt
+
+    - name: Install Python dependencies
+      shell: bash
+      run: pip install -r requirements.txt
+
+    # ── Newman: needed by load_demo_data.sh Layer B (900 demo collection).
+    # Mirrors the cache + install pattern from ci.yml acceptance job.
+    - uses: actions/setup-node@v6
+      with:
+        node-version: "20"
+
+    - name: Cache newman global install
+      uses: actions/cache@v5
+      with:
+        path: ~/.npm
+        key: newman-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+        restore-keys: |
+          newman-${{ runner.os }}-
+
+    - name: Install newman
+      shell: bash
+      run: npm install -g newman
