@@ -83,6 +83,9 @@ jobs:
     environment: dev-destructive
 
     steps:
+      # Checkout must run before any local composite action `uses:` resolves.
+      - uses: actions/checkout@v6
+
       - name: Set up kitchen IAP tunnel + demo tooling
         uses: ./.github/actions/setup-kitchen-iap-tooling
         with:
