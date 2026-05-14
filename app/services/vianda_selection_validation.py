@@ -433,14 +433,19 @@ def _find_next_available_kitchen_day_in_week(
         if d.weekday() >= 5:  # Saturday=5, Sunday=6
             if not _settings.DEV_MODE:
                 continue  # Production: skip weekends
-            # DEV_MODE: map weekend to friday so Postman/dev testing works any day
+            # DEV_MODE: map weekend to friday so Postman/dev testing works any day.
+            # Use the preceding Friday's date for holiday checks so that a holiday
+            # on that Friday is correctly detected (d itself is a weekend date and
+            # would never match a Friday holiday entry).
             day_name = "friday"
+            holiday_check_date = d - timedelta(days=d.weekday() - 4)
         else:
             day_name = weekday_names[d.weekday()]
+            holiday_check_date = d
         if day_name not in available_kitchen_days:
             continue
         if country_code and db:
-            date_str = d.strftime("%Y-%m-%d")
+            date_str = holiday_check_date.strftime("%Y-%m-%d")
             if _is_date_national_holiday(date_str, country_code, db):
                 continue
         return day_name
