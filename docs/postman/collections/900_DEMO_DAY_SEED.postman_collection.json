@@ -11494,7 +11494,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe01');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -11562,10 +11562,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const piId = pm.collectionVariables.get('paymentIdPe01');",
                   "if (!piId) { throw new Error('paymentIdPe01 not set. Confirm Create Subscription stored it.'); }",
-                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "const sk = pm.environment.get('stripeSecretKey');",
                   "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
                 ]
               }
@@ -11639,7 +11639,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe01');",
                   "if (!subId) { throw new Error('subIdPe01 not set.'); }"
                 ]
@@ -11784,7 +11784,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe02');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -11852,10 +11852,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const piId = pm.collectionVariables.get('paymentIdPe02');",
                   "if (!piId) { throw new Error('paymentIdPe02 not set. Confirm Create Subscription stored it.'); }",
-                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "const sk = pm.environment.get('stripeSecretKey');",
                   "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
                 ]
               }
@@ -11929,7 +11929,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe02');",
                   "if (!subId) { throw new Error('subIdPe02 not set.'); }"
                 ]
@@ -12074,7 +12074,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe03');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -12142,10 +12142,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const piId = pm.collectionVariables.get('paymentIdPe03');",
                   "if (!piId) { throw new Error('paymentIdPe03 not set. Confirm Create Subscription stored it.'); }",
-                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "const sk = pm.environment.get('stripeSecretKey');",
                   "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
                 ]
               }
@@ -12219,7 +12219,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe03');",
                   "if (!subId) { throw new Error('subIdPe03 not set.'); }"
                 ]
@@ -12364,7 +12364,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe04');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -12432,10 +12432,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const piId = pm.collectionVariables.get('paymentIdPe04');",
                   "if (!piId) { throw new Error('paymentIdPe04 not set. Confirm Create Subscription stored it.'); }",
-                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "const sk = pm.environment.get('stripeSecretKey');",
                   "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
                 ]
               }
@@ -12509,7 +12509,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe04');",
                   "if (!subId) { throw new Error('subIdPe04 not set.'); }"
                 ]
@@ -12654,7 +12654,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe05');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "// Update request URL with actual subscription ID",
@@ -12722,10 +12722,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const piId = pm.collectionVariables.get('paymentIdPe05');",
                   "if (!piId) { throw new Error('paymentIdPe05 not set. Confirm Create Subscription stored it.'); }",
-                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "const sk = pm.environment.get('stripeSecretKey');",
                   "if (!sk) { throw new Error('stripeSecretKey not set. load_demo_data.sh --target=gcp-dev passes it via --env-var.'); }"
                 ]
               }
@@ -12799,7 +12799,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe05');",
                   "if (!subId) { throw new Error('subIdPe05 not set.'); }"
                 ]
@@ -12943,7 +12943,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe07');",
                   "if (!subId) { throw new Error('subscription_id not set. Run Create Subscription first.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -13009,10 +13009,10 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const piId = pm.collectionVariables.get('paymentIdPe07');",
                   "if (!piId) { throw new Error('paymentId not set. Confirm Create Subscription stored it.'); }",
-                  "const sk = pm.collectionVariables.get('stripeSecretKey');",
+                  "const sk = pm.environment.get('stripeSecretKey');",
                   "if (!sk) { throw new Error('stripeSecretKey not set.'); }"
                 ],
                 "type": "text/javascript"
@@ -13086,7 +13086,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') !== 'stripe') { pm.execution.skipRequest('paymentMode != stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdPe07');",
                   "if (!subId) { throw new Error('subIdPe07 not set.'); }"
                 ],
@@ -25265,7 +25265,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdAr01');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -25400,7 +25400,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdAr02');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -25535,7 +25535,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdAr03');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -25670,7 +25670,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdAr04');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -25805,7 +25805,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdAr05');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -25940,7 +25940,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdAr07');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -38317,7 +38317,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdUs01');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -38452,7 +38452,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdUs02');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -38587,7 +38587,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdUs03');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -38722,7 +38722,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdUs04');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -38857,7 +38857,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdUs05');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -38992,7 +38992,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "if ((pm.environment.get('paymentMode') || pm.collectionVariables.get('paymentMode')) === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
+                  "if (pm.environment.get('paymentMode') === 'stripe') { pm.execution.skipRequest('paymentMode == stripe'); return; }",
                   "const subId = pm.collectionVariables.get('subIdUs07');",
                   "if (!subId) { throw new Error('subscription_id not set.'); }",
                   "const url = pm.request.url.toString().replace('PLACEHOLDER_SUB_ID', subId);",
@@ -43558,20 +43558,6 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// [demo loader] hoist env-scope vars to collection scope so pm.collectionVariables.get() reads them.",
-          "// Newman --env-var writes to environment scope; the per-request pre-request scripts in this collection",
-          "// historically read via pm.collectionVariables.get() which is scope-pinned to collection. See kitchen#330.",
-          "['paymentMode', 'stripeSecretKey'].forEach(function (k) {",
-          "  var envVal = pm.environment.get(k);",
-          "  if (envVal) {",
-          "    pm.collectionVariables.set(k, envVal);",
-          "  } else {",
-          "    var colVal = pm.collectionVariables.get(k);",
-          "    if (colVal) {",
-          "      console.warn('[scope-fallback] ' + k + ' fell back to collection-scope default (\"' + colVal + '\"). load_demo_data.sh passes via --env-var; see kitchen#330 if you expected env-scope to win.');",
-          "    }",
-          "  }",
-          "});",
           "// [demo loader] x-client-type bypass — captcha_guard exempts b2c-mobile",
           "pm.request.headers.upsert({key: 'x-client-type', value: 'b2c-mobile'});",
           ""
