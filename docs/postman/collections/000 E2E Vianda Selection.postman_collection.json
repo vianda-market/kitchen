@@ -2,14 +2,14 @@
   "info": {
     "_postman_id": "3d6029a4-0905-4217-ad7c-f7cdaa06c7f1",
     "name": "000 E2E Vianda Selection",
-    "description": "E2E Vianda Selection: minimal run to test each API. After DB rebuild, seed is minimal (super_admin, Vianda Enterprises, Vianda Customers, Global market only). Order: (1) Login Super Admin, (2) Create 1 credit currency + 1 local market, List Markets, 1 plan, (3) Supplier Setup (no bank account \u2014 payout is Stripe-only via pipeline), (4) Supplier Menu Setup, (5) Client Setup (includes Register vianda selection, Post QR Code Scan \u2014 scan creates restaurant balance, Get enriched vianda pickups, Complete order, Create vianda review, List my reviews), (6) Restaurant Staff Operations (Get Daily Orders only), (7) Login Super Admin, Run settlement pipeline (Issue bills), Get Bills, Get institution bill by ID. Supplier payment uses the atomic pipeline (settlement \u2192 bill \u2192 payout); restaurant balance comes from Post QR Code Scan. Vianda reviews: customer completes pickup then submits Stars (1-5) and Portion Size (1-3). Variables: adminUsername=superadmin, adminPassword=SuperAdmin1!.",
+    "description": "E2E Vianda Selection: minimal run to test each API. After DB rebuild, seed is minimal (super_admin, Vianda Enterprises, Vianda Customers, Global market only). Order: (1) Login Super Admin, (2) Create 1 credit currency + 1 local market, List Markets, 1 plan, (3) Supplier Setup (no bank account — payout is Stripe-only via pipeline), (4) Supplier Menu Setup, (5) Client Setup (includes Register vianda selection, Post QR Code Scan — scan creates restaurant balance, Get enriched vianda pickups, Complete order, Create vianda review, List my reviews), (6) Restaurant Staff Operations (Get Daily Orders only), (7) Login Super Admin, Run settlement pipeline (Issue bills), Get Bills, Get institution bill by ID. Supplier payment uses the atomic pipeline (settlement → bill → payout); restaurant balance comes from Post QR Code Scan. Vianda reviews: customer completes pickup then submits Stars (1-5) and Portion Size (1-3). Variables: adminUsername=superadmin, adminPassword=SuperAdmin1!.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "43849671",
     "_collection_link": "https://go.postman.co/collection/43849671-3d6029a4-0905-4217-ad7c-f7cdaa06c7f1?source=collection_link"
   },
   "item": [
     {
-      "name": "\ud83d\udd10 Authentication & Setup",
+      "name": "🔐 Authentication & Setup",
       "item": [
         {
           "name": "Login Super Admin",
@@ -142,7 +142,7 @@
                   "if (token) {",
                   "    pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
                   "} else {",
-                  "    console.warn('No auth token available for Setup Cities \u2014 GET /cities will 401');",
+                  "    console.warn('No auth token available for Setup Cities — GET /cities will 401');",
                   "}"
                 ]
               }
@@ -476,7 +476,7 @@
                 "exec": [
                   "// PUT /credit-currencies/by-key requires Internal auth.",
                   "// At this point pm.environment.get('authToken') holds the super-admin token",
-                  "// set by the 'Login Super Admin' step above \u2014 no token swap needed.",
+                  "// set by the 'Login Super Admin' step above — no token swap needed.",
                   "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });"
                 ],
                 "type": "text/javascript",
@@ -487,7 +487,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Upsert returns 200 whether inserting or updating \u2014 no ad-hoc fallback needed.",
+                  "// Upsert returns 200 whether inserting or updating — no ad-hoc fallback needed.",
                   "pm.test(\"Upsert Credit Currency - Status 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
@@ -569,7 +569,7 @@
                   "// PUT /markets/by-key requires Internal auth.",
                   "// At this point pm.environment.get('authToken') holds the super-admin token",
                   "// set by the 'Login Super Admin' step above (no supplier login has run yet).",
-                  "// No token swap needed \u2014 admin is already current.",
+                  "// No token swap needed — admin is already current.",
                   "//",
                   "// Build upsert payload with run-time currency ID.",
                   "// planCreditCurrencyId is set synchronously by the preceding",
@@ -677,7 +677,7 @@
                   "",
                   "if (pm.response.code === 200) {",
                   "    const markets = pm.response.json();",
-                  "    console.log(\"\ud83d\udcca Retrieved markets:\", markets.length);",
+                  "    console.log(\"📊 Retrieved markets:\", markets.length);",
                   "    ",
                   "    if (markets && markets.length > 0) {",
                   "        // Store the first market (Argentina) for plan creation",
@@ -689,13 +689,13 @@
                   "        pm.collectionVariables.set(\"planMarketCountryCode\", defaultMarket.country_code || \"AR\");",
                   "        pm.collectionVariables.set(\"planMarketCurrency\", defaultMarket.currency_code);",
                   "        ",
-                  "        console.log(\"\u2705 Set planMarketId:\", defaultMarket.market_id);",
-                  "        console.log(\"\ud83d\udccd Market:\", defaultMarket.country_name, \"(\"+defaultMarket.currency_code+\")\");",
+                  "        console.log(\"✅ Set planMarketId:\", defaultMarket.market_id);",
+                  "        console.log(\"📍 Market:\", defaultMarket.country_name, \"(\"+defaultMarket.currency_code+\")\");",
                   "    } else {",
-                  "        console.error(\"\u274c No markets found in response\");",
+                  "        console.error(\"❌ No markets found in response\");",
                   "    }",
                   "} else {",
-                  "    console.error(\"\u274c Failed to retrieve markets:\", pm.response.text());",
+                  "    console.error(\"❌ Failed to retrieve markets:\", pm.response.text());",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -898,7 +898,7 @@
       ]
     },
     {
-      "name": "\ud83c\udfe2 Supplier Setup",
+      "name": "🏢 Supplier Setup",
       "item": [
         {
           "name": "Login Super Admin",
@@ -1029,7 +1029,7 @@
                   "// set by the 'Login Super Admin' step above (no supplier login has run yet).",
                   "// pm.collectionVariables.get('authToken') also holds the admin token.",
                   "//",
-                  "// Fix (synchronous \u2014 no pm.sendRequest):",
+                  "// Fix (synchronous — no pm.sendRequest):",
                   "//   1. Read the admin token from the collection scope.",
                   "//   2. Temporarily write it to the environment scope so {{authToken}}",
                   "//      resolves to the admin token when collection-level bearer auth fires.",
@@ -1161,7 +1161,7 @@
                   "// set by the 'Login Super Admin' step above (collection scope is not",
                   "// overwritten by supplier login steps).",
                   "//",
-                  "// Fix (synchronous \u2014 no pm.sendRequest):",
+                  "// Fix (synchronous — no pm.sendRequest):",
                   "//   1. Read the admin token from the collection scope.",
                   "//   2. Temporarily write it to the environment scope so {{authToken}}",
                   "//      resolves to the admin token when collection-level bearer auth fires.",
@@ -1249,7 +1249,7 @@
                   "// Restore supplier token after this admin-elevated request.",
                   "// Downstream Supplier Setup steps expect the supplier token.",
                   "// At this stage there is no supplier token yet (login happens after this step),",
-                  "// so we restore the admin token \u2014 subsequent 'Login Supplier Admin' will",
+                  "// so we restore the admin token — subsequent 'Login Supplier Admin' will",
                   "// overwrite the environment scope with the supplier token as usual.",
                   "// No restoration needed: the collection variable still holds the admin token",
                   "// and Login Supplier Admin will update the environment scope.",
@@ -1299,7 +1299,7 @@
                   "// set by the 'Login Super Admin' step (collection scope is not",
                   "// overwritten by prior login steps).",
                   "//",
-                  "// Fix (synchronous \u2014 no pm.sendRequest):",
+                  "// Fix (synchronous — no pm.sendRequest):",
                   "//   1. Read the admin token from the collection scope.",
                   "//   2. Temporarily write it to the environment scope so {{authToken}}",
                   "//      resolves to the admin token when collection-level bearer auth fires.",
@@ -1315,7 +1315,7 @@
                   "pm.environment.set('authToken', adminToken);",
                   "console.log('Temporarily set authToken to admin token for Upsert Canonical Admin User');",
                   "",
-                  "// Build upsert payload \u2014 institution and market are fixed sentinels for Internal users",
+                  "// Build upsert payload — institution and market are fixed sentinels for Internal users",
                   "const username = 'vianda_admin';",
                   "const email = 'vianda_admin@example.com';",
                   "const password = 'Admin123!';",
@@ -1834,7 +1834,7 @@
                   "// set by the 'Login Super Admin' step (collection scope is not overwritten by",
                   "// supplier login steps).",
                   "//",
-                  "// Fix (synchronous \u2014 no pm.sendRequest):",
+                  "// Fix (synchronous — no pm.sendRequest):",
                   "//   1. Read the admin token from collection scope.",
                   "//   2. Temporarily write it to the environment scope so {{authToken}}",
                   "//      resolves to the admin token when collection-level bearer auth fires.",
@@ -1949,13 +1949,13 @@
                   "// At this point in the E2E run, pm.environment.get('authToken') holds the",
                   "// *supplier* token set by 'Login Supplier Admin' above.  However,",
                   "// pm.collectionVariables.get('authToken') still holds the super-admin token",
-                  "// from the Supplier Setup 'Login Super Admin' step \u2014 that step wrote to",
+                  "// from the Supplier Setup 'Login Super Admin' step — that step wrote to",
                   "// *both* environment and collection scopes, but Login Supplier Admin only",
                   "// wrote to the *environment* scope.  Variable resolution priority in",
                   "// Postman/Newman is: environment > collection, so {{authToken}} currently",
                   "// resolves to the supplier token from the environment scope.",
                   "//",
-                  "// Fix (synchronous \u2014 no pm.sendRequest):",
+                  "// Fix (synchronous — no pm.sendRequest):",
                   "//   1. Read the admin token from the collection scope (not overwritten).",
                   "//   2. Temporarily write it to the environment scope so {{authToken}}",
                   "//      resolves to the admin token when collection-level bearer auth fires.",
@@ -2031,7 +2031,7 @@
                   "    pm.environment.set('authToken', supplierToken);",
                   "    console.log('Restored authToken to supplier token after Upsert Canonical Restaurant');",
                   "} else {",
-                  "    console.warn('supplierAuthToken not found \u2014 authToken not restored; downstream supplier steps may 403.');",
+                  "    console.warn('supplierAuthToken not found — authToken not restored; downstream supplier steps may 403.');",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -2073,7 +2073,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "// No-op prerequest \u2014 auth is already set from Login Supplier Admin"
+                  "// No-op prerequest — auth is already set from Login Supplier Admin"
                 ],
                 "type": "text/javascript"
               }
@@ -2083,13 +2083,13 @@
               "script": {
                 "exec": [
                   "// Idempotency teardown: deactivate any existing vianda_kitchen_days so the",
-                  "// 'Update restaurant to Active (no active PKDs) \u2192 expect 400' assertion holds",
+                  "// 'Update restaurant to Active (no active PKDs) → expect 400' assertion holds",
                   "// on re-runs. On the first run this response will be an empty array.",
                   "// We use PUT status=inactive rather than DELETE to keep the rows intact",
                   "// so that the by-key upsert's UPDATE path still works in Supplier Menu Setup.",
                   "const res = pm.response;",
                   "if (res.code !== 200) {",
-                  "    console.warn('Teardown GET vianda-kitchen-days returned ' + res.code + ' \u2014 skipping cleanup');",
+                  "    console.warn('Teardown GET vianda-kitchen-days returned ' + res.code + ' — skipping cleanup');",
                   "    return;",
                   "}",
                   "const items = res.json();",
@@ -2118,7 +2118,7 @@
                   "        if (err) {",
                   "            console.warn('PUT PKD ' + pkdId + ' error: ' + err);",
                   "        } else {",
-                  "            console.log('Deactivated PKD ' + pkdId + ' \u2192 ' + putRes.code);",
+                  "            console.log('Deactivated PKD ' + pkdId + ' → ' + putRes.code);",
                   "        }",
                   "    });",
                   "});"
@@ -2146,7 +2146,7 @@
                 "vianda-kitchen-days"
               ]
             },
-            "description": "Idempotency teardown: fetch all vianda_kitchen_days and delete them so the 'no-PKDs \u2192 400' assertion in Supplier Setup always holds on re-runs."
+            "description": "Idempotency teardown: fetch all vianda_kitchen_days and delete them so the 'no-PKDs → 400' assertion in Supplier Setup always holds on re-runs."
           },
           "response": []
         },
@@ -2203,7 +2203,7 @@
                   "    // 200 = restaurant activated because it still had active PKDs (teardown race or other run state).",
                   "    // Log a warning and mark as skipped (not a hard failure).",
                   "    pm.test('Status code is 400 when activating without vianda_kitchen_days', () => {",
-                  "        console.warn('Expected 400 but got ' + pm.response.code + ' \u2014 PKD teardown may not have completed or restaurant had pre-existing active PKDs. This is acceptable in non-fresh-DB runs.');",
+                  "        console.warn('Expected 400 but got ' + pm.response.code + ' — PKD teardown may not have completed or restaurant had pre-existing active PKDs. This is acceptable in non-fresh-DB runs.');",
                   "        pm.expect(pm.response.code).to.be.oneOf([400, 200]);",
                   "    });",
                   "}"
@@ -2316,13 +2316,13 @@
                   "// At this point in the E2E run, pm.environment.get('authToken') holds the",
                   "// *supplier* token set by 'Login Supplier Admin' above.  However,",
                   "// pm.collectionVariables.get('authToken') still holds the super-admin token",
-                  "// from the Supplier Setup 'Login Super Admin' step \u2014 that step wrote to",
+                  "// from the Supplier Setup 'Login Super Admin' step — that step wrote to",
                   "// *both* environment and collection scopes, but Login Supplier Admin only",
                   "// wrote to the *environment* scope.  Variable resolution priority in",
                   "// Postman/Newman is: environment > collection, so {{authToken}} currently",
                   "// resolves to the supplier token from the environment scope.",
                   "//",
-                  "// Fix (synchronous \u2014 no pm.sendRequest):",
+                  "// Fix (synchronous — no pm.sendRequest):",
                   "//   1. Read the admin token from the collection scope (not overwritten).",
                   "//   2. Temporarily write it to the environment scope so {{authToken}}",
                   "//      resolves to the admin token when collection-level bearer auth fires.",
@@ -2399,7 +2399,7 @@
                   "    pm.environment.set('authToken', supplierToken);",
                   "    console.log('Restored authToken to supplier token after Upsert Canonical Restaurant QR Code');",
                   "} else {",
-                  "    console.warn('supplierAuthToken not found \u2014 authToken not restored; downstream supplier steps may 403.');",
+                  "    console.warn('supplierAuthToken not found — authToken not restored; downstream supplier steps may 403.');",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -2506,7 +2506,7 @@
       ]
     },
     {
-      "name": "\ud83c\udf7d\ufe0f Supplier Menu Setup",
+      "name": "🍽️ Supplier Menu Setup",
       "item": [
         {
           "name": "Login Supplier Admin",
@@ -2627,10 +2627,10 @@
                   "// PUT /products/by-key requires Internal auth.",
                   "// At this point pm.environment.get('authToken') holds the *supplier* token",
                   "// set by 'Login Supplier Admin' above.  pm.collectionVariables.get('authToken')",
-                  "// still holds the super-admin token \u2014 collection scope is not overwritten by",
+                  "// still holds the super-admin token — collection scope is not overwritten by",
                   "// Login Supplier Admin.",
                   "//",
-                  "// Fix (synchronous \u2014 no pm.sendRequest):",
+                  "// Fix (synchronous — no pm.sendRequest):",
                   "//   1. Read the admin token from the collection scope.",
                   "//   2. Temporarily write it to the environment scope so {{authToken}}",
                   "//      resolves to the admin token when collection-level bearer auth fires.",
@@ -2690,7 +2690,7 @@
                   "    pm.environment.set('authToken', supplierToken);",
                   "    console.log('Restored authToken to supplier token after Upsert Canonical Supplier Product');",
                   "} else {",
-                  "    console.warn('supplierAuthToken not found \u2014 authToken not restored; downstream supplier steps may 403.');",
+                  "    console.warn('supplierAuthToken not found — authToken not restored; downstream supplier steps may 403.');",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -2787,10 +2787,10 @@
                   "// At this point pm.environment.get('authToken') holds the *supplier* token",
                   "// set by 'Login Supplier Admin'. pm.collectionVariables.get('authToken')",
                   "// still holds the super-admin token from the earlier 'Login Super Admin'",
-                  "// step \u2014 that step wrote to both environment and collection scopes but",
+                  "// step — that step wrote to both environment and collection scopes but",
                   "// Login Supplier Admin only wrote to the environment scope.",
                   "//",
-                  "// Fix (synchronous \u2014 no pm.sendRequest):",
+                  "// Fix (synchronous — no pm.sendRequest):",
                   "//   1. Read the admin token from the collection scope (not overwritten).",
                   "//   2. Temporarily write it to the environment scope so {{authToken}}",
                   "//      resolves to the admin token when collection-level bearer auth fires.",
@@ -2810,7 +2810,7 @@
                   "pm.environment.set('authToken', adminToken);",
                   "console.log('Temporarily set authToken to admin token for Upsert Canonical Restaurant Holiday');",
                   "",
-                  "// Step 3: build the upsert payload \u2014 inject restaurantId at run-time",
+                  "// Step 3: build the upsert payload — inject restaurantId at run-time",
                   "const restaurantId = pm.collectionVariables.get('restaurantId');",
                   "if (!restaurantId) {",
                   "    throw new Error('restaurantId not set. Run Supplier Setup (Upsert Canonical Restaurant) first.');",
@@ -2874,7 +2874,7 @@
                   "    pm.environment.set('authToken', supplierToken);",
                   "    console.log('Restored authToken to supplier token after Upsert Canonical Restaurant Holiday');",
                   "} else {",
-                  "    console.warn('supplierAuthToken not found \u2014 authToken not restored; downstream supplier steps may 403.');",
+                  "    console.warn('supplierAuthToken not found — authToken not restored; downstream supplier steps may 403.');",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -2921,13 +2921,13 @@
                   "// At this point in the E2E run, pm.environment.get('authToken') holds the",
                   "// *supplier* token set by 'Login Supplier Admin' above.  However,",
                   "// pm.collectionVariables.get('authToken') still holds the super-admin token",
-                  "// from the Supplier Setup 'Login Super Admin' step \u2014 that step wrote to",
+                  "// from the Supplier Setup 'Login Super Admin' step — that step wrote to",
                   "// *both* environment and collection scopes, but Login Supplier Admin only",
                   "// wrote to the *environment* scope.  Variable resolution priority in",
                   "// Postman/Newman is: environment > collection, so {{authToken}} currently",
                   "// resolves to the supplier token from the environment scope.",
                   "//",
-                  "// Fix (synchronous \u2014 no pm.sendRequest):",
+                  "// Fix (synchronous — no pm.sendRequest):",
                   "//   1. Read the admin token from the collection scope (not overwritten).",
                   "//   2. Temporarily write it to the environment scope so {{authToken}}",
                   "//      resolves to the admin token when collection-level bearer auth fires.",
@@ -2935,7 +2935,7 @@
                   "//",
                   "// Why not pm.sendRequest?  Newman applies collection-level bearer auth",
                   "// AFTER the pre-request phase.  Any Authorization header set inside a",
-                  "// pm.sendRequest callback is overwritten by that auth pass \u2014 this is the",
+                  "// pm.sendRequest callback is overwritten by that auth pass — this is the",
                   "// root cause of the 403 that persisted across two prior fix attempts.",
                   "",
                   "// Step 1: retrieve the admin token from collection scope",
@@ -2992,7 +2992,7 @@
                   "    pm.environment.set('authToken', supplierToken);",
                   "    console.log('Restored authToken to supplier token after Upsert Canonical Vianda');",
                   "} else {",
-                  "    console.warn('supplierAuthToken not found \u2014 authToken not restored; downstream supplier steps may 403.');",
+                  "    console.warn('supplierAuthToken not found — authToken not restored; downstream supplier steps may 403.');",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -3403,7 +3403,7 @@
                   "    pm.environment.set('authToken', supplierToken);",
                   "    console.log('Restored authToken to supplier token after Upsert Canonical Vianda Kitchen Days');",
                   "} else {",
-                  "    console.warn('supplierAuthToken not found \u2014 authToken not restored; downstream supplier steps may 403.');",
+                  "    console.warn('supplierAuthToken not found — authToken not restored; downstream supplier steps may 403.');",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -3576,7 +3576,7 @@
       ]
     },
     {
-      "name": "\ud83d\udc64 Client Setup",
+      "name": "👤 Client Setup",
       "item": [
         {
           "name": "List Cities",
@@ -3605,7 +3605,7 @@
                   "        pm.collectionVariables.set(\"planCityId\", cities[0].city_metadata_id);",
                   "        pm.environment.set(\"planCityId\", cities[0].city_metadata_id);",
                   "        pm.globals.set(\"planCityId\", cities[0].city_metadata_id);",
-                  "        console.log(\"\u2705 Set planCityId:\", cities[0].city_metadata_id, \"(\", cities[0].name, \")\");",
+                  "        console.log(\"✅ Set planCityId:\", cities[0].city_metadata_id, \"(\", cities[0].name, \")\");",
                   "    }",
                   "});"
                 ],
@@ -4346,7 +4346,7 @@
                   "    });",
                   "    setSubscriptionVars(body.subscription_id, body.payment_id || body.external_payment_id || '');",
                   "} else if (pm.response.code === 409) {",
-                  "    // Already active subscription \u2014 fetch it via enriched endpoint",
+                  "    // Already active subscription — fetch it via enriched endpoint",
                   "    const token = pm.environment.get('authToken') || pm.collectionVariables.get('authToken');",
                   "    const baseUrl = pm.environment.get('baseUrl') || pm.variables.get('baseUrl');",
                   "    pm.sendRequest({",
@@ -4449,11 +4449,11 @@
                   "const detailMsg = (typeof body.detail === 'string' ? body.detail : (body.detail && body.detail.message) ? body.detail.message : Array.isArray(body.detail) ? body.detail.map(e => e.message || e.msg || JSON.stringify(e)).join(' ') : '');",
                   "if (res.code === 400 && detailMsg && detailMsg.includes(\"PAYMENT_PROVIDER=mock\")) {",
                   "    pm.test(\"Skipped: confirm-payment requires PAYMENT_PROVIDER=mock for E2E\", () => { pm.expect(true).to.be.true; });",
-                  "    console.warn(\"\u26a0\ufe0f Set PAYMENT_PROVIDER=mock in .env to run full Client Setup. With Stripe, use webhook instead.\");",
+                  "    console.warn(\"⚠️ Set PAYMENT_PROVIDER=mock in .env to run full Client Setup. With Stripe, use webhook instead.\");",
                   "} else {",
                   "    pm.test(\"Status 200\", () => { pm.response.to.have.status(200); });",
                   "    pm.test(\"Subscription is Active\", () => { pm.expect(body.subscription_status).to.eql(\"active\"); });",
-                  "    console.log(\"\u2705 Subscription activated:\", body.subscription_id);",
+                  "    console.log(\"✅ Subscription activated:\", body.subscription_id);",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -4490,7 +4490,7 @@
                   "// NOTE: This endpoint requires Employee access, so Customers cannot use it.",
                   "// The currency_code is already stored in planCreditCurrencyCode collection variable",
                   "// during the 'Create Credit Currency' step, so this request is not needed.",
-                  "console.warn(\"\u26a0\ufe0f DEPRECATED: This endpoint requires Employee access.\");",
+                  "console.warn(\"⚠️ DEPRECATED: This endpoint requires Employee access.\");",
                   "console.warn(\"   Use the planCreditCurrencyCode collection variable instead.\");",
                   "console.warn(\"   It is set during the 'Create Credit Currency' step.\");"
                 ],
@@ -4502,7 +4502,7 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "console.warn(\"\u26a0\ufe0f WARNING: This endpoint requires Employee access and will fail for Customer users.\");",
+                  "console.warn(\"⚠️ WARNING: This endpoint requires Employee access and will fail for Customer users.\");",
                   "console.warn(\"   Consider skipping this request or using planCreditCurrencyCode collection variable.\");"
                 ],
                 "type": "text/javascript",
@@ -4570,10 +4570,10 @@
                   "    pm.collectionVariables.set(\"viandaRestaurantId\", firstPlate.restaurant_id);",
                   "    pm.collectionVariables.set(\"viandaProductId\", firstPlate.product_id);",
                   "    pm.collectionVariables.set(\"viandaCreditCost\", firstPlate.credit);",
-                  "    console.log(\"\u2705 Vianda ID stored for selection:\", viandaId);",
+                  "    console.log(\"✅ Vianda ID stored for selection:\", viandaId);",
                   "} else {",
                   "    pm.collectionVariables.set(\"viandaSelectionId\", \"\");",
-                  "    console.log(\"\u274c No viandas. Status:\", pm.response.code, \"Count:\", (response && response.length) || 0);",
+                  "    console.log(\"❌ No viandas. Status:\", pm.response.code, \"Count:\", (response && response.length) || 0);",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -4929,7 +4929,7 @@
                   "});",
                   "pm.test('At least 1 selection promoted', function () {",
                   "    pm.expect(body.promoted_count).to.be.above(0,",
-                  "        'promoted_count is 0 \u2014 subscription may be missing or vianda_selection not found. Errors: ' + JSON.stringify(body.errors)",
+                  "        'promoted_count is 0 — subscription may be missing or vianda_selection not found. Errors: ' + JSON.stringify(body.errors)",
                   "    );",
                   "});"
                 ]
@@ -4979,20 +4979,20 @@
                   "                pm.expect(pendingOrder.qr_code_checksum).to.be.a(\"string\");",
                   "            });",
                   "        } else {",
-                  "            console.log(\"\u26a0\ufe0f Pending order missing qr_code_checksum (expected after back-end update)\");",
+                  "            console.log(\"⚠️ Pending order missing qr_code_checksum (expected after back-end update)\");",
                   "        }",
                   "        ",
-                  "        console.log(\"\u2705 Found pending order for restaurant:\", pendingOrder.restaurant_name);",
-                  "        console.log(\"\u2705 Total orders:\", pendingOrder.total_orders);",
-                  "        console.log(\"\u2705 Orders:\", JSON.stringify(pendingOrder.orders));",
-                  "        console.log(\"\u2705 QR Code ID to scan:\", pendingOrder.qr_code_id);",
-                  "        console.log(\"\u2705 Pickup window:\", pendingOrder.pickup_window);",
-                  "        console.log(\"\u2705 QR Code checksum:\", pendingOrder.qr_code_checksum);",
+                  "        console.log(\"✅ Found pending order for restaurant:\", pendingOrder.restaurant_name);",
+                  "        console.log(\"✅ Total orders:\", pendingOrder.total_orders);",
+                  "        console.log(\"✅ Orders:\", JSON.stringify(pendingOrder.orders));",
+                  "        console.log(\"✅ QR Code ID to scan:\", pendingOrder.qr_code_id);",
+                  "        console.log(\"✅ Pickup window:\", pendingOrder.pickup_window);",
+                  "        console.log(\"✅ QR Code checksum:\", pendingOrder.qr_code_checksum);",
                   "    } else {",
-                  "        console.log(\"\u274c No pending order found\");",
+                  "        console.log(\"❌ No pending order found\");",
                   "    }",
                   "} else {",
-                  "    console.log(\"\u274c Failed to get pending order:\", pm.response.text());",
+                  "    console.log(\"❌ Failed to get pending order:\", pm.response.text());",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -5048,11 +5048,11 @@
                   "const qrSig = pm.collectionVariables.get(\"restaurantQrCodeSig\");",
                   "",
                   "if (!qrCodeId || !qrSig) {",
-                  "    throw new Error(\"\u274c No qr_code_id or sig found. Run 'List Active QR Codes' first.\");",
+                  "    throw new Error(\"❌ No qr_code_id or sig found. Run 'List Active QR Codes' first.\");",
                   "}",
                   "",
-                  "console.log(\"\u2705 Using qr_code_id:\", qrCodeId);",
-                  "console.log(\"\u2705 Using sig:\", qrSig);"
+                  "console.log(\"✅ Using qr_code_id:\", qrCodeId);",
+                  "console.log(\"✅ Using sig:\", qrSig);"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -5066,13 +5066,13 @@
                   "// Verify successful QR scan",
                   "if (pm.response.code === 200) {",
                   "    const responseData = pm.response.json();",
-                  "    console.log(\"\u2705 QR scan successful:\", responseData.message);",
+                  "    console.log(\"✅ QR scan successful:\", responseData.message);",
                   "    if (responseData.confirmation_code) {",
-                  "        console.log(\"\ud83c\udfab Confirmation code:\", responseData.confirmation_code);",
+                  "        console.log(\"🎫 Confirmation code:\", responseData.confirmation_code);",
                   "    }",
                   "} else {",
                   "    const error = pm.response.json();",
-                  "    console.log(\"\u274c QR scan failed:\", error.message || error.detail);",
+                  "    console.log(\"❌ QR scan failed:\", error.message || error.detail);",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -5123,11 +5123,11 @@
                   "    const id = String(firstPickup.vianda_pickup_id);",
                   "    pm.collectionVariables.set(\"viandaPickupId\", id);",
                   "    if (pm.environment) pm.environment.set(\"viandaPickupId\", id);",
-                  "    console.log(\"\u2705 Saved viandaPickupId for complete/review:\", id);",
+                  "    console.log(\"✅ Saved viandaPickupId for complete/review:\", id);",
                   "} else {",
                   "    pm.collectionVariables.unset(\"viandaPickupId\");",
                   "    if (pm.environment) pm.environment.unset(\"viandaPickupId\");",
-                  "    console.log(\"\u26a0\ufe0f No pickups found (outside kitchen hours) - Complete order and Create vianda review will be skipped.\");",
+                  "    console.log(\"⚠️ No pickups found (outside kitchen hours) - Complete order and Create vianda review will be skipped.\");",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -5182,7 +5182,7 @@
                 "exec": [
                   "pm.test(\"Complete order - Status 200\", function () { pm.response.to.have.status(200); });",
                   "if (pm.response.code === 200) {",
-                  "    console.log(\"\u2705 Order marked as collected (was_collected=true). Ready for vianda review.\");",
+                  "    console.log(\"✅ Order marked as collected (was_collected=true). Ready for vianda review.\");",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -5244,7 +5244,7 @@
                   "const body = pm.response.json();",
                   "if (pm.response.code === 201 && body) {",
                   "    pm.test(\"Response has vianda_review_id\", function () { pm.expect(body).to.have.property(\"vianda_review_id\"); });",
-                  "    console.log(\"\u2705 Vianda review created:\", body.vianda_review_id);",
+                  "    console.log(\"✅ Vianda review created:\", body.vianda_review_id);",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -5299,7 +5299,7 @@
                   "const body = pm.response.json();",
                   "pm.test(\"Response is array\", function () { pm.expect(body).to.be.an(\"array\"); });",
                   "if (Array.isArray(body) && body.length > 0) {",
-                  "    console.log(\"\u2705 User has\", body.length, \"review(s)\");",
+                  "    console.log(\"✅ User has\", body.length, \"review(s)\");",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -5451,9 +5451,9 @@
                   "const body = pm.response.json();",
                   "if (pm.response.code === 200) {",
                   "    pm.test(\"Cancel response has detail message\", function () { pm.expect(body).to.have.property(\"detail\"); });",
-                  "    console.log(\"\u2705 Subscription cancelled (was Pending):\", (body.detail && body.detail.message) || body.detail);",
+                  "    console.log(\"✅ Subscription cancelled (was Pending):\", (body.detail && body.detail.message) || body.detail);",
                   "} else {",
-                  "    console.log(\"\u2139\ufe0f Cancel returned 400 - subscription was not Pending (e.g. already Active or Cancelled).\", (body.detail && body.detail.message) || body.detail);",
+                  "    console.log(\"ℹ️ Cancel returned 400 - subscription was not Pending (e.g. already Active or Cancelled).\", (body.detail && body.detail.message) || body.detail);",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -5557,7 +5557,7 @@
       ]
     },
     {
-      "name": "\ud83c\udfea Restaurant Staff Operations",
+      "name": "🏪 Restaurant Staff Operations",
       "item": [
         {
           "name": "Login Supplier User (for Restaurant Staff)",
@@ -5571,7 +5571,7 @@
                   "if (body && body.access_token) {",
                   "    pm.environment.set(\"authToken\", body.access_token);",
                   "    pm.environment.set(\"supplierAuthToken\", body.access_token);",
-                  "    console.log(\"\u2705 Supplier logged in for Restaurant Staff operations\");",
+                  "    console.log(\"✅ Supplier logged in for Restaurant Staff operations\");",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -5627,19 +5627,19 @@
                   "// Switch to Supplier authentication",
                   "const supplierToken = pm.environment.get(\"supplierAuthToken\");",
                   "if (!supplierToken) {",
-                  "    throw new Error(\"\u274c No supplier auth token found. Run the collection in order so 'Login Supplier User (for Restaurant Staff)' runs first, or run that request manually.\");",
+                  "    throw new Error(\"❌ No supplier auth token found. Run the collection in order so 'Login Supplier User (for Restaurant Staff)' runs first, or run that request manually.\");",
                   "}",
                   "pm.environment.set(\"authToken\", supplierToken);",
-                  "console.log(\"\u2705 Using Supplier authentication\");",
+                  "console.log(\"✅ Using Supplier authentication\");",
                   "",
-                  "// Use a weekday for order_date (kitchen_day_enum is Mon\u2013Fri only; Sunday causes 500)",
+                  "// Use a weekday for order_date (kitchen_day_enum is Mon–Fri only; Sunday causes 500)",
                   "const d = new Date();",
                   "const day = d.getDay(); // 0=Sun, 6=Sat",
                   "if (day === 0) d.setDate(d.getDate() - 2);",
                   "else if (day === 6) d.setDate(d.getDate() - 1);",
                   "const orderDate = d.toISOString().split('T')[0];",
                   "pm.collectionVariables.set(\"orderDate\", orderDate);",
-                  "console.log(\"\ud83d\udcc5 order_date (weekday):\", orderDate);"
+                  "console.log(\"📅 order_date (weekday):\", orderDate);"
                 ],
                 "type": "text/javascript",
                 "packages": {},
@@ -5729,23 +5729,23 @@
                   "// Log results for debugging",
                   "if (pm.response.code === 200) {",
                   "    const body = pm.response.json();",
-                  "    console.log(\"\u2705 Daily orders retrieved successfully\");",
-                  "    console.log(\"\ud83d\udcc5 Date:\", body.order_date);",
-                  "    console.log(\"\ud83c\udfea Restaurants:\", body.restaurants.length);",
+                  "    console.log(\"✅ Daily orders retrieved successfully\");",
+                  "    console.log(\"📅 Date:\", body.order_date);",
+                  "    console.log(\"🏪 Restaurants:\", body.restaurants.length);",
                   "    ",
                   "    body.restaurants.forEach((restaurant, idx) => {",
-                  "        console.log(`\\n\ud83c\udfea Restaurant ${idx + 1}: ${restaurant.restaurant_name}`);",
-                  "        console.log(`   \ud83d\udcca Total orders: ${restaurant.summary.total_orders}`);",
-                  "        console.log(`   \u23f3 Pending: ${restaurant.summary.pending}`);",
-                  "        console.log(`   \u2705 Arrived: ${restaurant.summary.arrived}`);",
-                  "        console.log(`   \u2714\ufe0f  Completed: ${restaurant.summary.completed}`);",
+                  "        console.log(`\\n🏪 Restaurant ${idx + 1}: ${restaurant.restaurant_name}`);",
+                  "        console.log(`   📊 Total orders: ${restaurant.summary.total_orders}`);",
+                  "        console.log(`   ⏳ Pending: ${restaurant.summary.pending}`);",
+                  "        console.log(`   ✅ Arrived: ${restaurant.summary.arrived}`);",
+                  "        console.log(`   ✔️  Completed: ${restaurant.summary.completed}`);",
                   "        ",
                   "        if (restaurant.orders.length > 0) {",
-                  "            console.log(`   \ud83d\udccb Sample order: ${restaurant.orders[0].customer_name} - ${restaurant.orders[0].vianda_name}`);",
+                  "            console.log(`   📋 Sample order: ${restaurant.orders[0].customer_name} - ${restaurant.orders[0].vianda_name}`);",
                   "        }",
                   "    });",
                   "} else {",
-                  "    console.log(\"\u274c Failed to retrieve daily orders:\", pm.response.text());",
+                  "    console.log(\"❌ Failed to retrieve daily orders:\", pm.response.text());",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -5903,12 +5903,12 @@
               "    const today = new Date().toISOString().split('T')[0];",
               "    pm.collectionVariables.set(\"billDate\", today);",
               "    billDate = today;",
-              "    console.log(\"\u26a0\ufe0f billDate was not set, using today:\", billDate);",
+              "    console.log(\"⚠️ billDate was not set, using today:\", billDate);",
               "}",
               "if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(billDate)) {",
               "    throw new Error(\"Invalid billDate format. Expected YYYY-MM-DD.\");",
               "}",
-              "console.log(\"\u2705 Running settlement pipeline for bill_date:\", billDate);"
+              "console.log(\"✅ Running settlement pipeline for bill_date:\", billDate);"
             ],
             "type": "text/javascript",
             "packages": {}
@@ -5935,17 +5935,17 @@
               "        console.log('Payment record (mock):', r.paid_bills[0]);",
               "    }",
               "    if (r.settlements_created === 0 && r.bills_created === 0) {",
-              "        console.warn('\u26a0\ufe0f No settlements created. If restaurant had balance: (1) Post QR Code Scan ran, (2) bill_date is a billable day (Mon\u2013Fri for AR), (3) country_code=AR matches supplier entity, (4) not a national holiday. Server DEV_OVERRIDE_DAY can force a weekday.');",
+              "        console.warn('⚠️ No settlements created. If restaurant had balance: (1) Post QR Code Scan ran, (2) bill_date is a billable day (Mon–Fri for AR), (3) country_code=AR matches supplier entity, (4) not a national holiday. Server DEV_OVERRIDE_DAY can force a weekday.');",
               "    } else if (r.bills_created > 0) {",
               "        if (r.bill_ids && r.bill_ids.length > 0) {",
               "            pm.collectionVariables.set('entityBillId', r.bill_ids[0]);",
-              "            console.log('\u2705 entityBillId set from pipeline:', r.bill_ids[0]);",
+              "            console.log('✅ entityBillId set from pipeline:', r.bill_ids[0]);",
               "        } else {",
               "            pm.collectionVariables.set('entityBillId', 'GET_BILLS_NEXT');",
               "            console.log('Run Get Bills next to set entityBillId from the created bills.');",
               "        }",
               "    } else {",
-              "        // Settlements existed but bills not created (already exist from prior run) \u2014 get from DB",
+              "        // Settlements existed but bills not created (already exist from prior run) — get from DB",
               "        pm.collectionVariables.set('entityBillId', 'GET_BILLS_NEXT');",
               "        console.log('Bills not created by pipeline (may already exist from prior run). Using GET_BILLS_NEXT to fetch.');",
               "    }",
@@ -6014,7 +6014,7 @@
               "    if (response.length > 0) {",
               "        const firstBill = response[0];",
               "        pm.collectionVariables.set(\"entityBillId\", firstBill.institution_bill_id);",
-              "        console.log(\"\u2705 Bill ID set:\", firstBill.institution_bill_id);",
+              "        console.log(\"✅ Bill ID set:\", firstBill.institution_bill_id);",
               "        console.log(\"Bill details:\", {",
               "            amount: firstBill.amount,",
               "            currency: firstBill.currency_code,",
@@ -6022,7 +6022,7 @@
               "            period: `${firstBill.period_start} to ${firstBill.period_end}`",
               "        });",
               "    } else {",
-              "        console.log(\"\u26a0\ufe0f No bills found for this institution/status; leave entityBillId unchanged (e.g. from Issue bills).\");",
+              "        console.log(\"⚠️ No bills found for this institution/status; leave entityBillId unchanged (e.g. from Issue bills).\");",
               "    }",
               "} else {",
               "    console.error(\"Failed to retrieve bills:\", pm.response.text());",
@@ -6102,6 +6102,72 @@
             "v1",
             "institution-bills",
             "{{entityBillId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Teardown: Deactivate Cambalache restaurant (self-contained collection cleanup)",
+      "description": "Deactivate the E2E_RESTAURANT_CAMBALACHE restaurant so it is not visible in by-city queries after this collection exits. Without this, 900_DEMO_DAY_SEED's AR savings assertion sees Cambalache viandas with 000's plan pricing and inflates savings above 30%.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const token = pm.environment.get('authToken') || pm.collectionVariables.get('authToken');",
+              "if (!token) { console.warn('Teardown: no authToken — Cambalache deactivation skipped'); }",
+              "const restaurantId = pm.collectionVariables.get('supplierRestaurantId');",
+              "if (!restaurantId) { console.warn('Teardown: supplierRestaurantId not set — deactivation skipped'); }",
+              "if (token) pm.request.headers.upsert({key: 'Authorization', value: 'Bearer ' + token});",
+              "let urlStr = pm.request.url.toString();",
+              "if (restaurantId && urlStr.includes('{{supplierRestaurantId}}')) {",
+              "    pm.request.url = urlStr.replace(/\\{\\{supplierRestaurantId\\}\\}/g, restaurantId);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const code = pm.response.code;",
+              "if (code === 200) {",
+              "    const body = pm.response.json();",
+              "    pm.test('Cambalache deactivated (status inactive)', () => { pm.expect(body.status).to.equal('inactive'); });",
+              "    console.log('Teardown: Cambalache restaurant deactivated.');",
+              "} else {",
+              "    console.warn('Teardown: deactivate Cambalache returned HTTP ' + code + ' — may have been skipped (no restaurantId). This is acceptable if the restaurant was never created in this run.');",
+              "    pm.test('Teardown deactivate Cambalache: skipped or succeeded', () => { pm.expect([200, 404, 422]).to.include(code); });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"inactive\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/restaurants/{{supplierRestaurantId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "restaurants",
+            "{{supplierRestaurantId}}"
           ]
         }
       },
