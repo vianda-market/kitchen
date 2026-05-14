@@ -12,7 +12,7 @@ Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flo
 
 - Never pass UUID directly to psycopg2 — always `str(uuid_value)`.
 - Never register routes directly to `app` — use `create_versioned_router()`.
-- Never write Python unit tests for `app/services/` or `app/routes/` — use Postman collections (full HTTP stack).
+- Never write Python unit tests for `app/services/` or `app/routes/` **for HTTP-shaped surface** (request handling, auth, DB-touching service entry points) — use Postman collections (full HTTP stack). **Exception:** *pure helpers* — functions taking no `db` / `session` / `Request` / `Response` parameter, making no `crud.*`, `await db.*`, gateway, or HTTP outbound call, with non-trivial branching/transformation/computation — may be covered by pytest in `app/tests/services/` or `app/tests/routes/`. Existing precedents: `app/tests/services/test_market_service.py` (`is_global_market`, `default_language_for_country_code`), `app/tests/gateways/ads/test_zone_haversine.py` (`_haversine_km`). Rule of thumb: if you can call the function without a fixture, it's a pure helper.
 - Never store secrets in code.
 - Never pass `page`/`page_size` pagination params from cron jobs or internal service calls — pagination is HTTP-only.
 - Never edit an already-applied migration file — write a new one.
@@ -102,7 +102,7 @@ Server-side pagination is opt-in per route — not all endpoints need it.
 | Layer | How |
 |---|---|
 | `app/utils/`, `app/gateways/`, `app/auth/`, `app/security/` | pytest unit tests |
-| `app/services/`, `app/routes/` | Postman collections only (full HTTP stack) |
+| `app/services/`, `app/routes/` | Postman collections for HTTP-shaped code; pytest for pure helpers (no db/session/Request param). See "Never" rule above for the test-rule carve-out. |
 
 - Postman collections must be self-contained — no hardcoded UUIDs, create or query test data inline.
 - Collections live in `docs/postman/collections/`.
