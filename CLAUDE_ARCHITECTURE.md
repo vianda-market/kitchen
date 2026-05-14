@@ -847,6 +847,8 @@ Three-layer dataset (PE + AR + US) that populates a narrative demo for stakehold
 | `.github/workflows/ci.yml` | PR to `main`, push to `main` | Lint/type/complexity/security/SQL/license/pytest/Newman acceptance. `ci-pass` aggregator job is the single required check for branch protection. | — |
 | `.github/workflows/mutation.yml` | PR or push touching Tier-1 services, `workflow_dispatch` | Mutation testing via `mutmut` against money/credit business logic. Cache restored from `main`. | — |
 | `.github/workflows/deploy.yml` | PR merged with label, `workflow_dispatch` (reason required) | Builds Docker image → Artifact Registry → `gcloud run services update` on Cloud Run dev service. No auto-deploy on every merge. | `deploy:dev` |
+| `.github/workflows/db-rebuild.yml` | `workflow_dispatch` | DESTRUCTIVE — tears down and fully rebuilds dev Cloud SQL schema; optionally loads demo seed. Requires `dev-destructive` environment approval + confirmation phrase. IAP/Python/Newman scaffolding lives in `.github/actions/setup-kitchen-iap-tooling/`. | — |
+| `.github/workflows/postman-test-rig.yml` | `workflow_dispatch` | Purges demo rows (`dddddddd-dec0-*`) and re-runs `load_demo_data.sh` before executing a Postman test slice. NO schema teardown. Requires `dev-destructive` environment approval + confirmation phrase. Shares IAP/Python/Newman scaffolding via `.github/actions/setup-kitchen-iap-tooling/`. | — |
 
 ### Label semantics
 
