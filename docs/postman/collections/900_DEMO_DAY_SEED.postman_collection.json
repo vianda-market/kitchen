@@ -26191,7 +26191,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -26648,7 +26648,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -27105,7 +27105,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -27562,7 +27562,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -28019,7 +28019,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -39243,7 +39243,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -39700,7 +39700,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -40157,7 +40157,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -40614,7 +40614,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -41071,7 +41071,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -42182,7 +42182,7 @@
           }
         },
         {
-          "name": "Assert AR viandas savings >= 15 pct",
+          "name": "Assert AR viandas savings 15-30 pct",
           "event": [
             {
               "listen": "prerequest",
@@ -42231,8 +42231,8 @@
                   "    if (allPlates.length > 0) {",
                   "        const tooLow = allPlates.filter(p => p.savings < 15);",
                   "        pm.test('AR demo viandas savings >= 15%', () => { pm.expect(tooLow.length, 'viandas < 15%: ' + JSON.stringify(tooLow.map(p => ({name: p.product_name || p.name, savings: p.savings})))).to.eql(0); });",
-                  "        // Upper bound (<=30) removed: collection 000 leaves test restaurant active in Buenos Aires/Seattle",
-                  "        // which uses different plan pricing and inflates savings for its viandas.",
+                  "        const tooHighAr = allPlates.filter(p => p.savings > 30);",
+                  "        pm.test('AR demo viandas savings <= 30%', () => { pm.expect(tooHighAr.length, 'viandas > 30%: ' + JSON.stringify(tooHighAr.map(p => ({name: p.product_name || p.name, savings: p.savings})))).to.eql(0); });",
                   "        console.log('AR vianda savings:', allPlates.map(p => (p.product_name||p.name||'?') + ':' + p.savings + '%'));",
                   "    }",
                   "}"
@@ -42745,7 +42745,7 @@
           ]
         },
         {
-          "name": "Assert PE billing rows exist (>=1 from settlement pipeline)",
+          "name": "Assert PE billing rows exist (>=1 from settlement pipeline, >=2 after Layer C — see 901)",
           "event": [
             {
               "listen": "prerequest",
@@ -42790,7 +42790,7 @@
           }
         },
         {
-          "name": "Assert AR billing rows exist (>=1 from settlement pipeline)",
+          "name": "Assert AR billing rows exist (>=1 from settlement pipeline, >=2 after Layer C — see 901)",
           "event": [
             {
               "listen": "prerequest",
@@ -42835,7 +42835,7 @@
           }
         },
         {
-          "name": "Assert US billing rows exist (>=1 from settlement pipeline)",
+          "name": "Assert US billing rows exist (>=1 from settlement pipeline, >=2 after Layer C — see 901)",
           "event": [
             {
               "listen": "prerequest",

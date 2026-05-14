@@ -180,7 +180,7 @@ _Routes: `/institutions/`, `/institution-entities/`, `/employer/program`, `/empl
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_THREE_TIER_CASCADE.md` | **Three-tier cascade** — entity → institution → market config resolution for supplier terms and employer programs |
 | B2B | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2b_client/API_CLIENT_EMPLOYER_ADDRESSES_CITIES.md` | Employer address restrictions and cities API behavior |
 | B2C | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/b2c_client/EMPLOYER_MANAGEMENT_B2C.md` | Assign employer entity to customer — `employer_entity_id`, user-selected address types |
-| Both | `/Users/cdeachaval/learn/vianda/kitchen/docs/plans/MULTINATIONAL_INSTITUTIONS.md` | Full design doc — institution_market junction, employer_info removal, three-tier cascade, migration plan |
+| Internal | `/Users/cdeachaval/learn/vianda/kitchen/docs/api/internal/INSTITUTION_MARKET_MODEL.md` | Institution-market model — `institution_market` junction, entity as country boundary, three-tier cascade, employer normalization, route and scoping invariants |
 
 ---
 
