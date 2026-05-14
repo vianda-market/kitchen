@@ -43528,6 +43528,20 @@
       "script": {
         "type": "text/javascript",
         "exec": [
+          "// [demo loader] hoist env-scope vars to collection scope so pm.collectionVariables.get() reads them.",
+          "// Newman --env-var writes to environment scope; the per-request pre-request scripts in this collection",
+          "// historically read via pm.collectionVariables.get() which is scope-pinned to collection. See kitchen#330.",
+          "['paymentMode', 'stripeSecretKey'].forEach(function (k) {",
+          "  var envVal = pm.environment.get(k);",
+          "  if (envVal) {",
+          "    pm.collectionVariables.set(k, envVal);",
+          "  } else {",
+          "    var colVal = pm.collectionVariables.get(k);",
+          "    if (colVal) {",
+          "      console.warn('[scope-fallback] ' + k + ' fell back to collection-scope default (\"' + colVal + '\"). load_demo_data.sh passes via --env-var; see kitchen#330 if you expected env-scope to win.');",
+          "    }",
+          "  }",
+          "});",
           "// [demo loader] x-client-type bypass — captcha_guard exempts b2c-mobile",
           "pm.request.headers.upsert({key: 'x-client-type', value: 'b2c-mobile'});",
           ""
