@@ -46,7 +46,7 @@ Write a migration in `app/db/migrations/NNNN_description.sql`, then update `sche
 
 `migration` → `schema.sql` → `trigger.sql` → `seed/reference_data.sql` (if needed) → `app/dto/models.py` → `app/schemas/consolidated_schemas.py`
 
-Apply with `bash app/db/migrate.sh`. Full rebuild for fresh environments: `bash app/db/build_kitchen_db.sh` (primitive — schema only) or `bash app/db/build_dev_db.sh` (dev wrapper — primitive + demo_baseline + 900 seed). Never use either on a database with test data you want to keep. The GH Actions workflow `db-reset-dev.yml` runs `build_dev_db.sh --target=gcp-dev` against the dev Cloud SQL via IAP tunnel.
+Apply with `bash app/db/migrate.sh`. Full rebuild for fresh environments: `bash app/db/build_kitchen_db.sh` (primitive — schema only) or `bash app/db/build_dev_db.sh` (dev wrapper — primitive + demo_baseline + 900 seed). Never use either on a database with test data you want to keep. The GH Actions workflow `db-rebuild.yml` (renamed from `db-reset-dev.yml`) runs against the dev Cloud SQL via IAP tunnel; choose `seed=none` for schema-only or `seed=demo` for the full demo dataset.
 
 - History tables (`audit.*`) must mirror their main table — triggers must INSERT the new column.
 - DTOs define which fields CRUDService writes — **missing field in DTO = silently dropped on insert**.
