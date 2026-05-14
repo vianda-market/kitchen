@@ -168,6 +168,15 @@ class MapboxGeocodingGateway(BaseGateway):
         mode = cache.mode
 
         if mode == CacheMode.BYPASS:
+            logger.info(
+                "mapbox_cache_bypass_live",
+                extra={
+                    "event": "mapbox_cache_bypass_live",
+                    "operation": operation,
+                    "permanent": self._permanent,
+                    "billable": True,
+                },
+            )
             return super().call(operation, **kwargs)
 
         # Inject the permanent flag so ephemeral / permanent entries never share a key.
@@ -199,7 +208,15 @@ class MapboxGeocodingGateway(BaseGateway):
             key = f"{operation}|{tail}"
         hit = cache.get(key)
         if hit is not None:
-            logger.info("mapbox_geocode_cache: hit for %r", key)
+            logger.info(
+                "mapbox_cache_hit",
+                extra={
+                    "event": "mapbox_cache_hit",
+                    "operation": operation,
+                    "permanent": self._permanent,
+                    "billable": False,
+                },
+            )
             return hit
 
         if mode == CacheMode.REPLAY_ONLY:
@@ -209,6 +226,15 @@ class MapboxGeocodingGateway(BaseGateway):
             )
 
         # RECORD mode: call live API and persist response
+        logger.info(
+            "mapbox_cache_miss_record",
+            extra={
+                "event": "mapbox_cache_miss_record",
+                "operation": operation,
+                "permanent": self._permanent,
+                "billable": True,
+            },
+        )
         response = super().call(operation, **kwargs)
         cache.set(key, response)  # key already has permanent injected
         return response
