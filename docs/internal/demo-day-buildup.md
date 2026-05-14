@@ -286,32 +286,13 @@ For PE (credit_cost = 4 PEN) the spread is above the floor and the flag is not r
 
 This is an **audited API flag** — it signals "I know this plan compresses the spread and I accept it." It is not a workaround; the demo dataset intentionally uses a tight spread to maximise visible savings percentages for stakeholder demos.
 
-### 6.11 DEV_MODE holiday bypass — pin `target_kitchen_day` explicitly in folder 40
+### 6.11 DEV_MODE holiday bypass — ~~pin `target_kitchen_day` explicitly in folder 40~~ (FIXED in PR #258)
 
-`app/services/vianda_selection_validation._find_next_available_kitchen_day_in_week` skips national holidays when auto-selecting a kitchen day. However, in `DEV_MODE` (which defaults to `True` in `app/config/settings.py`), Saturdays are mapped to `"friday"` so E2E flows work on weekends.
+> **This workaround has been removed.** The root-cause bug was fixed in PR #258 (branch `fix/holiday-aware-weekday-remap`, closes kitchen#257). The `target_kitchen_day` overrides that were pinned in folder 40 for AR ("wednesday") and US ("monday") have been deleted from `900_DEMO_DAY_SEED.postman_collection.json`. Auto-resolution now correctly detects Friday holidays when the DEV_MODE weekend→Friday remap fires.
 
-When today IS a national holiday for the vianda's market AND `DEV_MODE=True`, the following sequence fires:
-1. Auto-select tries today (holiday) → skips (correct).
-2. Auto-select tries tomorrow (Saturday) → maps to `"friday"` via DEV_MODE logic.
-3. Checks if Saturday's date (`tomorrow`) is a national holiday — it is NOT.
-4. Returns `"friday"` with tomorrow's date as the target, **not today's** — bypassing the holiday guard.
-5. `_validate_restaurant_for_day` then resolves `"friday"` to today (the actual nearest Friday) → 403 holiday block.
+**Historical context (for reference only):** `_find_next_available_kitchen_day_in_week` mapped weekend days to `"friday"` in DEV_MODE but checked the holiday table against the weekend date itself (never a holiday), not the Friday date it had just resolved. This caused the auto-resolver to return a Friday that was a national holiday, which `_validate_restaurant_for_day` then rejected with `403 RESTAURANT_NATIONAL_HOLIDAY`. The workaround was to pin `target_kitchen_day` to a safe mid-week day in every folder 40 request body.
 
-**Fix:** add `"target_kitchen_day": "wednesday"` (or any safe mid-week day) to every vianda selection request body in folder 40 for non-PE markets. This bypasses auto-selection entirely and prevents the DEV_MODE edge case.
-
-Confirmed safe days by market (no 2026 public holidays on Wednesday):
-- AR: Wednesday is never a national holiday in 2026. Use `"wednesday"`.
-- US: Only Veterans Day (Nov 11) falls on Wednesday in 2026. For year-round safety, use `"wednesday"` — demo days are unlikely to land on Veterans Day.
-
-PE folder 40 uses auto-selection today (no Friday holidays in the near term), but should also be pinned for safety when the next engineer adds it.
-
-```json
-{
-  "vianda_id": "PLACEHOLDER",
-  "pickup_time_range": "12:00-12:15",
-  "target_kitchen_day": "wednesday"
-}
-```
+**The fix** (in `vianda_selection_validation.py`): after the weekend→Friday remap, `holiday_check_date` is set to the preceding Friday (`d - timedelta(days=d.weekday() - 4)`) instead of the weekend date. The holiday check now uses that Friday's date, so Friday holidays are correctly detected and the loop advances to the next working day. Covered by `TestFindNextAvailableKitchenDayHolidayAwareRemap` in `app/tests/services/test_vianda_selection_validation.py`.
 
 ---
 
@@ -341,7 +322,7 @@ Work through these in order. Each item has a verification gate before proceeding
    - C06 and C07 use the `.no_plan` / `.no_orders` suffixes.
    - Subscribe folder skips C06 and subscribes C07.
    - Order folder skips both C06 and C07.
-   - Every vianda selection request body in folder 40 includes `"target_kitchen_day": "wednesday"` (see Gotcha 6.11).
+   - Vianda selection request bodies in folder 40 do NOT include `target_kitchen_day` — auto-resolution is now holiday-aware (see Gotcha 6.11).
    - The plan upsert body in folder 10 includes `"acknowledge_spread_compression": true` (see Gotcha 6.10).
 
 8. **Add collection-level variables** for all new entity IDs and tokens to the top of the collection JSON.
@@ -592,5 +573,5 @@ a `canonical_key` on `subscription_info`; purge must delete history before info.
 - Do not touch `reference_data.sql` or migrations to add demo content.
 - Do not add demo data UUIDs to `kitchen_template`'s fingerprint in `scripts/refresh_db_template.sh`.
 - Do not hard-code `city_metadata_id` UUIDs in `demo_baseline.sql`. Always resolve them at runtime via the GeoNames JOIN — the UUID can change between rebuilds if the reference data is regenerated.
-- Do not add a `DEV_MODE` holiday-bypass patch to `app/services/vianda_selection_service.py` or `restaurant_explorer_service.py` to work around a failing folder 40. Fix it in the Postman collection instead (pin `target_kitchen_day`, see Gotcha 6.11).
+- Do not add a `DEV_MODE` holiday-bypass patch to `app/services/vianda_selection_service.py` or `restaurant_explorer_service.py` to work around a failing folder 40. The root-cause fix lives in `_find_next_available_kitchen_day_in_week` (see Gotcha 6.11); do not reintroduce `target_kitchen_day` pins in folder 40 request bodies.
 - Do not update the dec0 sub-range table in Section 4.1 without also documenting the new sub-range in the UUID SCHEME comment block at the top of `demo_baseline.sql`.
