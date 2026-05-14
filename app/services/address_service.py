@@ -8,6 +8,7 @@ Address type for customer addresses (home/work/other) is user-selected.
 Address type for restaurant, entity, and billing addresses is derived from linkages.
 """
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -24,6 +25,8 @@ from app.services.crud_service import address_service, geolocation_service
 from app.services.geolocation_service import get_persistent_geolocation_service
 from app.utils.db import db_insert, db_read, db_update
 from app.utils.log import log_info, log_warning
+
+logger = logging.getLogger(__name__)
 
 
 def derive_address_type_from_linkages(
@@ -518,6 +521,14 @@ class AddressBusinessService:
             log_info(
                 f"{address_type_str} address already has coordinates — skipping Mapbox call "
                 f"(lat={existing_geo.latitude}, lng={existing_geo.longitude})"
+            )
+            logger.info(
+                "mapbox_db_short_circuit",
+                extra={
+                    "event": "mapbox_db_short_circuit",
+                    "row_id": str(address.address_id),
+                    "billable": False,
+                },
             )
             return
 
