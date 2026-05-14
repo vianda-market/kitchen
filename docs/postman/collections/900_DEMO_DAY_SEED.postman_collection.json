@@ -26191,7 +26191,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -26648,7 +26648,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -27105,7 +27105,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -27562,7 +27562,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -28019,7 +28019,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"wednesday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -39243,7 +39243,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -39700,7 +39700,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -40157,7 +40157,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -40614,7 +40614,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -41071,7 +41071,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\", \"target_kitchen_day\": \"monday\"}",
+              "raw": "{\"vianda_id\": \"PLACEHOLDER\", \"pickup_time_range\": \"12:00-12:15\"}",
               "options": {
                 "raw": {
                   "language": "json"
