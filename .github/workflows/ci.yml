@@ -504,10 +504,16 @@ jobs:
         # main-suite plan/auth assertions.
         run: bash scripts/load_demo_data.sh --target=local
 
-      - name: Run demo-dependent collections (022 and 023)
+      - name: Run demo-dependent collections (022, 023, and 901)
         # 022 MAPS_CITY_PINS and 023 CITY_CENTROID_RECOMPUTE depend on demo restaurants
         # and city centroids created by the 900 seed above.
-        run: bash scripts/run_newman.sh 022 023
+        # 901 DEMO_DAY_BILLING_ASSERTIONS runs after load_demo_data.sh which includes
+        # both Layer B (Newman 900) and Layer C (demo_billing_backfill.sql). This
+        # ordering guarantees >=2 billing rows exist when the assertion fires (1 from
+        # the settlement pipeline + 2 from the secondary-supplier backfill per market).
+        # Previously these assertions lived inside 900 and fired before Layer C — see
+        # kitchen#314 for the relaxation history.
+        run: bash scripts/run_newman.sh 022 023 901
 
       - name: Stop server
         if: always()

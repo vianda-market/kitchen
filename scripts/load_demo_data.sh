@@ -336,7 +336,7 @@ NEWMAN_ARGS=(
   --env-var "demoAdminUsername=demo-admin@vianda.market"
   --env-var "demoAdminPassword=${DEMO_PASSWORD}"
   --env-var "baseUrl=${KITCHEN_API_BASE}"
-  --env-var "paymentMode=${PAYMENT_MODE}"
+  --global-var "paymentMode=${PAYMENT_MODE}"
   --bail
 )
 
