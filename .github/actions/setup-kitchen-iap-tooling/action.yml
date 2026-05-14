@@ -21,7 +21,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v6
+    # Note: callers MUST run actions/checkout BEFORE this composite, since GitHub
+    # Actions resolves `uses: ./.github/actions/...` from the workspace and the
+    # action's own action.yml is unreachable until checkout has run.
 
     - name: Authenticate to Google Cloud (WIF)
       uses: google-github-actions/auth@v3
