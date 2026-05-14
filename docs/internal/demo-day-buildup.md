@@ -286,9 +286,9 @@ For PE (credit_cost = 4 PEN) the spread is above the floor and the flag is not r
 
 This is an **audited API flag** — it signals "I know this plan compresses the spread and I accept it." It is not a workaround; the demo dataset intentionally uses a tight spread to maximise visible savings percentages for stakeholder demos.
 
-### 6.11 DEV_MODE holiday bypass — ~~pin `target_kitchen_day` explicitly in folder 40~~ (FIXED in PR #258)
+### 6.11 DEV_MODE holiday bypass — ~~pin `target_kitchen_day` explicitly in folder 40~~ (FIXED in PR #324)
 
-> **This workaround has been removed.** The root-cause bug was fixed in PR #258 (branch `fix/holiday-aware-weekday-remap`, closes kitchen#257). The `target_kitchen_day` overrides that were pinned in folder 40 for AR ("wednesday") and US ("monday") have been deleted from `900_DEMO_DAY_SEED.postman_collection.json`. Auto-resolution now correctly detects Friday holidays when the DEV_MODE weekend→Friday remap fires.
+> **This workaround has been removed.** The root-cause bug was fixed in PR #324 (branch `fix/holiday-aware-weekday-remap`, closes kitchen#257). The `target_kitchen_day` overrides that were pinned in folder 40 for AR ("wednesday") and US ("monday") have been deleted from `900_DEMO_DAY_SEED.postman_collection.json`. Auto-resolution now correctly detects Friday holidays when the DEV_MODE weekend→Friday remap fires.
 
 **Historical context (for reference only):** `_find_next_available_kitchen_day_in_week` mapped weekend days to `"friday"` in DEV_MODE but checked the holiday table against the weekend date itself (never a holiday), not the Friday date it had just resolved. This caused the auto-resolver to return a Friday that was a national holiday, which `_validate_restaurant_for_day` then rejected with `403 RESTAURANT_NATIONAL_HOLIDAY`. The workaround was to pin `target_kitchen_day` to a safe mid-week day in every folder 40 request body.
 
