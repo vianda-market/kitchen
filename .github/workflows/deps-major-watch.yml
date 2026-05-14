@@ -1,0 +1,165 @@
+name: Dependency majors watch
+
+# Kitchen installs gitleaks via raw curl (gitleaks-action requires a paid org
+# license — see ci.yml comment). Dependabot's github-actions ecosystem only
+# tracks `uses:` references, so the version pin in ci.yml is invisible to it.
+# This workflow checks the GitHub releases API weekly and opens a tracking issue
+# when a new gitleaks release is available so the pin can be reviewed and bumped.
+#
+# Human review is required before any bump — gitleaks behavior (detection rules,
+# config syntax) can change across minor versions.
+#
+# To add more curl-pinned tools, extend the TRACKED list in the script step.
+
+on:
+  schedule:
+    # 13:00 UTC Monday — same cadence as Dependabot.
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: deps-major-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Open/update tracking issues for curl-pinned tools
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Tools installed via curl (not tracked by Dependabot).
+            // Each entry: { name, pinned, releaseUrl }
+            // pinned: the version string currently hard-coded in ci.yml.
+            // releaseUrl: the GitHub API endpoint for latest release.
+            const TRACKED = [
+              {
+                name: 'gitleaks',
+                pinned: 'v8.30.1',
+                releaseUrl: 'https://api.github.com/repos/gitleaks/gitleaks/releases/latest',
+                changelogUrl: 'https://github.com/gitleaks/gitleaks/releases',
+              },
+            ];
+
+            const LABEL = 'dependency-major-available';
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: LABEL,
+              });
+            } catch {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: LABEL,
+                color: 'fbca04',
+                description: 'A curl-pinned tool has a new release available',
+              });
+            }
+
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: LABEL,
+              per_page: 100,
+            });
+
+            const majorOf = (v) => String(v).replace(/^v/, '').split('.')[0];
+
+            const summary = [];
+            for (const tool of TRACKED) {
+              const resp = await fetch(tool.releaseUrl, {
+                headers: {
+                  Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                  'User-Agent': 'github-actions/deps-major-watch',
+                },
+              });
+              if (!resp.ok) {
+                core.warning(`Could not fetch latest release for ${tool.name}: HTTP ${resp.status}`);
+                continue;
+              }
+              const release = await resp.json();
+              const latest = release.tag_name || release.name;
+              if (!latest) {
+                core.warning(`No tag_name in release response for ${tool.name}`);
+                continue;
+              }
+
+              const pinnedMajor = majorOf(tool.pinned);
+              const latestMajor = majorOf(latest);
+              const isOutdated = tool.pinned !== latest;
+              if (!isOutdated) {
+                summary.push(`- ${tool.name}: up-to-date (${tool.pinned})`);
+                continue;
+              }
+
+              const isMajorBump = pinnedMajor !== latestMajor;
+              const bumpKind = isMajorBump ? 'major' : 'minor/patch';
+              const prefix = `deps: new ${tool.name} release available`;
+              const title = `${prefix} (${tool.pinned} → ${latest})`;
+              const body = [
+                `A new **${bumpKind}** release of \`${tool.name}\` is available.`,
+                '',
+                `- Pinned in \`.github/workflows/ci.yml\`: \`${tool.pinned}\``,
+                `- Latest release: \`${latest}\``,
+                '',
+                '### Action required',
+                '',
+                `Review the changelog and bump the curl install line in \`ci.yml\`:`,
+                '```yaml',
+                `curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/${latest}/gitleaks_${latest.replace(/^v/, '')}_linux_x64.tar.gz \\`,
+                `  | tar xz -C /usr/local/bin gitleaks`,
+                '```',
+                '',
+                '> **Do not auto-bump.** Behavior (detection rules, config syntax) may change',
+                '> between releases. Run gitleaks locally against the repo after bumping.',
+                '',
+                `Changelog: ${tool.changelogUrl}`,
+                '',
+                `_Auto-opened by \`.github/workflows/deps-major-watch.yml\`._`,
+              ].join('\n');
+
+              const existing = openIssues.find(i => i.title.startsWith(prefix));
+              if (existing) {
+                if (existing.title !== title) {
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: existing.number,
+                    title,
+                    body,
+                  });
+                  summary.push(`- Updated #${existing.number}: ${title}`);
+                } else {
+                  summary.push(`- Unchanged #${existing.number}: ${title}`);
+                }
+              } else {
+                const { data: created } = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title,
+                  body,
+                  labels: [LABEL],
+                });
+                summary.push(`- Opened #${created.number}: ${title}`);
+              }
+            }
+
+            if (summary.length === 0) {
+              summary.push('No curl-pinned tools currently tracked.');
+            }
+            await core.summary
+              .addHeading('Curl-pinned tool version watch')
+              .addRaw(summary.join('\n'))
+              .write();
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
