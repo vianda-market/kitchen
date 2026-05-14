@@ -1,3 +1,6 @@
+> **ARCHIVED** — Durable content promoted to `docs/api/marketing_site/LEADS_COVERAGE_CHECKER.md`.
+> This file is preserved as the original implementation plan (context, file analysis, pre-implementation notes). For current reference on the marketing site API contract, read the permanent doc above.
+
 # vianda-home Marketing Site — Public Leads API
 
 **Status:** Implemented (2026-04-05)
