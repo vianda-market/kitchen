@@ -111,7 +111,7 @@ def get_daily_orders(
           AND (r.restaurant_id = %s OR %s IS NULL)
     """
 
-    params: list[Any] = [
+    params = [
         str(user_institution_entity_id),
         kitchen_day,
         str(restaurant_id) if restaurant_id else None,
@@ -121,7 +121,7 @@ def get_daily_orders(
     # Apply optional status filter at SQL level
     if status_filter:
         base_query += "          AND ppl.status = ANY(%s)\n"
-        params.append(status_filter)
+        params.append(status_filter)  # type: ignore[arg-type]
 
     base_query += "        ORDER BY r.name ASC, ps.pickup_time_range ASC, u.last_name ASC\n"
 
@@ -368,7 +368,8 @@ def _add_reservations_and_live_metrics(
               AND ps.is_archived = FALSE
             GROUP BY pl.vianda_id, prod.name
         """
-        res_rows = db_read(res_query, (str(rid), kitchen_day, order_date.isoformat()), connection=db)
+        raw_res = db_read(res_query, (str(rid), kitchen_day, order_date.isoformat()), connection=db)
+        reservation_rows: list[dict[str, Any]] = raw_res if isinstance(raw_res, list) else []
         rest["reservations_by_vianda"] = [
             {
                 "vianda_id": str(r["vianda_id"]),
@@ -376,7 +377,7 @@ def _add_reservations_and_live_metrics(
                 "count": r["count"],
                 "completed_count": r["completed_count"] or 0,
             }
-            for r in (res_rows or [])
+            for r in reservation_rows
         ]
         # live_locked_count: count of vianda_pickup_live for this restaurant (today's promoted orders)
         live_query = """
