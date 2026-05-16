@@ -35426,7 +35426,7 @@
                   "const existing = pm.collectionVariables.get('cityMetadataIdUS');",
                   "if (existing && existing.length > 5) { console.log('Reusing cityMetadataIdUS:', existing); return; }",
                   "if (!cities || !cities.length) { console.warn('No cities for US'); return; }",
-                  "const city = cities[0];",
+                  "const city = cities.find(c => c.name === 'Seattle') || cities[0];",
                   "pm.collectionVariables.set('cityMetadataIdUS', city.city_metadata_id);",
                   "console.log('Resolved cityMetadataIdUS:', city.city_metadata_id, city.name);"
                 ],
@@ -35642,7 +35642,7 @@
                   "pm.test('Status 200', () => pm.expect(pm.response.code).to.eql(200));",
                   "const cities = pm.response.json();",
                   "pm.test('At least one city', () => pm.expect(cities.length).to.be.greaterThan(0));",
-                  "const city = cities[0];",
+                  "const city = cities.find(c => c.name === 'Seattle') || cities[0];",
                   "pm.collectionVariables.set('cityMetadataIdUS', city.city_metadata_id);",
                   "console.log('Resolved cityMetadataIdUS:', city.city_metadata_id, city.name);"
                 ]
