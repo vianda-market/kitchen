@@ -12,6 +12,7 @@ import psycopg2.extensions
 from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import get_current_user, get_resolved_locale
+from app.config.enums import Status
 from app.dependencies.database import get_db
 from app.i18n.envelope import envelope_exception
 from app.i18n.error_codes import ErrorCode
@@ -30,9 +31,23 @@ router = APIRouter(prefix="/restaurant-staff", tags=["Restaurant Staff"])
 
 
 @router.get("/daily-orders", response_model=DailyOrdersResponseSchema)
-def get_restaurant_daily_orders(
+def get_restaurant_daily_orders(  # noqa: PLR0913 — declarative FastAPI Query params, not algorithmic args
     restaurant_id: UUID | None = Query(None, description="Filter to specific restaurant"),
     order_date: date_type | None = Query(None, description="Date to query (defaults to today)"),
+    status: list[Status] | None = Query(
+        None,
+        description=(
+            "Filter by order status. Repeat for multiple values: ?status=pending&status=arrived. "
+            "Accepted values: pending, arrived, handed_out, completed, cancelled, active."
+        ),
+    ),
+    is_no_show: bool | None = Query(
+        None,
+        description=(
+            "Filter by no-show flag. true = only orders whose pickup window has passed while still pending; "
+            "false = exclude no-shows; omit = all orders."
+        ),
+    ),
     current_user: dict = Depends(get_current_user),
     locale: str = Depends(get_resolved_locale),
     db: psycopg2.extensions.connection = Depends(get_db),
@@ -49,15 +64,21 @@ def get_restaurant_daily_orders(
     **Filtering**:
     - Omit restaurant_id: Returns all restaurants in institution_entity
     - Include restaurant_id: Returns only that restaurant (with auth check)
+    - status: Repeat param for multi-select, e.g. ?status=pending&status=arrived
+    - is_no_show: true/false to filter by derived no-show flag
 
     **Query Parameters**:
     - restaurant_id (optional): UUID of specific restaurant to filter
     - order_date (optional): Date in YYYY-MM-DD format (defaults to today)
+    - status (optional, repeatable): Filter by status value(s)
+    - is_no_show (optional): Filter by no-show derived flag
 
     **Response**:
     Returns orders grouped by restaurant with summary statistics.
     Each order includes customer name (privacy-safe), vianda name,
     confirmation code, status, and pickup time information.
+    Each restaurant also includes reservations_by_vianda with completed_count
+    for the kiosk prep progress view.
     """
 
     def _get_daily_orders():
@@ -118,8 +139,18 @@ def get_restaurant_daily_orders(
         # 2. Default date to today if not provided
         query_date = order_date or date_type.today()
 
-        # 3. Call service
-        result = get_daily_orders(institution_entity_id, query_date, restaurant_id, db)
+        # 3. Convert Status enum list to string values for the service layer
+        status_filter = [s.value for s in status] if status else None
+
+        # 4. Call service
+        result = get_daily_orders(
+            institution_entity_id,
+            query_date,
+            restaurant_id,
+            db,
+            status_filter=status_filter,
+            is_no_show_filter=is_no_show,
+        )
 
         log_info(
             f"Retrieved daily orders for {len(result['restaurants'])} restaurant(s), "

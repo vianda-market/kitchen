@@ -18,7 +18,14 @@ Trust model: `docs/plans/PICKUP_HANDOFF_TRUST_MODEL.md`
 
 `GET /api/v1/restaurant-staff/daily-orders`
 
-Unchanged auth and query params. Response shape enhanced:
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `restaurant_id` | UUID | No | Filter to a specific restaurant (Supplier: must belong to their institution) |
+| `order_date` | date (YYYY-MM-DD) | No | Date to query (defaults to today) |
+| `status` | string (repeatable) | No | Filter by order status. Repeat for multi-select: `?status=pending&status=arrived`. Accepted values: `pending`, `arrived`, `handed_out`, `completed`, `cancelled`, `active`. Applied at SQL level. |
+| `is_no_show` | bool | No | Filter by the derived no-show flag. `true` = only orders whose pickup window passed while still pending; `false` = exclude no-shows; omit = all orders. Applied in the service layer. |
 
 ### Response
 
@@ -39,7 +46,7 @@ Unchanged auth and query params. Response shape enhanced:
           "customer_name": "M.G.",
           "vianda_name": "Grilled Chicken",
           "confirmation_code": "482951",
-          "status": "Arrived",
+          "status": "arrived",
           "arrival_time": "2026-04-04T12:02:00Z",
           "expected_completion_time": "2026-04-04T12:07:00Z",
           "completion_time": null,
@@ -47,7 +54,7 @@ Unchanged auth and query params. Response shape enhanced:
           "extensions_used": 0,
           "was_collected": false,
           "pickup_time_range": "12:00-12:15",
-          "kitchen_day": "Friday",
+          "kitchen_day": "friday",
           "pickup_type": "self",
           "is_no_show": false
         }
@@ -60,19 +67,27 @@ Unchanged auth and query params. Response shape enhanced:
         "completed": 5,
         "no_show": 0
       },
-      "reservations_by_vianda": [...],
+      "reservations_by_vianda": [
+        {
+          "vianda_id": "uuid",
+          "vianda_name": "Grilled Chicken",
+          "count": 10,
+          "completed_count": 7
+        }
+      ],
       "live_locked_count": 10
     }
   ]
 }
 ```
 
-### New fields per order
+### Fields per order
 
 | Field | Type | Description |
 |---|---|---|
 | `vianda_pickup_id` | UUID | Use for `POST /vianda-pickup/{id}/hand-out` and `/complete` |
 | `confirmation_code` | string | 6-digit numeric code. Display alongside each queue entry for visual matching. |
+| `status` | string | Lowercase status value: `pending`, `arrived`, `handed_out`, `completed`, `cancelled`, `active` |
 | `expected_completion_time` | datetime/null | Authoritative pickup deadline. Compute remaining: `expected_completion_time - server_time` |
 | `completion_time` | datetime/null | When order was completed |
 | `countdown_seconds` | int | Server-configured timer duration (currently 300s) |
@@ -81,13 +96,26 @@ Unchanged auth and query params. Response shape enhanced:
 | `pickup_type` | string/null | `self` / `offer` / `request` from pickup preferences |
 | `is_no_show` | bool | `true` when status is Pending and the order's `pickup_time_range` end has passed. Use to filter no-shows out of the active queue and into a "No-Show" dashboard section. |
 
-### New fields per restaurant
+### Fields per restaurant
 
 | Field | Type | Description |
 |---|---|---|
 | `require_kiosk_code_verification` | bool | Whether this restaurant requires code entry (Layer 2) |
 | `pickup_window_start` | string/null | Earliest pickup time (HH:MM) |
 | `pickup_window_end` | string/null | Latest pickup time (HH:MM) |
+| `live_locked_count` | int | Count of promoted (live) pickup records for this restaurant today |
+| `reservations_by_vianda` | array | Per-vianda reservation entries (see below) |
+
+### `reservations_by_vianda` entries
+
+| Field | Type | Description |
+|---|---|---|
+| `vianda_id` | string (UUID) | Vianda identifier |
+| `vianda_name` | string | Product name |
+| `count` | int | Total subscribed reservations for this vianda today |
+| `completed_count` | int | Number of pickups with status `completed` or `handed_out` for this vianda today. Use as the numerator for the prep progress bar: `completed_count / count`. |
+
+**`completed_count` note:** counts pickups with DB status `completed` OR `handed_out`. Status values are lowercase (e.g. `completed`, `handed_out`) — compare with lowercase in frontend code.
 
 ### Timer sync
 

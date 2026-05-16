@@ -3447,6 +3447,23 @@ class OrderSummarySchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ReservationByViandaSchema(BaseModel):
+    """Schema for a per-vianda reservation entry in the daily orders response"""
+
+    vianda_id: str = Field(..., description="Vianda UUID")
+    vianda_name: str = Field(..., description="Product name of the vianda")
+    count: int = Field(..., description="Total reserved (subscribed) count for this vianda today")
+    completed_count: int = Field(
+        0,
+        description=(
+            "Number of pickups with status 'completed' or 'handed_out' for this vianda today. "
+            "Use as the numerator for the prep progress bar: completed_count / count."
+        ),
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class RestaurantDailyOrdersSchema(BaseModel):
     """Schema for a restaurant's daily orders"""
 
@@ -3459,6 +3476,11 @@ class RestaurantDailyOrdersSchema(BaseModel):
     pickup_window_end: str | None = Field(None, description="Latest pickup time (HH:MM)")
     orders: list[DailyOrderItemSchema] = Field(..., description="List of orders for this restaurant")
     summary: OrderSummarySchema = Field(..., description="Summary statistics for this restaurant")
+    reservations_by_vianda: list[ReservationByViandaSchema] = Field(
+        default_factory=list,
+        description="Per-vianda reservation counts with completed_count for the prep view",
+    )
+    live_locked_count: int = Field(0, description="Count of live (promoted) pickup records for this restaurant today")
 
     model_config = ConfigDict(from_attributes=True)
 

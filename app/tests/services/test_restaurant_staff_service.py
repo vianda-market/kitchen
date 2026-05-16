@@ -10,6 +10,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 from app.services.restaurant_staff_service import (
+    _classify_order_status,
     _get_kitchen_day_for_date,
     _group_orders_by_restaurant,
     get_daily_orders,
@@ -523,3 +524,481 @@ class TestRestaurantStaffService:
         assert result[0]["restaurant_name"] == "Alpha Restaurant"
         assert result[1]["restaurant_name"] == "Beta Restaurant"
         assert result[2]["restaurant_name"] == "Zebra Restaurant"
+
+
+class TestStatusFilter:
+    """Tests for the status filter param on get_daily_orders."""
+
+    def _make_row(self, status: str, restaurant_id=None, restaurant_name="Test Restaurant") -> dict:
+        rid = restaurant_id or uuid4()
+        return {
+            "confirmation_code": "ABC123",
+            "status": status,
+            "arrival_time": None,
+            "pickup_time_range": "23:55-23:59",
+            "kitchen_day": "tuesday",
+            "first_initial": "J",
+            "last_initial": "D",
+            "vianda_name": "Chicken",
+            "restaurant_id": rid,
+            "restaurant_name": restaurant_name,
+            "vianda_pickup_id": uuid4(),
+            "expected_completion_time": None,
+            "completion_time": None,
+        }
+
+    def test_status_filter_single_value_appended_to_query(self, mock_db):
+        """Status filter adds AND ppl.status = ANY(%s) clause to SQL."""
+        institution_entity_id = uuid4()
+        order_date = date(2026, 2, 4)
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.return_value = []
+
+            get_daily_orders(institution_entity_id, order_date, None, mock_db, status_filter=["pending"])
+
+            call_args = mock_db_read.call_args
+            query = call_args[0][0]
+            params = call_args[0][1]
+
+            assert "ppl.status = ANY(%s)" in query
+            assert ["pending"] in params
+
+    def test_status_filter_multiple_values(self, mock_db):
+        """Status filter with multiple values passes a list to ANY(%s)."""
+        institution_entity_id = uuid4()
+        order_date = date(2026, 2, 4)
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.return_value = []
+
+            get_daily_orders(
+                institution_entity_id,
+                order_date,
+                None,
+                mock_db,
+                status_filter=["pending", "arrived"],
+            )
+
+            call_args = mock_db_read.call_args
+            params = call_args[0][1]
+
+            assert ["pending", "arrived"] in params
+
+    def test_status_filter_omitted_does_not_add_clause(self, mock_db):
+        """When status_filter is None, no ANY clause is added."""
+        institution_entity_id = uuid4()
+        order_date = date(2026, 2, 4)
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.return_value = []
+
+            get_daily_orders(institution_entity_id, order_date, None, mock_db)
+
+            call_args = mock_db_read.call_args
+            query = call_args[0][0]
+
+            assert "ppl.status = ANY(%s)" not in query
+
+    def test_status_filter_combined_with_is_no_show(self, mock_db):
+        """status_filter and is_no_show_filter can be combined."""
+        institution_entity_id = uuid4()
+        order_date = date(2026, 2, 4)
+        restaurant_id = uuid4()
+
+        # A pending row whose pickup window has clearly not passed (far future)
+        row_no_show = self._make_row("pending", restaurant_id=restaurant_id)
+        row_no_show["pickup_time_range"] = "00:00-00:01"  # window already passed
+        row_arrived = self._make_row("arrived", restaurant_id=restaurant_id)
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            # Main query returns both rows; reservations + live per restaurant
+            mock_db_read.side_effect = [[row_no_show, row_arrived], [], {"count": 2}]
+
+            result = get_daily_orders(
+                institution_entity_id,
+                order_date,
+                None,
+                mock_db,
+                status_filter=["pending"],
+                is_no_show_filter=True,
+            )
+
+            # Only the no-show pending row should survive both filters
+            orders = result["restaurants"][0]["orders"] if result["restaurants"] else []
+            assert all(o["is_no_show"] for o in orders)
+
+
+class TestIsNoShowFilter:
+    """Tests for the is_no_show filter param on get_daily_orders."""
+
+    def _make_base_rows(self, restaurant_id):
+        """Return a list with one pending no-show row and one arrived (non-no-show) row."""
+        # Pickup window guaranteed to be in the past
+        no_show_row = {
+            "confirmation_code": "NS0001",
+            "status": "pending",
+            "arrival_time": None,
+            "pickup_time_range": "00:00-00:01",
+            "kitchen_day": "tuesday",
+            "first_initial": "A",
+            "last_initial": "B",
+            "vianda_name": "Pasta",
+            "restaurant_id": restaurant_id,
+            "restaurant_name": "Test Restaurant",
+            "vianda_pickup_id": uuid4(),
+            "expected_completion_time": None,
+            "completion_time": None,
+        }
+        # Arrived order is never a no-show
+        arrived_row = {
+            "confirmation_code": "AR0002",
+            "status": "arrived",
+            "arrival_time": datetime(2026, 2, 4, 12, 0),
+            "pickup_time_range": "12:00-12:30",
+            "kitchen_day": "tuesday",
+            "first_initial": "C",
+            "last_initial": "D",
+            "vianda_name": "Pasta",
+            "restaurant_id": restaurant_id,
+            "restaurant_name": "Test Restaurant",
+            "vianda_pickup_id": uuid4(),
+            "expected_completion_time": None,
+            "completion_time": None,
+        }
+        return [no_show_row, arrived_row]
+
+    def test_is_no_show_true_returns_only_no_show_orders(self, mock_db):
+        """is_no_show_filter=True keeps only orders classified as no-shows."""
+        institution_entity_id = uuid4()
+        restaurant_id = uuid4()
+        order_date = date(2026, 2, 4)
+        rows = self._make_base_rows(restaurant_id)
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.side_effect = [rows, [], {"count": 1}]
+
+            result = get_daily_orders(institution_entity_id, order_date, None, mock_db, is_no_show_filter=True)
+
+            all_orders = [o for r in result["restaurants"] for o in r["orders"]]
+            assert all(o["is_no_show"] for o in all_orders)
+
+    def test_is_no_show_false_excludes_no_show_orders(self, mock_db):
+        """is_no_show_filter=False excludes no-show orders."""
+        institution_entity_id = uuid4()
+        restaurant_id = uuid4()
+        order_date = date(2026, 2, 4)
+        rows = self._make_base_rows(restaurant_id)
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.side_effect = [rows, [], {"count": 1}]
+
+            result = get_daily_orders(institution_entity_id, order_date, None, mock_db, is_no_show_filter=False)
+
+            all_orders = [o for r in result["restaurants"] for o in r["orders"]]
+            assert all(not o["is_no_show"] for o in all_orders)
+
+    def test_is_no_show_none_returns_all_orders(self, mock_db):
+        """is_no_show_filter=None (default) returns all orders regardless of no-show status."""
+        institution_entity_id = uuid4()
+        restaurant_id = uuid4()
+        order_date = date(2026, 2, 4)
+        rows = self._make_base_rows(restaurant_id)
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.side_effect = [rows, [], {"count": 2}]
+
+            result = get_daily_orders(institution_entity_id, order_date, None, mock_db)
+
+            all_orders = [o for r in result["restaurants"] for o in r["orders"]]
+            assert len(all_orders) == 2
+
+    def test_is_no_show_filter_drops_empty_restaurants(self, mock_db):
+        """Restaurants with no matching orders after filtering are excluded from response."""
+        institution_entity_id = uuid4()
+        restaurant_id = uuid4()
+        order_date = date(2026, 2, 4)
+
+        # Only arrived orders — no no-shows
+        rows = [
+            {
+                "confirmation_code": "AR001",
+                "status": "arrived",
+                "arrival_time": datetime(2026, 2, 4, 12, 0),
+                "pickup_time_range": "12:00-12:30",
+                "kitchen_day": "tuesday",
+                "first_initial": "X",
+                "last_initial": "Y",
+                "vianda_name": "Soup",
+                "restaurant_id": restaurant_id,
+                "restaurant_name": "Empty After Filter",
+                "vianda_pickup_id": uuid4(),
+                "expected_completion_time": None,
+                "completion_time": None,
+            }
+        ]
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.side_effect = [rows]
+
+            result = get_daily_orders(institution_entity_id, order_date, None, mock_db, is_no_show_filter=True)
+
+            # No restaurants should appear since none have no-show orders
+            assert result["restaurants"] == []
+
+
+class TestCompletedCount:
+    """Tests for the completed_count derived field in reservations_by_vianda."""
+
+    def test_completed_count_included_in_reservations_by_vianda(self, mock_db):
+        """completed_count field is present in each reservations_by_vianda entry."""
+        institution_entity_id = uuid4()
+        restaurant_id = uuid4()
+        order_date = date(2026, 2, 4)
+
+        order_row = {
+            "confirmation_code": "AB1234",
+            "status": "completed",
+            "arrival_time": datetime(2026, 2, 4, 12, 0),
+            "pickup_time_range": "12:00-12:30",
+            "kitchen_day": "tuesday",
+            "first_initial": "J",
+            "last_initial": "D",
+            "vianda_name": "Chicken",
+            "restaurant_id": restaurant_id,
+            "restaurant_name": "Test Restaurant",
+            "vianda_pickup_id": uuid4(),
+            "expected_completion_time": None,
+            "completion_time": None,
+        }
+
+        reservation_row = {
+            "vianda_id": uuid4(),
+            "vianda_name": "Chicken",
+            "count": 5,
+            "completed_count": 3,
+        }
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            # Main query, reservations_by_vianda query (returns reservation_row), live_locked_count query
+            mock_db_read.side_effect = [[order_row], [reservation_row], {"count": 1}]
+
+            result = get_daily_orders(institution_entity_id, order_date, None, mock_db)
+
+            reservations = result["restaurants"][0]["reservations_by_vianda"]
+            assert len(reservations) == 1
+            assert "completed_count" in reservations[0]
+            assert reservations[0]["completed_count"] == 3
+
+    def test_completed_count_defaults_to_zero_when_none(self, mock_db):
+        """completed_count defaults to 0 when the DB returns NULL (no pickups yet)."""
+        institution_entity_id = uuid4()
+        restaurant_id = uuid4()
+        order_date = date(2026, 2, 4)
+
+        order_row = {
+            "confirmation_code": "AB1234",
+            "status": "pending",
+            "arrival_time": None,
+            "pickup_time_range": "23:55-23:59",
+            "kitchen_day": "tuesday",
+            "first_initial": "J",
+            "last_initial": "D",
+            "vianda_name": "Salad",
+            "restaurant_id": restaurant_id,
+            "restaurant_name": "Test Restaurant",
+            "vianda_pickup_id": uuid4(),
+            "expected_completion_time": None,
+            "completion_time": None,
+        }
+
+        reservation_row = {
+            "vianda_id": uuid4(),
+            "vianda_name": "Salad",
+            "count": 4,
+            "completed_count": None,  # SQL COUNT FILTER returns NULL when no rows match
+        }
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.side_effect = [[order_row], [reservation_row], {"count": 0}]
+
+            result = get_daily_orders(institution_entity_id, order_date, None, mock_db)
+
+            reservations = result["restaurants"][0]["reservations_by_vianda"]
+            assert reservations[0]["completed_count"] == 0
+
+    def test_completed_count_counts_completed_and_handed_out(self, mock_db):
+        """completed_count counts both 'completed' and 'handed_out' status orders."""
+        institution_entity_id = uuid4()
+        restaurant_id = uuid4()
+        order_date = date(2026, 2, 4)
+
+        # Two orders: one completed, one handed_out
+        rows = [
+            {
+                "confirmation_code": "C00001",
+                "status": "completed",
+                "arrival_time": datetime(2026, 2, 4, 12, 0),
+                "pickup_time_range": "12:00-12:30",
+                "kitchen_day": "tuesday",
+                "first_initial": "A",
+                "last_initial": "B",
+                "vianda_name": "Rice",
+                "restaurant_id": restaurant_id,
+                "restaurant_name": "Test Restaurant",
+                "vianda_pickup_id": uuid4(),
+                "expected_completion_time": None,
+                "completion_time": None,
+            },
+            {
+                "confirmation_code": "H00002",
+                "status": "handed_out",
+                "arrival_time": datetime(2026, 2, 4, 12, 5),
+                "pickup_time_range": "12:00-12:30",
+                "kitchen_day": "tuesday",
+                "first_initial": "C",
+                "last_initial": "D",
+                "vianda_name": "Rice",
+                "restaurant_id": restaurant_id,
+                "restaurant_name": "Test Restaurant",
+                "vianda_pickup_id": uuid4(),
+                "expected_completion_time": None,
+                "completion_time": None,
+            },
+        ]
+
+        reservation_row = {
+            "vianda_id": uuid4(),
+            "vianda_name": "Rice",
+            "count": 3,
+            "completed_count": 2,  # Both completed + handed_out counted
+        }
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.side_effect = [rows, [reservation_row], {"count": 2}]
+
+            result = get_daily_orders(institution_entity_id, order_date, None, mock_db)
+
+            reservations = result["restaurants"][0]["reservations_by_vianda"]
+            assert reservations[0]["completed_count"] == 2
+
+    def test_completed_count_not_counted_for_pending_or_arrived(self, mock_db):
+        """Orders with status pending or arrived do not contribute to completed_count."""
+        institution_entity_id = uuid4()
+        restaurant_id = uuid4()
+        order_date = date(2026, 2, 4)
+
+        rows = [
+            {
+                "confirmation_code": "P00001",
+                "status": "pending",
+                "arrival_time": None,
+                "pickup_time_range": "23:55-23:59",
+                "kitchen_day": "tuesday",
+                "first_initial": "A",
+                "last_initial": "B",
+                "vianda_name": "Soup",
+                "restaurant_id": restaurant_id,
+                "restaurant_name": "Test Restaurant",
+                "vianda_pickup_id": uuid4(),
+                "expected_completion_time": None,
+                "completion_time": None,
+            },
+        ]
+
+        reservation_row = {
+            "vianda_id": uuid4(),
+            "vianda_name": "Soup",
+            "count": 2,
+            "completed_count": 0,  # pending/arrived do not count
+        }
+
+        with (
+            patch("app.services.restaurant_staff_service._get_kitchen_day_for_date") as mock_get_day,
+            patch("app.services.restaurant_staff_service.db_read") as mock_db_read,
+        ):
+            mock_get_day.return_value = "tuesday"
+            mock_db_read.side_effect = [rows, [reservation_row], {"count": 0}]
+
+            result = get_daily_orders(institution_entity_id, order_date, None, mock_db)
+
+            reservations = result["restaurants"][0]["reservations_by_vianda"]
+            assert reservations[0]["completed_count"] == 0
+
+
+class TestClassifyOrderStatus:
+    """Unit tests for _classify_order_status (pure helper, no db param)."""
+
+    def test_no_show_takes_precedence(self):
+        assert _classify_order_status(True, "pending", None) == "no_show"
+
+    def test_pending_status(self):
+        assert _classify_order_status(False, "pending", None) == "pending"
+
+    def test_arrived_status(self):
+        assert _classify_order_status(False, "arrived", datetime(2026, 1, 1, 12, 0)) == "arrived"
+
+    def test_handed_out_with_underscore(self):
+        assert _classify_order_status(False, "handed_out", None) == "handed_out"
+
+    def test_handed_out_with_space(self):
+        assert _classify_order_status(False, "handed out", None) == "handed_out"
+
+    def test_completed(self):
+        assert _classify_order_status(False, "completed", None) == "completed"
+
+    def test_complete_alias(self):
+        assert _classify_order_status(False, "complete", None) == "completed"
+
+    def test_active_no_arrival_maps_to_pending(self):
+        assert _classify_order_status(False, "active", None) == "pending"
+
+    def test_active_with_arrival_maps_to_arrived(self):
+        assert _classify_order_status(False, "active", datetime(2026, 1, 1, 12, 0)) == "arrived"
+
+    def test_unknown_status_falls_back_to_pending(self):
+        assert _classify_order_status(False, "unknown_status", None) == "pending"

@@ -24,7 +24,12 @@ from app.utils.log import log_info, log_warning
 
 
 def get_daily_orders(
-    user_institution_entity_id: UUID, order_date: date, restaurant_id: UUID | None, db: psycopg2.extensions.connection
+    user_institution_entity_id: UUID,
+    order_date: date,
+    restaurant_id: UUID | None,
+    db: psycopg2.extensions.connection,
+    status_filter: list[str] | None = None,
+    is_no_show_filter: bool | None = None,
 ) -> dict[str, Any]:
     """
     Get today's orders for restaurant(s) within an institution entity.
@@ -34,6 +39,12 @@ def get_daily_orders(
         order_date: Date to query orders for
         restaurant_id: Optional specific restaurant filter
         db: Database connection
+        status_filter: Optional list of status values to include (e.g. ['pending', 'arrived']).
+            Accepted values: pending, arrived, handed_out, completed, cancelled, active.
+            Applied at SQL level.
+        is_no_show_filter: Optional boolean to filter by is_no_show derived field.
+            True = only no-show orders; False = exclude no-shows; None = all orders.
+            Applied in the service layer after query, since is_no_show is derived.
 
     Returns:
         Dictionary with date and list of restaurants with their orders
@@ -65,8 +76,8 @@ def get_daily_orders(
         f"date={order_date}, kitchen_day={kitchen_day}, restaurant_id={restaurant_id}"
     )
 
-    # 2. Query all orders for the institution_entity (optionally filtered by restaurant)
-    query = """
+    # 2. Query all orders for the institution_entity (optionally filtered by restaurant/status)
+    base_query = """
         SELECT
             ppl.vianda_pickup_id,
             ppl.confirmation_code,
@@ -98,25 +109,31 @@ def get_daily_orders(
           AND ps.kitchen_day = %s
           AND ppl.is_archived = FALSE
           AND (r.restaurant_id = %s OR %s IS NULL)
-        ORDER BY r.name ASC, ps.pickup_time_range ASC, u.last_name ASC
     """
 
-    params = [
+    params: list[Any] = [
         str(user_institution_entity_id),
         kitchen_day,
         str(restaurant_id) if restaurant_id else None,
         str(restaurant_id) if restaurant_id else None,
     ]
 
+    # Apply optional status filter at SQL level
+    if status_filter:
+        base_query += "          AND ppl.status = ANY(%s)\n"
+        params.append(status_filter)
+
+    base_query += "        ORDER BY r.name ASC, ps.pickup_time_range ASC, u.last_name ASC\n"
+
     # 3. Execute query
-    rows = db_read(query, params, db)
+    rows = db_read(base_query, params, db)
 
     if not rows:
         log_info(f"No orders found for institution_entity_id={user_institution_entity_id}, kitchen_day={kitchen_day}")
         return {"order_date": order_date, "server_time": datetime.now(UTC), "restaurants": []}
 
     # 4. Group orders by restaurant and calculate summary statistics
-    restaurants_data = _group_orders_by_restaurant(rows)
+    restaurants_data = _group_orders_by_restaurant(rows, is_no_show_filter=is_no_show_filter)
 
     # 5. Add reservations_by_vianda and live_locked_count per restaurant
     _add_reservations_and_live_metrics(
@@ -255,12 +272,16 @@ def _compute_pickup_window_for_restaurant(rest: dict[str, Any]) -> None:
         rest["pickup_window_end"] = None
 
 
-def _group_orders_by_restaurant(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _group_orders_by_restaurant(
+    rows: list[dict[str, Any]], is_no_show_filter: bool | None = None
+) -> list[dict[str, Any]]:
     """
     Group orders by restaurant and calculate summary statistics.
 
     Args:
         rows: List of order rows from database query
+        is_no_show_filter: When set, include only orders matching this is_no_show value.
+            True = no-show orders only; False = non-no-show orders only; None = all orders.
 
     Returns:
         List of restaurant dictionaries with orders and summary
@@ -291,6 +312,11 @@ def _group_orders_by_restaurant(rows: list[dict[str, Any]]) -> list[dict[str, An
 
         status_lower = (row["status"] or "").lower()
         is_no_show = _compute_is_no_show(status_lower, row.get("arrival_time"), row.get("pickup_time_range"), now_time)
+
+        # Apply is_no_show filter at service layer (derived field, cannot be pushed to SQL)
+        if is_no_show_filter is not None and is_no_show != is_no_show_filter:
+            continue
+
         order = _build_order_row(row, is_no_show, settings.PICKUP_COUNTDOWN_SECONDS)
         restaurants_dict[restaurant_id]["orders"].append(order)
 
@@ -302,7 +328,8 @@ def _group_orders_by_restaurant(rows: list[dict[str, Any]]) -> list[dict[str, An
     for rest in restaurants_dict.values():
         _compute_pickup_window_for_restaurant(rest)
 
-    restaurants_list = list(restaurants_dict.values())
+    # Exclude restaurants that ended up with no orders after is_no_show filtering
+    restaurants_list = [r for r in restaurants_dict.values() if r["orders"]]
     restaurants_list.sort(key=lambda x: x["restaurant_name"])
     return restaurants_list
 
@@ -322,11 +349,19 @@ def _add_reservations_and_live_metrics(
     for rest in restaurants_data:
         rid = rest["restaurant_id"]
         # reservations_by_vianda: count from vianda_selection_info for this restaurant, kitchen_day, pickup_date
+        # Also derive completed_count (orders with status in completed/handed_out) per vianda
         res_query = """
-            SELECT pl.vianda_id, prod.name AS vianda_name, COUNT(*) AS count
+            SELECT
+                pl.vianda_id,
+                prod.name AS vianda_name,
+                COUNT(*) AS count,
+                COUNT(ppl.vianda_pickup_id) FILTER (
+                    WHERE ppl.status IN ('completed', 'handed_out') AND ppl.is_archived = FALSE
+                ) AS completed_count
             FROM vianda_selection_info ps
             JOIN vianda_info pl ON ps.vianda_id = pl.vianda_id
             JOIN product_info prod ON pl.product_id = prod.product_id
+            LEFT JOIN vianda_pickup_live ppl ON ppl.vianda_selection_id = ps.vianda_selection_id
             WHERE ps.restaurant_id = %s
               AND ps.kitchen_day = %s
               AND ps.pickup_date = %s
@@ -335,7 +370,12 @@ def _add_reservations_and_live_metrics(
         """
         res_rows = db_read(res_query, (str(rid), kitchen_day, order_date.isoformat()), connection=db)
         rest["reservations_by_vianda"] = [
-            {"vianda_id": str(r["vianda_id"]), "vianda_name": r["vianda_name"], "count": r["count"]}
+            {
+                "vianda_id": str(r["vianda_id"]),
+                "vianda_name": r["vianda_name"],
+                "count": r["count"],
+                "completed_count": r["completed_count"] or 0,
+            }
             for r in (res_rows or [])
         ]
         # live_locked_count: count of vianda_pickup_live for this restaurant (today's promoted orders)
