@@ -874,7 +874,6 @@ app/services/restaurant_staff_service.py:0: error: No overload variant of "__get
 app/services/restaurant_staff_service.py:0: error: Module "app.utils.db" has no attribute "db_write"  [attr-defined]
 app/services/restaurant_staff_service.py:0: error: Invalid index type "str" for "str"; expected type "SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]"  [index]
 app/services/restaurant_staff_service.py:0: error: Invalid index type "int" for "dict[str, Any]"; expected type "str"  [index]
-app/services/restaurant_staff_service.py:0: error: Invalid index type "str" for "str"; expected type "SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]"  [index]
 app/services/restaurant_staff_service.py:0: error: Argument 2 to "send_handed_out_push" has incompatible type "str | Any"; expected "UUID"  [arg-type]
 app/services/restaurant_staff_service.py:0: error: Module "app.utils.db" has no attribute "db_write"  [attr-defined]
 app/services/restaurant_staff_service.py:0: error: No overload variant of "__getitem__" of "list" matches argument type "str"  [call-overload]
