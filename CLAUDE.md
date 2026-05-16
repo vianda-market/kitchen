@@ -28,6 +28,7 @@ Read `CLAUDE_ARCHITECTURE.md` before planning new features or modifying data flo
 - Never add a top-level `paths:` / `paths-ignore:` filter to a required-check workflow (currently `ci.yml`, `mutation.yml` — branch protection requires `CI`, `Mutation Tests (Tier 1)`). The check stays "expected, never reported" on PRs the filter excludes, blocking the PR forever with no recourse short of admin override. Filter *inside* the job with `dorny/paths-filter@v4`, and end the job with an unconditional `if: always()` step whose job `name:` matches the required-check context. `ci.yml`'s top-of-file comment already documents this trap explicitly — preserve it.
 - Never tighten `Settings extra="ignore"` in `app/config/settings.py` without a coordinated cross-repo plan. The flag is what makes kitchen ↔ infra-kitchen-gcp env-var migrations order-independent; tightening turns every new env var into a strict deploy ordering.
 - Never seed multi-country fixtures under a single shared institution. The `restaurant → institution → institution_market → market.country_code` JOIN leaks across countries; use one demo-supplier institution per country, scoped to that country's `market_id`.
+- Merge PRs freely once CI is green AND the PR branch is up to date with `main` — no need to ask for sign-off unless the user has explicitly paused work. Never force-push to `main`, never bypass hooks (`--no-verify`), never bypass branch protection. If CI is red, unstable, or the PR touches infra/contracts that warrant a final review, ask first.
 
 ---
 
